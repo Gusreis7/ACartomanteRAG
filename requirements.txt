@@ -2,3 +2,4 @@ PyMuPDF
 pandas
 spacy
 plotly
+statsmodels
