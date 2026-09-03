@@ -1,2 +1,4 @@
-pypdf
+PyMuPDF
+pandas
 spacy
+plotly
