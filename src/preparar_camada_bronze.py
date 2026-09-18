@@ -13,19 +13,23 @@ Saídas:
 A camada raw não é alterada.
 
 Metadados calculados:
-    - is_carta
-    - qtd_assinaturas_machado
-    - is_coletanea
-    - qtd_titulos_similares
-    - titulos_similares
+    - categoria
+
+Categorias:
+    - Crítica
+    - Carta
+    - Coletânea
+    - Teatro
+    - Poema/Cântico
+    - Romance/Conto
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import unicodedata
+from collections import Counter
 from difflib import SequenceMatcher
 from pathlib import Path
 
@@ -62,16 +66,33 @@ DEFAULT_SIMILARIDADE_THRESHOLD = 0.1
 DEFAULT_QTD_TITULOS_COLETANEA = 2
 DEFAULT_TAMANHO_FRAGMENTO = 1000
 DEFAULT_TAMANHO_MINIMO_FRAGMENTO = 100
-DEFAULT_MIN_ASSINATURAS_CARTA = 10
 
-TITULOS_CARTA_EXPLICITOS = {
-    "correspondencia de machado de assis",
-    "pareceres de machado de assis",
+DEFAULT_MIN_ASSINATURAS_CARTA = 5
+
+DEFAULT_MAX_PALAVRAS_LINHA_POEMA = 10
+DEFAULT_MIN_PCT_LINHAS_CURTAS_POEMA = 0.85
+
+DEFAULT_MIN_REPETICOES_LOCUTOR = 3
+DEFAULT_MIN_LOCUTORES_TEATRO = 2
+DEFAULT_MIN_TURNOS_TEATRO = 10
+DEFAULT_MIN_PCT_LOCUTORES_TEATRO = 0.91
+
+CRITICAS_MANUAIS = {
+    "textos críticos",
+    "críticas teatrais",
 }
 
-TITULOS_EXCLUIR_CARTA = {
-    "na academia brasileira de letras",
-    "criticas teatrais",
+PALAVRAS_ESTRUTURA_TEATRO = {
+    "cena",
+    "ato",
+    "quadro",
+    "prólogo",
+    "prologo",
+    "epílogo",
+    "epilogo",
+    "capítulo",
+    "capitulo",
+    "canto",
 }
 
 
@@ -164,8 +185,40 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_MIN_ASSINATURAS_CARTA,
         help=(
             "Número de assinaturas acima do qual o documento "
-            "é classificado como correspondência. "
+            "é classificado como carta/correspondência. "
             f"Padrão: > {DEFAULT_MIN_ASSINATURAS_CARTA}"
+        ),
+    )
+
+    parser.add_argument(
+        "--max-palavras-linha-poema",
+        type=int,
+        default=DEFAULT_MAX_PALAVRAS_LINHA_POEMA,
+        help=(
+            "Máximo de palavras para considerar uma linha curta "
+            "na heurística de poema/cântico. "
+            f"Padrão: {DEFAULT_MAX_PALAVRAS_LINHA_POEMA}"
+        ),
+    )
+
+    parser.add_argument(
+        "--min-pct-linhas-curtas-poema",
+        type=float,
+        default=DEFAULT_MIN_PCT_LINHAS_CURTAS_POEMA,
+        help=(
+            "Percentual mínimo de linhas curtas para poema/cântico. "
+            f"Padrão: {DEFAULT_MIN_PCT_LINHAS_CURTAS_POEMA}"
+        ),
+    )
+
+    parser.add_argument(
+        "--min-pct-locutores-teatro",
+        type=float,
+        default=DEFAULT_MIN_PCT_LOCUTORES_TEATRO,
+        help=(
+            "Percentual mínimo de candidatos pertencentes a locutores "
+            "recorrentes para classificar como teatro. "
+            f"Padrão: {DEFAULT_MIN_PCT_LOCUTORES_TEATRO}"
         ),
     )
 
@@ -409,6 +462,211 @@ def normalizar_linha(texto: str) -> str:
 
 
 # ============================================================
+# HEURÍSTICA DE POEMAS / CÂNTICOS
+# ============================================================
+
+
+def avaliar_estrutura_poetica(
+    texto: str,
+    max_palavras_linha: int = DEFAULT_MAX_PALAVRAS_LINHA_POEMA,
+    min_pct_linhas_curtas: float = DEFAULT_MIN_PCT_LINHAS_CURTAS_POEMA,
+) -> dict:
+    linhas = [
+        linha.strip()
+        for linha in texto.splitlines()
+        if linha.strip()
+    ]
+
+    if not linhas:
+        return {
+            "is_poema": False,
+            "qtd_linhas": 0,
+            "qtd_linhas_curtas": 0,
+            "pct_linhas_curtas": 0.0,
+        }
+
+    qtd_linhas_curtas = sum(
+        len(linha.split()) <= max_palavras_linha
+        for linha in linhas
+    )
+
+    pct_linhas_curtas = qtd_linhas_curtas / len(linhas)
+
+    return {
+        "is_poema": pct_linhas_curtas >= min_pct_linhas_curtas,
+        "qtd_linhas": len(linhas),
+        "qtd_linhas_curtas": qtd_linhas_curtas,
+        "pct_linhas_curtas": pct_linhas_curtas,
+    }
+
+
+# ============================================================
+# HEURÍSTICA DE TEATRO
+# ============================================================
+
+
+def normalizar_locutor(linha: str) -> str:
+    linha = linha.strip().casefold()
+    linha = linha.strip(".,;:!?\"'()[]{}—–-")
+    return re.sub(r"\s+", " ", linha)
+
+
+def linha_parece_locutor(
+    linha: str,
+    max_palavras: int = 4,
+    max_chars: int = 40,
+) -> bool:
+    linha = linha.strip()
+
+    if not linha or len(linha) > max_chars:
+        return False
+
+    palavras = linha.split()
+
+    if len(palavras) > max_palavras:
+        return False
+
+    primeira_palavra = (
+        palavras[0]
+        .strip(".,;:!?\"'()[]{}—–-")
+        .casefold()
+    )
+
+    if primeira_palavra in PALAVRAS_ESTRUTURA_TEATRO:
+        return False
+
+    letras = [char for char in linha if char.isalpha()]
+
+    if not letras:
+        return False
+
+    proporcao_maiusculas = (
+        sum(char.isupper() for char in letras)
+        / len(letras)
+    )
+
+    return proporcao_maiusculas >= 0.90
+
+
+def extrair_locutor_linha(linha: str) -> str | None:
+    linha = linha.strip()
+
+    if not linha:
+        return None
+
+    if linha_parece_locutor(linha):
+        return normalizar_locutor(linha)
+
+    match = re.match(
+        r"""
+        ^
+        (?P<locutor>
+            [A-ZÁÀÂÃÉÊÍÓÔÕÚÜÇ]
+            [A-ZÁÀÂÃÉÊÍÓÔÕÚÜÇ\s.'-]{0,39}?
+        )
+        \s*
+        (?:
+            :|
+            \.|
+            —|
+            –|
+            -
+        )
+        \s*
+        (?P<fala>\S.+)
+        $
+        """,
+        linha,
+        flags=re.VERBOSE,
+    )
+
+    if not match:
+        return None
+
+    locutor = match.group("locutor").strip()
+
+    if not linha_parece_locutor(locutor):
+        return None
+
+    return normalizar_locutor(locutor)
+
+
+def avaliar_estrutura_teatral(
+    texto: str,
+    min_repeticoes_locutor: int = DEFAULT_MIN_REPETICOES_LOCUTOR,
+    min_locutores: int = DEFAULT_MIN_LOCUTORES_TEATRO,
+    min_turnos: int = DEFAULT_MIN_TURNOS_TEATRO,
+    min_pct_locutores_recorrentes: float = DEFAULT_MIN_PCT_LOCUTORES_TEATRO,
+) -> dict:
+    linhas = [
+        linha.strip()
+        for linha in texto.splitlines()
+        if linha.strip()
+    ]
+
+    candidatos = []
+
+    for indice, linha in enumerate(linhas):
+        locutor = extrair_locutor_linha(linha)
+
+        if locutor is None:
+            continue
+
+        candidatos.append(
+            {
+                "indice": indice,
+                "linha": linha,
+                "locutor": locutor,
+            }
+        )
+
+    contagem = Counter(
+        candidato["locutor"]
+        for candidato in candidatos
+    )
+
+    locutores_recorrentes = {
+        locutor
+        for locutor, qtd in contagem.items()
+        if qtd >= min_repeticoes_locutor
+    }
+
+    turnos_recorrentes = [
+        candidato
+        for candidato in candidatos
+        if candidato["locutor"] in locutores_recorrentes
+    ]
+
+    qtd_turnos = len(turnos_recorrentes)
+
+    pct_locutores_recorrentes = (
+        qtd_turnos / len(candidatos)
+        if candidatos
+        else 0.0
+    )
+
+    is_teatro = (
+        len(locutores_recorrentes) >= min_locutores
+        and qtd_turnos >= min_turnos
+        and pct_locutores_recorrentes
+        >= min_pct_locutores_recorrentes
+    )
+
+    return {
+        "is_teatro": is_teatro,
+        "qtd_candidatos_locutor": len(candidatos),
+        "qtd_locutores_recorrentes": len(locutores_recorrentes),
+        "qtd_turnos": qtd_turnos,
+        "pct_locutores_recorrentes": pct_locutores_recorrentes,
+        "locutores": sorted(locutores_recorrentes),
+        "contagem_locutores": {
+            locutor: contagem[locutor]
+            for locutor in sorted(locutores_recorrentes)
+        },
+    }
+
+
+# ============================================================
 # HEURÍSTICA DE CARTAS
 # ============================================================
 
@@ -455,6 +713,21 @@ def encontrar_assinaturas_machado(
         )
 
     return assinaturas
+
+
+
+
+def avaliar_carta(
+    texto: str,
+    qtd_assinaturas_minima: int = DEFAULT_MIN_ASSINATURAS_CARTA,
+) -> dict:
+    assinaturas = encontrar_assinaturas_machado(texto)
+
+    return {
+        "is_carta": len(assinaturas) > qtd_assinaturas_minima,
+        "qtd_assinaturas_machado": len(assinaturas),
+        "assinaturas": assinaturas,
+    }
 
 
 # ============================================================
@@ -817,45 +1090,31 @@ def main() -> None:
             "texto_bronze": row["_texto_bronze"],
         }
 
-    print("[+] Calculando flags de carta e coletânea...")
+    print("[+] Classificando categorias das obras...")
 
-    qtd_assinaturas = []
-    flags_carta = []
-
-    qtd_titulos_similares = []
-    titulos_similares_col = []
-    flags_coletanea = []
+    categorias = []
 
     for _, row in df.iterrows():
+        titulo = str(row["titulo"])
         texto = row["_texto_bronze"]
 
-        # Carta
-        assinaturas = encontrar_assinaturas_machado(texto)
-
-        qtd_assinaturas.append(len(assinaturas))
-
-        titulo_norm = normalizar_texto(
-            row["titulo"]
+        is_critica = (
+            titulo.strip().casefold()
+            in CRITICAS_MANUAIS
         )
 
-        is_carta = (
-            titulo_norm in TITULOS_CARTA_EXPLICITOS
-            or (
-                len(assinaturas) > args.min_assinaturas_carta
-                and titulo_norm not in TITULOS_EXCLUIR_CARTA
-            )
+        resultado_carta = avaliar_carta(
+            texto=texto,
+            qtd_assinaturas_minima=(
+                args.min_assinaturas_carta
+            ),
         )
 
-        flags_carta.append(
-            is_carta
-        )
-
-        # Coletânea
         resultado_coletanea = avaliar_coletanea(
             texto=texto,
-            titulo_atual=row["titulo"],
-            titulos_normalizados=(titulos_normalizados),
-            titulos_info=(titulos_info),
+            titulo_atual=titulo,
+            titulos_normalizados=titulos_normalizados,
+            titulos_info=titulos_info,
             similaridade_threshold=(
                 args.similaridade_threshold
             ),
@@ -870,26 +1129,41 @@ def main() -> None:
             ),
         )
 
-        qtd_titulos_similares.append(resultado_coletanea["qtd_titulos_similares"])
-
-        titulos_similares_col.append(
-            json.dumps(
-                resultado_coletanea["titulos_similares"],
-                ensure_ascii=False,
-            )
+        resultado_teatro = avaliar_estrutura_teatral(
+            texto=texto,
+            min_pct_locutores_recorrentes=(
+                args.min_pct_locutores_teatro
+            ),
         )
 
-        flags_coletanea.append(resultado_coletanea["is_coletanea"])
+        resultado_poema = avaliar_estrutura_poetica(
+            texto=texto,
+            max_palavras_linha=(
+                args.max_palavras_linha_poema
+            ),
+            min_pct_linhas_curtas=(
+                args.min_pct_linhas_curtas_poema
+            ),
+        )
 
-    df["qtd_assinaturas_machado"] = qtd_assinaturas
+        # As heurísticas não são mutuamente exclusivas.
+        # Mantemos a mesma prioridade validada no notebook.
+        if is_critica:
+            categoria = "Crítica"
+        elif resultado_carta["is_carta"]:
+            categoria = "Carta"
+        elif resultado_coletanea["is_coletanea"]:
+            categoria = "Coletânea"
+        elif resultado_teatro["is_teatro"]:
+            categoria = "Teatro"
+        elif resultado_poema["is_poema"]:
+            categoria = "Poema/Cântico"
+        else:
+            categoria = "Romance/Conto"
 
-    df["is_carta"] = flags_carta
+        categorias.append(categoria)
 
-    df["qtd_titulos_similares"] = qtd_titulos_similares
-
-    df["titulos_similares"] = titulos_similares_col
-
-    df["is_coletanea"] = flags_coletanea
+    df["categoria"] = categorias
 
     df["bronze_text_path"] = df["_pdf_path_resolvido"].apply(
         lambda path: caminho_relativo_projeto(
@@ -908,7 +1182,8 @@ def main() -> None:
         inplace=True,
     )
 
-    # Metadata bronze enxuto.
+    # Metadata bronze enxuto:
+    # os flags intermediários das heurísticas não são persistidos.
     colunas_metadata = [
         "titulo",
         "autor",
@@ -916,11 +1191,7 @@ def main() -> None:
         "acessos",
         "pdf_path",
         "bronze_text_path",
-        "qtd_assinaturas_machado",
-        "is_carta",
-        "qtd_titulos_similares",
-        "titulos_similares",
-        "is_coletanea",
+        "categoria",
     ]
 
     colunas_metadata = [
@@ -929,21 +1200,30 @@ def main() -> None:
         if coluna in df.columns
     ]
 
-    df = df[
-        colunas_metadata
-    ].copy()
+    df = df[colunas_metadata].copy()
 
     df.to_csv(
         output_metadata,
         index=False,
     )
 
+    distribuicao = df["categoria"].value_counts()
+
     print()
     print("[OK] Camada bronze criada.")
     print(f"     Textos:   {bronze_dir}")
     print(f"     Metadata: {output_metadata}")
-    print(f"     Cartas detectadas: " f"{int(df['is_carta'].sum())}")
-    print(f"     Coletâneas detectadas: " f"{int(df['is_coletanea'].sum())}")
+
+    print()
+    print("[+] Distribuição por categoria:")
+
+    for categoria, quantidade in distribuicao.items():
+        percentual = quantidade / len(df) * 100
+
+        print(
+            f"     {categoria}: "
+            f"{quantidade} ({percentual:.2f}%)"
+        )
 
 
 if __name__ == "__main__":
