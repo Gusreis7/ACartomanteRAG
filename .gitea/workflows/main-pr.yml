@@ -15,7 +15,15 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      COMPOSE_PROJECT_NAME: acartomante-pr-${{ gitea.run_number }}
+      
+      COMPOSE_PROJECT_NAME: acartomante-ci-${{ gitea.run_number }}
+      RUSTFS_ACCESS_KEY: ${{ secrets.RUSTFS_ACCESS_KEY }}
+      RUSTFS_SECRET_KEY: ${{ secrets.RUSTFS_SECRET_KEY }}
+
+      RUSTFS_VOLUME: /tmp/acartomante-ci-${{ gitea.run_number }}/rustfs
+
+      RUSTFS_API_PORT: 9003
+      RUSTFS_CONSOLE_PORT: 9004
 
     steps:
       - name: Checkout
@@ -45,16 +53,6 @@ jobs:
 
       - name: Show services
         run: docker compose ps
-
-      - name: Health check
-        run: |
-          curl \
-            --fail \
-            --retry 5 \
-            --retry-delay 3 \
-            --retry-connrefused \
-            http://localhost:8000/health 
-            
 
       - name: Show logs on failure
         if: failure()

@@ -1,0 +1,62 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: deploy-production
+    runs-on: ubuntu-latest
+
+    env:
+      COMPOSE_PROJECT_NAME: acartomante-prod
+
+      RUSTFS_ACCESS_KEY: ${{ secrets.RUSTFS_ACCESS_KEY }}
+      RUSTFS_SECRET_KEY: ${{ secrets.RUSTFS_SECRET_KEY }}
+
+      RUSTFS_VOLUME: /home/gustavo/Volumes/rustfs
+
+      RUSTFS_API_PORT: 9000
+      RUSTFS_CONSOLE_PORT: 9001
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show deployment info
+        run: |
+          echo "Deploying commit:"
+          git rev-parse HEAD
+
+          echo "Branch:"
+          echo "${{ gitea.ref }}"
+
+      - name: Prepare production storage
+        run: |
+          mkdir -p "$RUSTFS_VOLUME"
+
+      - name: Validate Docker Compose
+        run: docker compose config --quiet
+
+      - name: Pull images
+        run: docker compose pull
+
+      - name: Build services
+        run: docker compose build
+
+      - name: Deploy production
+        run: |
+          docker compose up \
+            --detach \
+            --wait \
+            --wait-timeout 120 \
+            --remove-orphans
+
+      - name: Show production services
+        run: docker compose ps
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs --no-color

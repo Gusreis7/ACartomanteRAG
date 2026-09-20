@@ -16,8 +16,11 @@ jobs:
       RUSTFS_ACCESS_KEY: ${{ secrets.RUSTFS_ACCESS_KEY }}
       RUSTFS_SECRET_KEY: ${{ secrets.RUSTFS_SECRET_KEY }}
 
-      # Storage descartável exclusivo desta execução.
       RUSTFS_VOLUME: /tmp/acartomante-ci-${{ gitea.run_number }}/rustfs
+
+      #portas de ci // evitar colisão quando a aplicação estiver em prod
+      RUSTFS_API_PORT: 9003
+      RUSTFS_CONSOLE_PORT: 9004
 
     steps:
       - name: Checkout

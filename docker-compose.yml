@@ -18,7 +18,6 @@ services:
 
   rustfs:
     image: rustfs/rustfs:1.0.0
-    container_name: acartomante-rustfs
 
     depends_on:
       volume-permission-helper:
@@ -28,14 +27,13 @@ services:
       - no-new-privileges:true
 
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${RUSTFS_API_PORT}:9000"
+      - "${RUSTFS_CONSOLE_PORT}:9001"
 
     environment:
       RUSTFS_VOLUMES: /data
 
       RUSTFS_ADDRESS: 0.0.0.0:9000
-
       RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
       RUSTFS_CONSOLE_ENABLE: "true"
 
