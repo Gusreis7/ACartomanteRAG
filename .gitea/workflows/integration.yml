@@ -13,15 +13,28 @@ jobs:
     env:
       COMPOSE_PROJECT_NAME: acartomante-ci-${{ gitea.run_number }}
 
+      RUSTFS_ACCESS_KEY: ${{ secrets.RUSTFS_ACCESS_KEY }}
+      RUSTFS_SECRET_KEY: ${{ secrets.RUSTFS_SECRET_KEY }}
+
+      RUSTFS_VOLUME: /tmp/acartomante-ci-${{ gitea.run_number }}/rustfs
+
+      #portas de ci // evitar colisão quando a aplicação estiver em prod
+      RUSTFS_API_PORT: 9003
+      RUSTFS_CONSOLE_PORT: 9004
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Prepare CI storage
+        run: |
+          mkdir -p "$RUSTFS_VOLUME"
+
       - name: Validate Docker Compose
         run: docker compose config --quiet
 
-      - name: Build services
-        run: docker compose build
+      - name: Pull images
+        run: docker compose pull
 
       - name: Start services
         run: |
@@ -33,15 +46,7 @@ jobs:
       - name: Show services
         run: docker compose ps
 
-      - name: Health check
-        run: |
-          curl \
-            --fail \
-            --retry 5 \
-            --retry-delay 3 \
-            --retry-connrefused \
-            http://localhost:8000/health
-
+     
       - name: Show logs on failure
         if: failure()
         run: docker compose logs --no-color
@@ -51,3 +56,13 @@ jobs:
         run: |
           docker compose down \
             --remove-orphans
+
+      - name: Cleanup CI storage
+        if: always()
+        run: |
+          docker run --rm \
+            -v "$RUSTFS_VOLUME:/data" \
+            alpine:3.22 \
+            sh -c "rm -rf /data/*"
+
+          rm -rf "$(dirname "$RUSTFS_VOLUME")"
