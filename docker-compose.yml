@@ -35,6 +35,7 @@ services:
       RUSTFS_VOLUMES: /data
 
       RUSTFS_ADDRESS: 0.0.0.0:9000
+
       RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
       RUSTFS_CONSOLE_ENABLE: "true"
 
@@ -45,5 +46,18 @@ services:
 
     volumes:
       - ${RUSTFS_VOLUME}:/data
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "sh",
+          "-ec",
+          "curl -fsS http://127.0.0.1:9000/health && curl -fsS http://127.0.0.1:9001/rustfs/console/health"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
     restart: unless-stopped
