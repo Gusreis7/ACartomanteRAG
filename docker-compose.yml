@@ -1,0 +1,49 @@
+services:
+  volume-permission-helper:
+    image: alpine:3.22
+    user: root
+
+    volumes:
+      - ${RUSTFS_VOLUME}:/data
+
+    command:
+      [
+        "sh",
+        "-c",
+        "mkdir -p /data && chown -R 10001:10001 /data"
+      ]
+
+    restart: "no"
+
+
+  rustfs:
+    image: rustfs/rustfs:1.0.0
+    container_name: acartomante-rustfs
+
+    depends_on:
+      volume-permission-helper:
+        condition: service_completed_successfully
+
+    security_opt:
+      - no-new-privileges:true
+
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+    environment:
+      RUSTFS_VOLUMES: /data
+
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_CONSOLE_ENABLE: "true"
+
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY}
+
+      RUSTFS_OBS_LOGGER_LEVEL: info
+
+    volumes:
+      - ${RUSTFS_VOLUME}:/data
+
+    restart: unless-stopped
