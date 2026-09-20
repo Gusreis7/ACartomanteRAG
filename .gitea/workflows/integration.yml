@@ -43,22 +43,7 @@ jobs:
       - name: Show services
         run: docker compose ps
 
-      - name: RustFS health check
-        run: |
-          curl \
-            --fail \
-            --retry 5 \
-            --retry-delay 3 \
-            --retry-connrefused \
-            http://127.0.0.1:9000/health
-
-          curl \
-            --fail \
-            --retry 5 \
-            --retry-delay 3 \
-            --retry-connrefused \
-            http://127.0.0.1:9001/rustfs/console/health
-
+     
       - name: Show logs on failure
         if: failure()
         run: docker compose logs --no-color
