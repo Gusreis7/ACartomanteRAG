@@ -1,9 +1,17 @@
-import os
+from __future__ import annotations
+
 from pathlib import Path
+from typing import Protocol
 
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
+
+
+class RustFSConfigProtocol(Protocol):
+    endpoint: str
+    access_key: str
+    secret_key: str
 
 
 class RustFSManager:
@@ -13,7 +21,7 @@ class RustFSManager:
         access_key: str,
         secret_key: str,
         region: str = "us-east-1",
-    ):
+    ) -> None:
         self.client = boto3.client(
             "s3",
             endpoint_url=endpoint,
@@ -29,14 +37,32 @@ class RustFSManager:
         )
 
     @classmethod
-    def from_env(cls) -> "RustFSManager":
+    def from_config(
+        cls,
+        config: RustFSConfigProtocol,
+        region: str = "us-east-1",
+    ) -> "RustFSManager":
+        """
+        Cria o manager a partir da configuração RustFS já resolvida
+        pelo ConfigManager.
+
+        Exemplo:
+            config = ConfigManager.load()
+            storage = RustFSManager.from_config(
+                config.environment.rustfs
+            )
+        """
         return cls(
-            endpoint=os.environ["RUSTFS_ENDPOINT"],
-            access_key=os.environ["RUSTFS_ACCESS_KEY"],
-            secret_key=os.environ["RUSTFS_SECRET_KEY"],
+            endpoint=config.endpoint,
+            access_key=config.access_key,
+            secret_key=config.secret_key,
+            region=region,
         )
 
-    def create_bucket(self, bucket: str) -> None:
+    def create_bucket(
+        self,
+        bucket: str,
+    ) -> None:
         if self.bucket_exists(bucket):
             return
 
@@ -44,15 +70,29 @@ class RustFSManager:
             Bucket=bucket,
         )
 
-    def bucket_exists(self, bucket: str) -> bool:
+    def bucket_exists(
+        self,
+        bucket: str,
+    ) -> bool:
         try:
             self.client.head_bucket(
                 Bucket=bucket,
             )
             return True
 
-        except ClientError:
-            return False
+        except ClientError as exc:
+            status = exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+
+            error_code = exc.response.get("Error", {}).get("Code")
+
+            if status == 404 or error_code in {
+                "404",
+                "NoSuchBucket",
+                "NotFound",
+            }:
+                return False
+
+            raise
 
     def object_exists(
         self,
@@ -67,12 +107,15 @@ class RustFSManager:
             return True
 
         except ClientError as exc:
-            status = exc.response.get(
-                "ResponseMetadata",
-                {},
-            ).get("HTTPStatusCode")
+            status = exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
 
-            if status == 404:
+            error_code = exc.response.get("Error", {}).get("Code")
+
+            if status == 404 or error_code in {
+                "404",
+                "NoSuchKey",
+                "NotFound",
+            }:
                 return False
 
             raise
@@ -83,6 +126,11 @@ class RustFSManager:
         key: str,
         local_path: str | Path,
     ) -> None:
+        local_path = Path(local_path)
+
+        if not local_path.is_file():
+            raise FileNotFoundError(f"Arquivo não encontrado: {local_path}")
+
         self.client.upload_file(
             Filename=str(local_path),
             Bucket=bucket,
@@ -102,10 +150,12 @@ class RustFSManager:
             "Body": data,
         }
 
-        if content_type:
+        if content_type is not None:
             kwargs["ContentType"] = content_type
 
-        self.client.put_object(**kwargs)
+        self.client.put_object(
+            **kwargs,
+        )
 
     def download_file(
         self,
@@ -145,7 +195,7 @@ class RustFSManager:
     ) -> list[str]:
         paginator = self.client.get_paginator("list_objects_v2")
 
-        keys = []
+        keys: list[str] = []
 
         for page in paginator.paginate(
             Bucket=bucket,
