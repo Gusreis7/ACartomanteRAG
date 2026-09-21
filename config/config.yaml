@@ -1,6 +1,7 @@
 storage:
   raw_bucket: acartomante-raw
   bronze_bucket: acartomante-bronze
+  silver_bucket: acartomante-silver
 
 bronze:
   coletanea:
@@ -21,3 +22,26 @@ bronze:
     min_locutores: 2
     min_turnos: 10
     min_pct_locutores: 0.91
+
+silver:
+  pipeline_version: 1
+
+  chunking:
+    strategy: hybrid
+    tokenizer: roberta_crawl_pt # tokenizer principal a ser usado, importante estar versionado
+    chunk_size: 512
+    overlap: 64
+
+  tokenizers:
+    # configuracoes de tokenizers definidos
+    roberta_crawl_pt:
+      model: eduagarcia/RoBERTaCrawlPT-base
+      revision: main
+
+    bertimbau:
+      model: neuralmind/bert-base-portuguese-cased
+      revision: main
+
+  semantic:
+    min_capitulos: 2
+    min_mediana_chars: 200
