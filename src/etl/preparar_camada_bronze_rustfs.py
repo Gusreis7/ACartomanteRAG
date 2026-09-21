@@ -36,7 +36,6 @@ Categorias:
 from __future__ import annotations
 
 import argparse
-import os
 import re
 import tempfile
 import unicodedata
@@ -47,12 +46,9 @@ from pathlib import Path
 
 import pandas as pd
 import pymupdf
-from dotenv import load_dotenv
 
+from src.config.config_manager import ConfigManager
 from src.storage.rustfs_manager import RustFSManager
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_ENV_PATH = PROJECT_ROOT / "config" / ".env"
 
 DEFAULT_RAW_MANIFEST_KEY = "manifests/obras_raw.parquet"
 DEFAULT_BRONZE_MANIFEST_KEY = "manifests/obras_bronze.parquet"
@@ -103,86 +99,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--env-file",
         type=Path,
-        default=DEFAULT_ENV_PATH,
+        default=None,
         help=(
-            "Arquivo .env com as configurações do RustFS. "
-            f"Padrão: {DEFAULT_ENV_PATH}"
+            "Sobrescreve o .env padrão do ConfigManager. "
+            "Se omitido, usa config/.env."
         ),
     )
 
     parser.add_argument(
-        "--raw-bucket",
+        "--config-file",
+        type=Path,
         default=None,
-        help="Sobrescreve RUSTFS_RAW_BUCKET definido no .env.",
-    )
-
-    parser.add_argument(
-        "--bronze-bucket",
-        default=None,
-        help="Sobrescreve RUSTFS_BRONZE_BUCKET definido no .env.",
-    )
-
-    parser.add_argument(
-        "--raw-manifest-key",
-        default=DEFAULT_RAW_MANIFEST_KEY,
-    )
-
-    parser.add_argument(
-        "--bronze-manifest-key",
-        default=DEFAULT_BRONZE_MANIFEST_KEY,
-    )
-
-    parser.add_argument(
-        "--bronze-text-prefix",
-        default=DEFAULT_BRONZE_TEXT_PREFIX,
-    )
-
-    parser.add_argument(
-        "--similaridade-threshold",
-        type=float,
-        default=DEFAULT_SIMILARIDADE_THRESHOLD,
-    )
-
-    parser.add_argument(
-        "--qtd-titulos-coletanea",
-        type=int,
-        default=DEFAULT_QTD_TITULOS_COLETANEA,
-    )
-
-    parser.add_argument(
-        "--tamanho-fragmento",
-        type=int,
-        default=DEFAULT_TAMANHO_FRAGMENTO,
-    )
-
-    parser.add_argument(
-        "--tamanho-minimo-fragmento",
-        type=int,
-        default=DEFAULT_TAMANHO_MINIMO_FRAGMENTO,
-    )
-
-    parser.add_argument(
-        "--min-assinaturas-carta",
-        type=int,
-        default=DEFAULT_MIN_ASSINATURAS_CARTA,
-    )
-
-    parser.add_argument(
-        "--max-palavras-linha-poema",
-        type=int,
-        default=DEFAULT_MAX_PALAVRAS_LINHA_POEMA,
-    )
-
-    parser.add_argument(
-        "--min-pct-linhas-curtas-poema",
-        type=float,
-        default=DEFAULT_MIN_PCT_LINHAS_CURTAS_POEMA,
-    )
-
-    parser.add_argument(
-        "--min-pct-locutores-teatro",
-        type=float,
-        default=DEFAULT_MIN_PCT_LOCUTORES_TEATRO,
+        help=(
+            "Sobrescreve o YAML padrão do ConfigManager. "
+            "Se omitido, usa config/config.yaml."
+        ),
     )
 
     return parser.parse_args()
@@ -1070,41 +1001,34 @@ def bronze_object_key(
 def main() -> None:
     args = parse_args()
 
-    if args.env_file.exists():
-        load_dotenv(
-            dotenv_path=args.env_file,
-            override=False,
-        )
-        print(f"[+] Configuração carregada de: {args.env_file}")
-    else:
-        print(
-            f"[AVISO] Arquivo .env não encontrado: {args.env_file}. "
-            "Usando apenas variáveis já presentes no ambiente."
-        )
+    config_kwargs = {}
 
-    raw_bucket = args.raw_bucket or os.getenv(
-        "RUSTFS_RAW_BUCKET",
-        "acartomante-raw",
-    )
+    if args.env_file is not None:
+        config_kwargs["env_file"] = args.env_file
 
-    bronze_bucket = args.bronze_bucket or os.getenv(
-        "RUSTFS_BRONZE_BUCKET",
-        "acartomante-bronze",
-    )
+    if args.config_file is not None:
+        config_kwargs["yaml_file"] = args.config_file
 
-    storage = RustFSManager.from_env()
+    config = ConfigManager.load(**config_kwargs)
+
+    raw_bucket = config.storage.raw_bucket
+    bronze_bucket = config.storage.bronze_bucket
+
+    storage = RustFSManager.from_config(config.environment.rustfs)
 
     if not storage.bucket_exists(raw_bucket):
         raise RuntimeError(f"Bucket Raw não encontrado: {raw_bucket}")
 
     storage.create_bucket(bronze_bucket)
 
-    print(f"[+] Lendo manifest Raw: " f"s3://{raw_bucket}/{args.raw_manifest_key}")
+    print(f"[+] Bucket Raw:    {raw_bucket}")
+    print(f"[+] Bucket Bronze: {bronze_bucket}")
+    print(f"[+] Lendo manifest Raw: " f"s3://{raw_bucket}/{DEFAULT_RAW_MANIFEST_KEY}")
 
     raw_manifest = carregar_parquet_rustfs(
         storage=storage,
         bucket=raw_bucket,
-        key=args.raw_manifest_key,
+        key=DEFAULT_RAW_MANIFEST_KEY,
     )
 
     total_raw = len(raw_manifest)
@@ -1130,7 +1054,7 @@ def main() -> None:
             bronze_key = bronze_object_key(
                 document_id=document_id,
                 titulo=titulo,
-                prefix=args.bronze_text_prefix,
+                prefix=DEFAULT_BRONZE_TEXT_PREFIX,
             )
 
             print(f"[{indice + 1}/{len(df)}] {titulo}")
@@ -1227,7 +1151,7 @@ def main() -> None:
 
         resultado_carta = avaliar_carta(
             texto=texto,
-            qtd_assinaturas_minima=(args.min_assinaturas_carta),
+            qtd_assinaturas_minima=(config.bronze.carta.min_assinaturas),
         )
 
         resultado_coletanea = avaliar_coletanea(
@@ -1235,21 +1159,24 @@ def main() -> None:
             titulo_atual=titulo,
             titulos_normalizados=titulos_normalizados,
             titulos_info=titulos_info,
-            similaridade_threshold=(args.similaridade_threshold),
-            qtd_titulos_coletanea=(args.qtd_titulos_coletanea),
-            tamanho_fragmento=(args.tamanho_fragmento),
-            tamanho_minimo_fragmento=(args.tamanho_minimo_fragmento),
+            similaridade_threshold=(config.bronze.coletanea.similaridade_threshold),
+            qtd_titulos_coletanea=(config.bronze.coletanea.qtd_titulos_minima),
+            tamanho_fragmento=(config.bronze.coletanea.tamanho_fragmento),
+            tamanho_minimo_fragmento=(config.bronze.coletanea.tamanho_minimo_fragmento),
         )
 
         resultado_teatro = avaliar_estrutura_teatral(
             texto=texto,
-            min_pct_locutores_recorrentes=(args.min_pct_locutores_teatro),
+            min_repeticoes_locutor=(config.bronze.teatro.min_repeticoes_locutor),
+            min_locutores=(config.bronze.teatro.min_locutores),
+            min_turnos=(config.bronze.teatro.min_turnos),
+            min_pct_locutores_recorrentes=(config.bronze.teatro.min_pct_locutores),
         )
 
         resultado_poema = avaliar_estrutura_poetica(
             texto=texto,
-            max_palavras_linha=(args.max_palavras_linha_poema),
-            min_pct_linhas_curtas=(args.min_pct_linhas_curtas_poema),
+            max_palavras_linha=(config.bronze.poema.max_palavras_linha),
+            min_pct_linhas_curtas=(config.bronze.poema.min_pct_linhas_curtas),
         )
 
         if is_critica:
@@ -1318,14 +1245,14 @@ def main() -> None:
     salvar_parquet_rustfs(
         storage=storage,
         bucket=bronze_bucket,
-        key=args.bronze_manifest_key,
+        key=DEFAULT_BRONZE_MANIFEST_KEY,
         df=df_manifest,
     )
 
     print()
     print("[OK] Camada Bronze criada.")
-    print(f"     Textos: s3://{bronze_bucket}/" f"{args.bronze_text_prefix}/")
-    print(f"     Manifest: s3://{bronze_bucket}/" f"{args.bronze_manifest_key}")
+    print(f"     Textos: s3://{bronze_bucket}/" f"{DEFAULT_BRONZE_TEXT_PREFIX}/")
+    print(f"     Manifest: s3://{bronze_bucket}/" f"{DEFAULT_BRONZE_MANIFEST_KEY}")
 
     sucessos = df_manifest["status_bronze"].eq("success").sum()
 

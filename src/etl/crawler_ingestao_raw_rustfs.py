@@ -1,6 +1,5 @@
 import argparse
 import hashlib
-import os
 import re
 import tempfile
 import time
@@ -11,8 +10,8 @@ from urllib.parse import urljoin
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-from dotenv import load_dotenv
 
+from src.config.config_manager import ConfigManager
 from src.storage.rustfs_manager import RustFSManager
 
 BASE_URL = "https://dominiopublico.mec.gov.br/"
@@ -43,9 +42,6 @@ HEADERS = {
 }
 
 MANIFEST_KEY = "manifests/obras_raw.parquet"
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_ENV_PATH = PROJECT_ROOT / "config" / ".env"
 
 session = requests.Session()
 session.headers.update(HEADERS)
@@ -505,54 +501,62 @@ def main():
         "--pagina-inicial",
         type=int,
         default=1,
+        help="Página inicial do crawler. Padrão: 1.",
     )
 
     parser.add_argument(
         "--pagina-final",
         type=int,
         default=7,
+        help="Página final do crawler. Padrão: 7.",
     )
 
     parser.add_argument(
         "--delay",
         type=float,
         default=0.5,
+        help="Delay entre páginas, em segundos. Padrão: 0.5.",
     )
 
     parser.add_argument(
         "--env-file",
         type=Path,
-        default=DEFAULT_ENV_PATH,
-        help=("Arquivo .env com as configurações do RustFS. " "Padrão: config/.env"),
+        default=None,
+        help=(
+            "Sobrescreve o .env padrão do ConfigManager. "
+            "Se omitido, usa config/.env."
+        ),
     )
 
     parser.add_argument(
-        "--bucket",
+        "--config-file",
+        type=Path,
         default=None,
-        help=("Sobrescreve RUSTFS_RAW_BUCKET definido no .env."),
+        help=(
+            "Sobrescreve o YAML padrão do ConfigManager. "
+            "Se omitido, usa config/config.yaml."
+        ),
     )
 
     args = parser.parse_args()
 
-    if args.env_file.exists():
-        load_dotenv(
-            dotenv_path=args.env_file,
-            override=False,
-        )
-        print(f"[+] Configuração carregada de: {args.env_file}")
-    else:
-        print(
-            f"[AVISO] Arquivo .env não encontrado: {args.env_file}. "
-            "Usando apenas variáveis já presentes no ambiente."
-        )
+    config_kwargs = {}
 
-    bucket = args.bucket or os.getenv(
-        "RUSTFS_RAW_BUCKET",
-        "acartomante-raw",
-    )
+    if args.env_file is not None:
+        config_kwargs["env_file"] = args.env_file
 
-    storage = RustFSManager.from_env()
+    if args.config_file is not None:
+        config_kwargs["yaml_file"] = args.config_file
+
+    config = ConfigManager.load(**config_kwargs)
+
+    bucket = config.storage.raw_bucket
+
+    storage = RustFSManager.from_config(config.environment.rustfs)
+
     storage.create_bucket(bucket)
+
+    print(f"[+] Bucket Raw: {bucket}")
 
     manifest_anterior = carregar_manifest_existente(
         storage=storage,

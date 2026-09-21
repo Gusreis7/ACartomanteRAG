@@ -1,0 +1,23 @@
+storage:
+  raw_bucket: acartomante-raw
+  bronze_bucket: acartomante-bronze
+
+bronze:
+  coletanea:
+    similaridade_threshold: 0.10
+    qtd_titulos_minima: 2
+    tamanho_fragmento: 1000
+    tamanho_minimo_fragmento: 100
+
+  carta:
+    min_assinaturas: 5
+
+  poema:
+    max_palavras_linha: 10
+    min_pct_linhas_curtas: 0.85
+
+  teatro:
+    min_repeticoes_locutor: 3
+    min_locutores: 2
+    min_turnos: 10
+    min_pct_locutores: 0.91
