@@ -6,16 +6,10 @@ from typing import Literal
 
 import yaml
 from dotenv import load_dotenv
-from pydantic import (
-    BaseModel,
-    Field,
-    model_validator,
-)
+from pydantic import BaseModel, Field, model_validator
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
 DEFAULT_ENV_PATH = PROJECT_ROOT / "config" / ".env"
-
 DEFAULT_YAML_PATH = PROJECT_ROOT / "config" / "config.yaml"
 
 
@@ -26,13 +20,21 @@ class RustFSConfig(BaseModel):
 
 
 class QdrantConfig(BaseModel):
-    url: str
-    api_key: str | None = None
+    host: str
+    port: int = Field(
+        ge=1,
+        le=65535,
+    )
+    api_key: str
+
+    @property
+    def url(self) -> str:
+        return f"http://{self.host}:{self.port}"
 
 
 class EnvironmentConfig(BaseModel):
     rustfs: RustFSConfig
-    qdrant: QdrantConfig | None = None
+    qdrant: QdrantConfig
 
 
 class StorageConfig(BaseModel):
@@ -42,62 +44,26 @@ class StorageConfig(BaseModel):
 
 
 class ColetaneaConfig(BaseModel):
-    similaridade_threshold: float = Field(
-        default=0.10,
-        ge=0,
-        le=1,
-    )
-    qtd_titulos_minima: int = Field(
-        default=2,
-        ge=1,
-    )
-    tamanho_fragmento: int = Field(
-        default=1000,
-        gt=0,
-    )
-    tamanho_minimo_fragmento: int = Field(
-        default=100,
-        gt=0,
-    )
+    similaridade_threshold: float = Field(default=0.10, ge=0, le=1)
+    qtd_titulos_minima: int = Field(default=2, ge=1)
+    tamanho_fragmento: int = Field(default=1000, gt=0)
+    tamanho_minimo_fragmento: int = Field(default=100, gt=0)
 
 
 class CartaConfig(BaseModel):
-    min_assinaturas: int = Field(
-        default=5,
-        ge=0,
-    )
+    min_assinaturas: int = Field(default=5, ge=0)
 
 
 class PoemaConfig(BaseModel):
-    max_palavras_linha: int = Field(
-        default=10,
-        gt=0,
-    )
-    min_pct_linhas_curtas: float = Field(
-        default=0.85,
-        ge=0,
-        le=1,
-    )
+    max_palavras_linha: int = Field(default=10, gt=0)
+    min_pct_linhas_curtas: float = Field(default=0.85, ge=0, le=1)
 
 
 class TeatroConfig(BaseModel):
-    min_repeticoes_locutor: int = Field(
-        default=3,
-        ge=1,
-    )
-    min_locutores: int = Field(
-        default=2,
-        ge=1,
-    )
-    min_turnos: int = Field(
-        default=10,
-        ge=1,
-    )
-    min_pct_locutores: float = Field(
-        default=0.91,
-        ge=0,
-        le=1,
-    )
+    min_repeticoes_locutor: int = Field(default=3, ge=1)
+    min_locutores: int = Field(default=2, ge=1)
+    min_turnos: int = Field(default=10, ge=1)
+    min_pct_locutores: float = Field(default=0.91, ge=0, le=1)
 
 
 class BronzeConfig(BaseModel):
@@ -113,72 +79,39 @@ class ChunkTokenizerConfig(BaseModel):
 
 
 class SilverChunkingConfig(BaseModel):
-    strategy: Literal[
-        "fixed",
-        "hybrid",
-    ] = "hybrid"
-
+    strategy: Literal["fixed", "hybrid"] = "hybrid"
     tokenizer: str
-
-    chunk_size: int = Field(
-        default=512,
-        gt=0,
-    )
-
-    overlap: int = Field(
-        default=64,
-        ge=0,
-    )
+    chunk_size: int = Field(default=512, gt=0)
+    overlap: int = Field(default=64, ge=0)
 
     @model_validator(mode="after")
     def validate_overlap(self):
         if self.overlap >= self.chunk_size:
             raise ValueError(
-                "silver.chunking.overlap "
-                "deve ser menor que "
+                "silver.chunking.overlap deve ser menor que "
                 "silver.chunking.chunk_size"
             )
-
         return self
 
 
 class SilverSemanticConfig(BaseModel):
-    min_capitulos: int = Field(
-        default=2,
-        ge=2,
-    )
-
-    min_mediana_chars: int = Field(
-        default=200,
-        ge=0,
-    )
+    min_capitulos: int = Field(default=2, ge=2)
+    min_mediana_chars: int = Field(default=200, ge=0)
 
 
 class SilverConfig(BaseModel):
-    pipeline_version: int = Field(
-        default=1,
-        ge=1,
-    )
-
-    tokenizers: dict[
-        str,
-        ChunkTokenizerConfig,
-    ]
-
+    pipeline_version: int = Field(default=1, ge=1)
+    tokenizers: dict[str, ChunkTokenizerConfig]
     chunking: SilverChunkingConfig
-
     semantic: SilverSemanticConfig = SilverSemanticConfig()
 
     @model_validator(mode="after")
     def validate_tokenizer(self):
         if self.chunking.tokenizer not in self.tokenizers:
             raise ValueError(
-                "Tokenizer selecionado em "
-                "silver.chunking.tokenizer "
-                "não existe em "
-                "silver.tokenizers."
+                "Tokenizer selecionado em silver.chunking.tokenizer "
+                "não existe em silver.tokenizers."
             )
-
         return self
 
 
@@ -193,67 +126,72 @@ class ConfigManager:
     @classmethod
     def load(
         cls,
-        env_file: str | Path = (DEFAULT_ENV_PATH),
-        yaml_file: str | Path = (DEFAULT_YAML_PATH),
+        env_file: str | Path = DEFAULT_ENV_PATH,
+        yaml_file: str | Path = DEFAULT_YAML_PATH,
     ) -> AppConfig:
         env_file = Path(env_file)
         yaml_file = Path(yaml_file)
 
         if env_file.exists():
-            load_dotenv(
-                dotenv_path=env_file,
-                override=False,
-            )
+            load_dotenv(dotenv_path=env_file, override=False)
 
         if not yaml_file.exists():
             raise FileNotFoundError(
-                "Arquivo de configuração " "não encontrado: " f"{yaml_file}"
+                f"Arquivo de configuração não encontrado: {yaml_file}"
             )
 
-        with yaml_file.open(
-            "r",
-            encoding="utf-8",
-        ) as file:
+        with yaml_file.open("r", encoding="utf-8") as file:
             yaml_config = yaml.safe_load(file) or {}
 
-        if not isinstance(
-            yaml_config,
-            dict,
-        ):
-            raise ValueError("config.yaml deve possuir " "um objeto YAML na raiz.")
+        if not isinstance(yaml_config, dict):
+            raise ValueError("config.yaml deve possuir um objeto YAML na raiz.")
 
         rustfs_endpoint = os.getenv("RUSTFS_ENDPOINT")
         rustfs_access_key = os.getenv("RUSTFS_ACCESS_KEY")
         rustfs_secret_key = os.getenv("RUSTFS_SECRET_KEY")
 
+        qdrant_scheme = os.getenv("QDRANT_SCHEME")
+        qdrant_host = os.getenv("QDRANT_HOST")
+        qdrant_http_port = os.getenv("QDRANT_HTTP_PORT")
+        qdrant_api_key = os.getenv("QDRANT_API_KEY")
+        qdrant_ca_cert = os.getenv("QDRANT_CA_CERT")
+
         required = {
-            "RUSTFS_ENDPOINT": (rustfs_endpoint),
-            "RUSTFS_ACCESS_KEY": (rustfs_access_key),
-            "RUSTFS_SECRET_KEY": (rustfs_secret_key),
+            "RUSTFS_ENDPOINT": rustfs_endpoint,
+            "RUSTFS_ACCESS_KEY": rustfs_access_key,
+            "RUSTFS_SECRET_KEY": rustfs_secret_key,
+            "QDRANT_SCHEME": qdrant_scheme,
+            "QDRANT_HOST": qdrant_host,
+            "QDRANT_HTTP_PORT": qdrant_http_port,
+            "QDRANT_API_KEY": qdrant_api_key,
         }
 
         missing = [key for key, value in required.items() if not value]
 
         if missing:
             raise ValueError(
-                "Variáveis de ambiente " "obrigatórias ausentes: " + ", ".join(missing)
+                "Variáveis de ambiente obrigatórias ausentes: " + ", ".join(missing)
             )
+
+        try:
+            qdrant_port = int(qdrant_http_port)
+        except ValueError as exc:
+            raise ValueError("QDRANT_HTTP_PORT deve ser um número inteiro.") from exc
 
         environment = {
             "rustfs": {
-                "endpoint": (rustfs_endpoint),
-                "access_key": (rustfs_access_key),
-                "secret_key": (rustfs_secret_key),
-            }
+                "endpoint": rustfs_endpoint,
+                "access_key": rustfs_access_key,
+                "secret_key": rustfs_secret_key,
+            },
+            "qdrant": {
+                "scheme": qdrant_scheme,
+                "host": qdrant_host,
+                "port": qdrant_port,
+                "api_key": qdrant_api_key,
+                "ca_cert": qdrant_ca_cert or None,
+            },
         }
-
-        qdrant_url = os.getenv("QDRANT_URL")
-
-        if qdrant_url:
-            environment["qdrant"] = {
-                "url": qdrant_url,
-                "api_key": os.getenv("QDRANT_API_KEY"),
-            }
 
         return AppConfig.model_validate(
             {
