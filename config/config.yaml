@@ -28,12 +28,11 @@ silver:
 
   chunking:
     strategy: hybrid
-    tokenizer: roberta_crawl_pt  # tokenizer principal a ser usado, importante estar versionado
+    tokenizer: roberta_crawl_pt
     chunk_size: 512
     overlap: 64
 
   tokenizers:
-    # configuracoes de tokenizers definidos
     roberta_crawl_pt:
       model: eduagarcia/RoBERTaCrawlPT-base
       revision: main

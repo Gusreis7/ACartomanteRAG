@@ -13,13 +13,21 @@ jobs:
     env:
       COMPOSE_PROJECT_NAME: acartomante-prod
 
+      # Application connection
+      RUSTFS_ENDPOINT: http://localhost:9000
+      QDRANT_URL: http://localhost:6333
+
+      # Secrets
       RUSTFS_ACCESS_KEY: ${{ secrets.RUSTFS_ACCESS_KEY }}
       RUSTFS_SECRET_KEY: ${{ secrets.RUSTFS_SECRET_KEY }}
+      QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
 
+      # Docker Compose / production deployment
       RUSTFS_VOLUME: /home/gustavo/Volumes/rustfs
-
+      QDRANT_VOLUME: /home/gustavo/Volumes/qdrant
       RUSTFS_API_PORT: 9000
       RUSTFS_CONSOLE_PORT: 9001
+      QDRANT_HTTP_PORT: 6333
 
     steps:
       - name: Checkout
@@ -35,7 +43,7 @@ jobs:
 
       - name: Prepare production storage
         run: |
-          mkdir -p "$RUSTFS_VOLUME"
+          mkdir -p "$RUSTFS_VOLUME" "$QDRANT_VOLUME"
 
       - name: Validate Docker Compose
         run: docker compose config --quiet
@@ -48,11 +56,7 @@ jobs:
 
       - name: Deploy production
         run: |
-          docker compose up \
-            --detach \
-            --wait \
-            --wait-timeout 120 \
-            --remove-orphans
+          docker compose up             --detach             --wait             --wait-timeout 120             --remove-orphans
 
       - name: Show production services
         run: docker compose ps

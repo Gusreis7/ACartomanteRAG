@@ -8,6 +8,7 @@ import yaml
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, model_validator
 
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ENV_PATH = PROJECT_ROOT / "config" / ".env"
 DEFAULT_YAML_PATH = PROJECT_ROOT / "config" / "config.yaml"
@@ -20,16 +21,8 @@ class RustFSConfig(BaseModel):
 
 
 class QdrantConfig(BaseModel):
-    host: str
-    port: int = Field(
-        ge=1,
-        le=65535,
-    )
+    url: str
     api_key: str
-
-    @property
-    def url(self) -> str:
-        return f"http://{self.host}:{self.port}"
 
 
 class EnvironmentConfig(BaseModel):
@@ -103,7 +96,9 @@ class SilverConfig(BaseModel):
     pipeline_version: int = Field(default=1, ge=1)
     tokenizers: dict[str, ChunkTokenizerConfig]
     chunking: SilverChunkingConfig
-    semantic: SilverSemanticConfig = SilverSemanticConfig()
+    semantic: SilverSemanticConfig = Field(
+        default_factory=SilverSemanticConfig
+    )
 
     @model_validator(mode="after")
     def validate_tokenizer(self):
@@ -133,7 +128,10 @@ class ConfigManager:
         yaml_file = Path(yaml_file)
 
         if env_file.exists():
-            load_dotenv(dotenv_path=env_file, override=False)
+            load_dotenv(
+                dotenv_path=env_file,
+                override=False,
+            )
 
         if not yaml_file.exists():
             raise FileNotFoundError(
@@ -144,52 +142,39 @@ class ConfigManager:
             yaml_config = yaml.safe_load(file) or {}
 
         if not isinstance(yaml_config, dict):
-            raise ValueError("config.yaml deve possuir um objeto YAML na raiz.")
+            raise ValueError(
+                "config.yaml deve possuir um objeto YAML na raiz."
+            )
 
-        rustfs_endpoint = os.getenv("RUSTFS_ENDPOINT")
-        rustfs_access_key = os.getenv("RUSTFS_ACCESS_KEY")
-        rustfs_secret_key = os.getenv("RUSTFS_SECRET_KEY")
-
-        qdrant_scheme = os.getenv("QDRANT_SCHEME")
-        qdrant_host = os.getenv("QDRANT_HOST")
-        qdrant_http_port = os.getenv("QDRANT_HTTP_PORT")
-        qdrant_api_key = os.getenv("QDRANT_API_KEY")
-        qdrant_ca_cert = os.getenv("QDRANT_CA_CERT")
-
-        required = {
-            "RUSTFS_ENDPOINT": rustfs_endpoint,
-            "RUSTFS_ACCESS_KEY": rustfs_access_key,
-            "RUSTFS_SECRET_KEY": rustfs_secret_key,
-            "QDRANT_SCHEME": qdrant_scheme,
-            "QDRANT_HOST": qdrant_host,
-            "QDRANT_HTTP_PORT": qdrant_http_port,
-            "QDRANT_API_KEY": qdrant_api_key,
+        environment_values = {
+            "RUSTFS_ENDPOINT": os.getenv("RUSTFS_ENDPOINT"),
+            "RUSTFS_ACCESS_KEY": os.getenv("RUSTFS_ACCESS_KEY"),
+            "RUSTFS_SECRET_KEY": os.getenv("RUSTFS_SECRET_KEY"),
+            "QDRANT_URL": os.getenv("QDRANT_URL"),
+            "QDRANT_API_KEY": os.getenv("QDRANT_API_KEY"),
         }
 
-        missing = [key for key, value in required.items() if not value]
+        missing = [
+            key
+            for key, value in environment_values.items()
+            if not value
+        ]
 
         if missing:
             raise ValueError(
-                "Variáveis de ambiente obrigatórias ausentes: " + ", ".join(missing)
+                "Variáveis de ambiente obrigatórias ausentes: "
+                + ", ".join(missing)
             )
-
-        try:
-            qdrant_port = int(qdrant_http_port)
-        except ValueError as exc:
-            raise ValueError("QDRANT_HTTP_PORT deve ser um número inteiro.") from exc
 
         environment = {
             "rustfs": {
-                "endpoint": rustfs_endpoint,
-                "access_key": rustfs_access_key,
-                "secret_key": rustfs_secret_key,
+                "endpoint": environment_values["RUSTFS_ENDPOINT"],
+                "access_key": environment_values["RUSTFS_ACCESS_KEY"],
+                "secret_key": environment_values["RUSTFS_SECRET_KEY"],
             },
             "qdrant": {
-                "scheme": qdrant_scheme,
-                "host": qdrant_host,
-                "port": qdrant_port,
-                "api_key": qdrant_api_key,
-                "ca_cert": qdrant_ca_cert or None,
+                "url": environment_values["QDRANT_URL"],
+                "api_key": environment_values["QDRANT_API_KEY"],
             },
         }
 
