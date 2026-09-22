@@ -1,3 +1,56 @@
-**/*.env
-Dataset
+# Ambientes / secrets
+**/.env
+
+# Dados locais
+Dataset/
 Volumes/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Ambientes virtuais
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Testes / cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Linters / type checkers
+.mypy_cache/
+.ruff_cache/
+
+# Builds / pacotes
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+logs/
+
+# Arquivos temporários
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# SO / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Cache geral
+.cache/
+
+# Parquet/artefatos locais temporários
+*.parquet.tmp
