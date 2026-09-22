@@ -15,15 +15,23 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      
       COMPOSE_PROJECT_NAME: acartomante-ci-${{ gitea.run_number }}
+
+      # Application connection
+      RUSTFS_ENDPOINT: http://localhost:9003
+      QDRANT_URL: http://localhost:6335
+
+      # Secrets
       RUSTFS_ACCESS_KEY: ${{ secrets.RUSTFS_ACCESS_KEY }}
       RUSTFS_SECRET_KEY: ${{ secrets.RUSTFS_SECRET_KEY }}
+      QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
 
+      # Docker Compose / CI deployment
       RUSTFS_VOLUME: /tmp/acartomante-ci-${{ gitea.run_number }}/rustfs
-
+      QDRANT_VOLUME: /tmp/acartomante-ci-${{ gitea.run_number }}/qdrant
       RUSTFS_API_PORT: 9003
       RUSTFS_CONSOLE_PORT: 9004
+      QDRANT_HTTP_PORT: 6335
 
     steps:
       - name: Checkout
@@ -38,6 +46,10 @@ jobs:
             exit 1
           fi
 
+      - name: Prepare CI storage
+        run: |
+          mkdir -p "$RUSTFS_VOLUME" "$QDRANT_VOLUME"
+
       - name: Validate Docker Compose
         run: docker compose config --quiet
 
@@ -46,10 +58,7 @@ jobs:
 
       - name: Start services
         run: |
-          docker compose up \
-            --detach \
-            --wait \
-            --wait-timeout 120
+          docker compose up             --detach             --wait             --wait-timeout 120
 
       - name: Show services
         run: docker compose ps
@@ -60,6 +69,9 @@ jobs:
 
       - name: Shutdown services
         if: always()
+        run: docker compose down --remove-orphans
+
+      - name: Cleanup CI storage
+        if: always()
         run: |
-          docker compose down \
-            --remove-orphans
+          rm -rf "/tmp/acartomante-ci-${{ gitea.run_number }}"
