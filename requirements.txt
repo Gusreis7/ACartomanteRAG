@@ -3,3 +3,8 @@ pandas
 spacy
 plotly
 statsmodels
+
+torch>=2.2,<3
+transformers>=5.0,<6
+sentence-transformers>=6.1,<7
+huggingface-hub>=1.0,<2

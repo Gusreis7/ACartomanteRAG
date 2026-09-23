@@ -34,6 +34,7 @@ class StorageConfig(BaseModel):
     raw_bucket: str = "acartomante-raw"
     bronze_bucket: str = "acartomante-bronze"
     silver_bucket: str = "acartomante-silver"
+    embedding_indexes_bucket: str = "acartomante-indexes"
 
 
 class ColetaneaConfig(BaseModel):
@@ -110,11 +111,91 @@ class SilverConfig(BaseModel):
         return self
 
 
+class EmbeddingModelConfig(BaseModel):
+    backend: str = Field(min_length=1)
+    model: str = Field(min_length=1)
+    revision: str = "main"
+
+    inference_dtype: Literal[
+        "float32",
+        "float16",
+        "bfloat16",
+    ] = "float32"
+
+    pooling: Literal[
+        "model",
+        "mean",
+        "cls",
+        "max",
+    ] = "model"
+
+    document_prompt_name: str | None = None
+    query_prompt_name: str | None = None
+
+    truncate_dim: int | None = Field(
+        default=None,
+        gt=0,
+    )
+
+
+class EmbeddingIndexConfig(BaseModel):
+    normalize_embeddings: bool = False
+
+    distance: Literal[
+        "cosine",
+        "dot",
+        "euclid",
+    ] = "cosine"
+
+
+class EmbeddingExecutionConfig(BaseModel):
+    device: str = "auto"
+
+    batch_size: int = Field(
+        default=32,
+        gt=0,
+    )
+
+
+class EmbeddingConfig(BaseModel):
+    pipeline_version: int = Field(
+        default=1,
+        ge=1,
+    )
+
+    selected_model: str
+
+    models: dict[
+        str,
+        EmbeddingModelConfig,
+    ]
+
+    index: EmbeddingIndexConfig = Field(
+        default_factory=EmbeddingIndexConfig
+    )
+
+    execution: EmbeddingExecutionConfig = Field(
+        default_factory=EmbeddingExecutionConfig
+    )
+
+    @model_validator(mode="after")
+    def validate_selected_model(self):
+        if self.selected_model not in self.models:
+            raise ValueError(
+                "Modelo selecionado em "
+                "embedding.selected_model "
+                "não existe em embedding.models."
+            )
+
+        return self
+
+
 class AppConfig(BaseModel):
     environment: EnvironmentConfig
     storage: StorageConfig
     bronze: BronzeConfig
     silver: SilverConfig
+    embedding: EmbeddingConfig
 
 
 class ConfigManager:
@@ -138,43 +219,81 @@ class ConfigManager:
                 f"Arquivo de configuração não encontrado: {yaml_file}"
             )
 
-        with yaml_file.open("r", encoding="utf-8") as file:
+        with yaml_file.open(
+            "r",
+            encoding="utf-8",
+        ) as file:
             yaml_config = yaml.safe_load(file) or {}
 
-        if not isinstance(yaml_config, dict):
+        if not isinstance(
+            yaml_config,
+            dict,
+        ):
             raise ValueError(
                 "config.yaml deve possuir um objeto YAML na raiz."
             )
 
         environment_values = {
-            "RUSTFS_ENDPOINT": os.getenv("RUSTFS_ENDPOINT"),
-            "RUSTFS_ACCESS_KEY": os.getenv("RUSTFS_ACCESS_KEY"),
-            "RUSTFS_SECRET_KEY": os.getenv("RUSTFS_SECRET_KEY"),
-            "QDRANT_URL": os.getenv("QDRANT_URL"),
-            "QDRANT_API_KEY": os.getenv("QDRANT_API_KEY"),
+            "RUSTFS_ENDPOINT": os.getenv(
+                "RUSTFS_ENDPOINT"
+            ),
+            "RUSTFS_ACCESS_KEY": os.getenv(
+                "RUSTFS_ACCESS_KEY"
+            ),
+            "RUSTFS_SECRET_KEY": os.getenv(
+                "RUSTFS_SECRET_KEY"
+            ),
+            "QDRANT_URL": os.getenv(
+                "QDRANT_URL"
+            ),
+            "QDRANT_API_KEY": os.getenv(
+                "QDRANT_API_KEY"
+            ),
         }
 
         missing = [
             key
-            for key, value in environment_values.items()
+            for key, value
+            in environment_values.items()
             if not value
         ]
 
         if missing:
             raise ValueError(
-                "Variáveis de ambiente obrigatórias ausentes: "
+                "Variáveis de ambiente "
+                "obrigatórias ausentes: "
                 + ", ".join(missing)
             )
 
         environment = {
             "rustfs": {
-                "endpoint": environment_values["RUSTFS_ENDPOINT"],
-                "access_key": environment_values["RUSTFS_ACCESS_KEY"],
-                "secret_key": environment_values["RUSTFS_SECRET_KEY"],
+                "endpoint": (
+                    environment_values[
+                        "RUSTFS_ENDPOINT"
+                    ]
+                ),
+                "access_key": (
+                    environment_values[
+                        "RUSTFS_ACCESS_KEY"
+                    ]
+                ),
+                "secret_key": (
+                    environment_values[
+                        "RUSTFS_SECRET_KEY"
+                    ]
+                ),
             },
             "qdrant": {
-                "url": environment_values["QDRANT_URL"],
-                "api_key": environment_values["QDRANT_API_KEY"],
+                "url": (
+                    environment_values[
+                        "QDRANT_URL"
+                    ]
+                ),
+                "api_key": (
+                    environment_values[
+                        "QDRANT_API_KEY"
+                    ]
+                ),
             },
         }
 
