@@ -2,6 +2,7 @@ storage:
   raw_bucket: acartomante-raw
   bronze_bucket: acartomante-bronze
   silver_bucket: acartomante-silver
+  embedding_indexes_bucket: acartomante-indexes
 
 bronze:
   coletanea:
@@ -44,3 +45,36 @@ silver:
   semantic:
     min_capitulos: 2
     min_mediana_chars: 200
+
+embedding:
+  pipeline_version: 1
+  selected_model: colibri
+
+  models:
+    colibri:
+      backend: sentence_transformers
+      model: tardellirs/colibri-embed-ptbr
+      revision: main
+      inference_dtype: float32
+      pooling: model
+      document_prompt_name: document
+      query_prompt_name: query
+      truncate_dim: null
+
+    qwen3_embedding_06b:
+      backend: sentence_transformers
+      model: Qwen/Qwen3-Embedding-0.6B
+      revision: main
+      inference_dtype: bfloat16
+      pooling: model
+      document_prompt_name: document
+      query_prompt_name: query
+      truncate_dim: null
+
+  index:
+    normalize_embeddings: false
+    distance: cosine
+
+  execution:
+    device: auto
+    batch_size: 32
