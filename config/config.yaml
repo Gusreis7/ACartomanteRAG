@@ -3,6 +3,7 @@ storage:
   bronze_bucket: acartomante-bronze
   silver_bucket: acartomante-silver
   embedding_indexes_bucket: acartomante-indexes
+  benchmarks_bucket: acartomante-benchmarks
 
 bronze:
   coletanea:

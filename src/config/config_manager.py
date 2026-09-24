@@ -8,7 +8,6 @@ import yaml
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, model_validator
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ENV_PATH = PROJECT_ROOT / "config" / ".env"
 DEFAULT_YAML_PATH = PROJECT_ROOT / "config" / "config.yaml"
@@ -35,6 +34,7 @@ class StorageConfig(BaseModel):
     bronze_bucket: str = "acartomante-bronze"
     silver_bucket: str = "acartomante-silver"
     embedding_indexes_bucket: str = "acartomante-indexes"
+    benchmarks_bucket: str = "acartomante-benchmarks"
 
 
 class ColetaneaConfig(BaseModel):
@@ -97,9 +97,7 @@ class SilverConfig(BaseModel):
     pipeline_version: int = Field(default=1, ge=1)
     tokenizers: dict[str, ChunkTokenizerConfig]
     chunking: SilverChunkingConfig
-    semantic: SilverSemanticConfig = Field(
-        default_factory=SilverSemanticConfig
-    )
+    semantic: SilverSemanticConfig = Field(default_factory=SilverSemanticConfig)
 
     @model_validator(mode="after")
     def validate_tokenizer(self):
@@ -170,9 +168,7 @@ class EmbeddingConfig(BaseModel):
         EmbeddingModelConfig,
     ]
 
-    index: EmbeddingIndexConfig = Field(
-        default_factory=EmbeddingIndexConfig
-    )
+    index: EmbeddingIndexConfig = Field(default_factory=EmbeddingIndexConfig)
 
     execution: EmbeddingExecutionConfig = Field(
         default_factory=EmbeddingExecutionConfig
@@ -229,71 +225,32 @@ class ConfigManager:
             yaml_config,
             dict,
         ):
-            raise ValueError(
-                "config.yaml deve possuir um objeto YAML na raiz."
-            )
+            raise ValueError("config.yaml deve possuir um objeto YAML na raiz.")
 
         environment_values = {
-            "RUSTFS_ENDPOINT": os.getenv(
-                "RUSTFS_ENDPOINT"
-            ),
-            "RUSTFS_ACCESS_KEY": os.getenv(
-                "RUSTFS_ACCESS_KEY"
-            ),
-            "RUSTFS_SECRET_KEY": os.getenv(
-                "RUSTFS_SECRET_KEY"
-            ),
-            "QDRANT_URL": os.getenv(
-                "QDRANT_URL"
-            ),
-            "QDRANT_API_KEY": os.getenv(
-                "QDRANT_API_KEY"
-            ),
+            "RUSTFS_ENDPOINT": os.getenv("RUSTFS_ENDPOINT"),
+            "RUSTFS_ACCESS_KEY": os.getenv("RUSTFS_ACCESS_KEY"),
+            "RUSTFS_SECRET_KEY": os.getenv("RUSTFS_SECRET_KEY"),
+            "QDRANT_URL": os.getenv("QDRANT_URL"),
+            "QDRANT_API_KEY": os.getenv("QDRANT_API_KEY"),
         }
 
-        missing = [
-            key
-            for key, value
-            in environment_values.items()
-            if not value
-        ]
+        missing = [key for key, value in environment_values.items() if not value]
 
         if missing:
             raise ValueError(
-                "Variáveis de ambiente "
-                "obrigatórias ausentes: "
-                + ", ".join(missing)
+                "Variáveis de ambiente " "obrigatórias ausentes: " + ", ".join(missing)
             )
 
         environment = {
             "rustfs": {
-                "endpoint": (
-                    environment_values[
-                        "RUSTFS_ENDPOINT"
-                    ]
-                ),
-                "access_key": (
-                    environment_values[
-                        "RUSTFS_ACCESS_KEY"
-                    ]
-                ),
-                "secret_key": (
-                    environment_values[
-                        "RUSTFS_SECRET_KEY"
-                    ]
-                ),
+                "endpoint": (environment_values["RUSTFS_ENDPOINT"]),
+                "access_key": (environment_values["RUSTFS_ACCESS_KEY"]),
+                "secret_key": (environment_values["RUSTFS_SECRET_KEY"]),
             },
             "qdrant": {
-                "url": (
-                    environment_values[
-                        "QDRANT_URL"
-                    ]
-                ),
-                "api_key": (
-                    environment_values[
-                        "QDRANT_API_KEY"
-                    ]
-                ),
+                "url": (environment_values["QDRANT_URL"]),
+                "api_key": (environment_values["QDRANT_API_KEY"]),
             },
         }
 
