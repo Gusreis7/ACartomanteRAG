@@ -19,7 +19,7 @@ from src.utils.chunking import (
 )
 from src.storage.rustfs_manager import RustFSManager
 
-BRONZE_MANIFEST_KEY = "manifests/obras_bronze.parquet"
+BRONZE_CURRENT_KEY = "current.json"
 
 
 def parse_args() -> argparse.Namespace:
@@ -37,45 +37,6 @@ def parse_args() -> argparse.Namespace:
         "--config-file",
         type=Path,
         default=None,
-    )
-
-    parser.add_argument(
-        "--strategy",
-        choices=["fixed", "hybrid"],
-        default=None,
-        help=(
-            "Sobrescreve silver.chunking.strategy do config.yaml "
-            "somente para esta execução."
-        ),
-    )
-
-    parser.add_argument(
-        "--tokenizer",
-        default=None,
-        help=(
-            "Sobrescreve silver.chunking.tokenizer do config.yaml "
-            "somente para esta execução."
-        ),
-    )
-
-    parser.add_argument(
-        "--chunk-size",
-        type=int,
-        default=None,
-        help=(
-            "Sobrescreve silver.chunking.chunk_size do config.yaml "
-            "somente para esta execução."
-        ),
-    )
-
-    parser.add_argument(
-        "--overlap",
-        type=int,
-        default=None,
-        help=(
-            "Sobrescreve silver.chunking.overlap do config.yaml "
-            "somente para esta execução."
-        ),
     )
 
     return parser.parse_args()
@@ -110,7 +71,7 @@ def build_dataset_id(
     overlap: int,
     tokenizer_model: str,
     tokenizer_revision: str,
-    bronze_manifest_sha256: str,
+    bronze_artifact_id: str,
     semantic_config: dict,
 ) -> tuple[str, str]:
     signature = {
@@ -121,7 +82,7 @@ def build_dataset_id(
         "tokenizer_revision": (tokenizer_revision),
         "chunk_size": chunk_size,
         "overlap": overlap,
-        "bronze_manifest_sha256": (bronze_manifest_sha256),
+        "bronze_artifact_id": (bronze_artifact_id),
         "semantic": semantic_config,
     }
 
@@ -181,14 +142,86 @@ def main() -> None:
 
     storage.create_bucket(silver_bucket)
 
-    bronze_manifest_bytes = storage.download_bytes(
+    bronze_current_bytes = storage.download_bytes(
         bucket=bronze_bucket,
-        key=BRONZE_MANIFEST_KEY,
+        key=BRONZE_CURRENT_KEY,
     )
 
-    bronze_manifest_sha256 = hashlib.sha256(bronze_manifest_bytes).hexdigest()
+    bronze_current = json.loads(
+        bronze_current_bytes.decode("utf-8")
+    )
 
-    bronze_manifest = pd.read_parquet(io.BytesIO(bronze_manifest_bytes))
+    bronze_artifact_id = str(
+        bronze_current.get(
+            "bronze_artifact_id",
+            "",
+        )
+    ).strip()
+
+    bronze_manifest_key = str(
+        bronze_current.get(
+            "manifest_key",
+            "",
+        )
+    ).strip()
+
+    if (
+        not bronze_artifact_id
+        or not bronze_manifest_key
+    ):
+        raise RuntimeError(
+            "current.json da Bronze inválido: "
+            "bronze_artifact_id/manifest_key ausentes."
+        )
+
+    bronze_manifest_bytes = storage.download_bytes(
+        bucket=bronze_bucket,
+        key=bronze_manifest_key,
+    )
+
+    # SHA é só verificação de integridade.
+    bronze_manifest_sha256 = hashlib.sha256(
+        bronze_manifest_bytes
+    ).hexdigest()
+
+    expected_bronze_sha = str(
+        bronze_current.get(
+            "manifest_sha256",
+            "",
+        )
+    ).strip()
+
+    if (
+        expected_bronze_sha
+        and bronze_manifest_sha256
+        != expected_bronze_sha
+    ):
+        raise RuntimeError(
+            "Falha de integridade no manifest Bronze. "
+            f"Esperado={expected_bronze_sha}; "
+            f"obtido={bronze_manifest_sha256}."
+        )
+
+    bronze_manifest = pd.read_parquet(
+        io.BytesIO(bronze_manifest_bytes)
+    )
+
+    manifest_artifact_ids = set(
+        bronze_manifest["bronze_artifact_id"]
+        .dropna()
+        .astype(str)
+        .unique()
+    )
+
+    if manifest_artifact_ids != {
+        bronze_artifact_id
+    }:
+        raise RuntimeError(
+            "bronze_artifact_id do manifest "
+            "não corresponde ao current.json. "
+            f"current={bronze_artifact_id}; "
+            f"manifest={sorted(manifest_artifact_ids)}."
+        )
 
     if "status_bronze" in (bronze_manifest.columns):
         bronze_manifest = (
@@ -202,59 +235,7 @@ def main() -> None:
 
     chunking_config = config.silver.chunking
 
-    strategy = (
-        args.strategy
-        if args.strategy is not None
-        else chunking_config.strategy
-    )
-
-    tokenizer_alias = (
-        args.tokenizer
-        if args.tokenizer is not None
-        else chunking_config.tokenizer
-    )
-
-    chunk_size = (
-        args.chunk_size
-        if args.chunk_size is not None
-        else chunking_config.chunk_size
-    )
-
-    overlap = (
-        args.overlap
-        if args.overlap is not None
-        else chunking_config.overlap
-    )
-
-    if chunk_size <= 0:
-        raise ValueError(
-            "chunk_size deve ser maior que zero."
-        )
-
-    if overlap < 0:
-        raise ValueError(
-            "overlap não pode ser negativo."
-        )
-
-    if overlap >= chunk_size:
-        raise ValueError(
-            "overlap deve ser menor que chunk_size."
-        )
-
-    if tokenizer_alias not in config.silver.tokenizers:
-        tokenizers_disponiveis = ", ".join(
-            sorted(config.silver.tokenizers)
-        )
-
-        raise ValueError(
-            f"Tokenizer '{tokenizer_alias}' não existe em "
-            "silver.tokenizers. Disponíveis: "
-            f"{tokenizers_disponiveis}"
-        )
-
-    tokenizer_config = config.silver.tokenizers[
-        tokenizer_alias
-    ]
+    tokenizer_config = config.silver.tokenizers[chunking_config.tokenizer]
 
     tokenizer = HuggingFaceChunkTokenizer(
         model=tokenizer_config.model,
@@ -263,28 +244,20 @@ def main() -> None:
 
     semantic_config = config.silver.semantic
 
-    semantic_signature = (
-        {
-            "min_capitulos": (
-                semantic_config.min_capitulos
-            ),
-            "min_mediana_chars": (
-                semantic_config.min_mediana_chars
-            ),
-        }
-        if strategy == "hybrid"
-        else {}
-    )
+    semantic_signature = {
+        "min_capitulos": (semantic_config.min_capitulos),
+        "min_mediana_chars": (semantic_config.min_mediana_chars),
+    }
 
     dataset_id, config_hash = build_dataset_id(
         pipeline_version=(config.silver.pipeline_version),
-        strategy=strategy,
-        tokenizer_alias=tokenizer_alias,
-        chunk_size=chunk_size,
-        overlap=overlap,
+        strategy=(chunking_config.strategy),
+        tokenizer_alias=(chunking_config.tokenizer),
+        chunk_size=(chunking_config.chunk_size),
+        overlap=(chunking_config.overlap),
         tokenizer_model=(tokenizer_config.model),
         tokenizer_revision=(tokenizer.resolved_revision),
-        bronze_manifest_sha256=(bronze_manifest_sha256),
+        bronze_artifact_id=(bronze_artifact_id),
         semantic_config=(semantic_signature),
     )
 
@@ -296,11 +269,11 @@ def main() -> None:
 
     print(
         "[+] Chunking: "
-        f"{strategy} | "
-        f"{chunk_size} "
+        f"{chunking_config.strategy} | "
+        f"{chunking_config.chunk_size} "
         f"tokens | "
         f"overlap="
-        f"{overlap}"
+        f"{chunking_config.overlap}"
     )
 
     chunks = []
@@ -341,7 +314,7 @@ def main() -> None:
         sections, effective_strategy = build_sections(
             text=text,
             title=title,
-            strategy=strategy,
+            strategy=(chunking_config.strategy),
             min_capitulos=(semantic_config.min_capitulos),
             min_mediana_chars=(semantic_config.min_mediana_chars),
         )
@@ -366,8 +339,8 @@ def main() -> None:
         for section in sections:
             section_chunks = tokenizer.split(
                 text=section["text"],
-                chunk_size=chunk_size,
-                overlap=overlap,
+                chunk_size=(chunking_config.chunk_size),
+                overlap=(chunking_config.overlap),
             )
 
             for (
@@ -400,7 +373,7 @@ def main() -> None:
                         "categoria": (category),
                         "source_bronze_bucket": (bronze_bucket),
                         "source_bronze_object_key": (bronze_object_key),
-                        "requested_strategy": strategy,
+                        "requested_strategy": (chunking_config.strategy),
                         "effective_strategy": (effective_strategy),
                         "section_index": (section["section_index"]),
                         "section_type": (section["section_type"]),
@@ -411,11 +384,11 @@ def main() -> None:
                         "chapter_rule": (section["chapter_rule"]),
                         "chunk_index": (chunk_index),
                         "chunk_index_in_section": (chunk_index_in_section),
-                        "chunk_tokenizer": tokenizer_alias,
+                        "chunk_tokenizer": (chunking_config.tokenizer),
                         "chunk_tokenizer_model": (tokenizer_config.model),
                         "chunk_tokenizer_revision": (tokenizer.resolved_revision),
-                        "chunk_size": chunk_size,
-                        "overlap": overlap,
+                        "chunk_size": (chunking_config.chunk_size),
+                        "overlap": (chunking_config.overlap),
                         "token_count": (chunk["token_count"]),
                         "start_char": (document_char_start),
                         "end_char": (document_char_end),
@@ -457,12 +430,13 @@ def main() -> None:
                 "config_hash": (config_hash),
                 "created_at_utc": (datetime.now(timezone.utc).isoformat()),
                 "source_bronze_bucket": (bronze_bucket),
-                "source_bronze_manifest_key": (BRONZE_MANIFEST_KEY),
+                "source_bronze_artifact_id": (bronze_artifact_id),
+                "source_bronze_manifest_key": (bronze_manifest_key),
                 "source_bronze_manifest_sha256": (bronze_manifest_sha256),
-                "strategy": strategy,
-                "chunk_size": chunk_size,
-                "overlap": overlap,
-                "chunk_tokenizer": tokenizer_alias,
+                "strategy": (chunking_config.strategy),
+                "chunk_size": (chunking_config.chunk_size),
+                "overlap": (chunking_config.overlap),
+                "chunk_tokenizer": (chunking_config.tokenizer),
                 "chunk_tokenizer_model": (tokenizer_config.model),
                 "chunk_tokenizer_revision": (tokenizer.resolved_revision),
                 "min_capitulos": (semantic_config.min_capitulos),
