@@ -186,13 +186,20 @@ class EmbeddingConfig(BaseModel):
         return self
 
 
+class RetrievalConfig(BaseModel):
+    release: str = "default"
+    index_id: str | None = None
+
+
 class AppConfig(BaseModel):
     environment: EnvironmentConfig
     storage: StorageConfig
     bronze: BronzeConfig
     silver: SilverConfig
     embedding: EmbeddingConfig
+    retrieval: RetrievalConfig
 
+    retrieval: RetrievalConfig
 
 class ConfigManager:
     @classmethod

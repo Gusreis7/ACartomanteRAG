@@ -15,6 +15,7 @@ from tqdm.auto import tqdm
 from src.config.config_manager import AppConfig, EmbeddingModelConfig
 from src.embeddings.base import EmbedderInfo
 from src.embeddings.registry import EmbedderRegistry
+from src.indexing.release_manager import ReleaseManager
 from src.storage.qdrant_manager import QdrantManager
 from src.storage.rustfs_manager import RustFSManager
 
@@ -455,6 +456,25 @@ class EmbeddingIndex:
                 "application/json"
             ),
         )
+
+        release_manager = ReleaseManager(
+            config=self.config,
+            rustfs=self.rustfs,
+        )
+
+        bootstrapped = (
+            release_manager
+            .bootstrap_if_missing(
+                index_id=index_id,
+                release="default",
+            )
+        )
+
+        if bootstrapped:
+            print(
+                "[+] Bootstrap release: "
+                f"default -> {index_id}"
+            )
 
         return manifest
 
