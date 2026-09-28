@@ -22,6 +22,7 @@ esac
 PINNED_INDEX="$(
   python - <<'PYCFG'
 from pathlib import Path
+
 import yaml
 
 cfg = (
@@ -53,14 +54,16 @@ if [[ -n "${PINNED_INDEX}" ]]; then
 fi
 
 if [[ -z "${INDEX_ID:-}" ]]; then
-  echo "INDEX_ID não definido. Assumindo default"
-  INDEX_ID="default"
+  echo "[skip] INDEX_ID não definido. Pulando promotion."
+  exit 0
 fi
 
 echo "[+] Branch:  ${BRANCH}"
 echo "[+] Release: ${RELEASE}"
 echo "[+] Index:   ${INDEX_ID}"
 
-python -m src.indexing.publish_index   --index-id "${INDEX_ID}"   --release "${RELEASE}"
+python -m src.indexing.publish_index \
+  --index-id "${INDEX_ID}" \
+  --release "${RELEASE}"
 
 echo "[ok] Release promovida: ${RELEASE} -> ${INDEX_ID}"
