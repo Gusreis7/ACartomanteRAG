@@ -1,0 +1,528 @@
+query_id,query,canonical_work,evidence_text,query_type,difficulty,gold_answer,created_at,updated_at
+9dd2a609-264f-4c79-bad0-7c87cd8d9017,Que hábitos domésticos vinham comprometendo a situação econômica do advogado?,A carteira,"segundo as
+circunstâncias, e as dele não podiam ser piores. Gastos de família excessivos, a
+princípio por servir a parentes, e depois por agradar à mulher, que vivia aborrecida
+da solidão; baile daqui, jantar dali, chapéus, leques, tanta cousa mais, que não havia
+remédio senão ir descontando o futuro.",theme,medium,Gastos familiares,2026-09-23 13:50:54,2026-09-23 13:50:54
+a620a339-1e23-4977-8d8b-f6709dbf32b3,Ele mantinha uma aparência de sucesso diante dos outros apesar dos problemas profissionais?,A carteira,"—Tu agora vais bem, não? dizia-lhe ultimamente o Gustavo C..., advogado e
+familiar da casa.
+
+— Agora vou, mentiu o Honório.
+
+A verdade é que ia mal. Poucas causas, de pequena monta, e constituintes
+remissos; por desgraça perdera ultimamente um processo, com que fundara grandes
+esperanças. Não só recebeu pouco, mas até parece que ele lhe tirou alguma cousa
+à reputação jurídica; em todo caso, andavam mofinas nos jornais.",theme,medium,Sim,2026-09-23 13:51:37,2026-09-23 13:51:37
+3e796b5e-0c17-4d32-93a6-acf1d07160a4,Quem era responsável pelo piano que entretinha as visitas à noite?,A carteira,"e depois ia ouvir os
+trechos de música alemã, que D. Amélia tocava muito bem ao piano, e que o
+Gustavo escutava com indizível prazer, ou jogavam cartas, ou simplesmente
+falavam de política.",description,easy,D. Amélia,2026-09-23 13:52:28,2026-09-23 13:52:28
+408b2905-3420-423d-9a3f-d8a8a0366ca2,"O que provavelmente explicava o choro secreto do advogado, apesar da alegria que demonstrava em público?",A carteira,"D. Amélia não sabia nada; ele não contava nada à mulher, bons ou maus
+negócios. Não contava nada a ninguém. Fingia-se tão alegre como se nadasse em
+um mar de prosperidades. Quando o Gustavo, que ia todas as noites à casa dele,
+dizia uma ou duas pilhérias, ele respondia com três e quatro; e depois ia ouvir os
+trechos de música alemã, que D. Amélia tocava muito bem ao piano, e que o
+Gustavo escutava com indizível prazer, ou jogavam cartas, ou simplesmente
+falavam de política.
+
+Um dia, a mulher foi achá-lo dando muitos beijos à filha, criança de quatro
+anos, e viu-lhe os olhos molhados; ficou espantada, e perguntou-lhe o que era.
+
+— Nada, nada.
+
+Compreende-se que era o medo do futuro e o horror da miséria.
+Mas as esperanças voltavam com facilidade. A idéia de que os dias
+melhores tinham de vir dava-lhe conforto para a luta. Estava com, trinta e quatro
+
+3
+anos; era o princípio da carreira: todos os princípios são difíceis. E toca a trabalhar,
+a esperar, a gastar, pedir fiado ou: emprestado, para pagar mal, e a más horas.",relationship,hard,"Compreende-se que era o medo do futuro e o horror da miséria.
+Mas as esperanças voltavam com facilidade. A idéia de que os dias
+melhores tinham de vir dava-lhe conforto para a luta. Estava com, trinta e quatro",2026-09-23 13:53:53,2026-09-23 13:53:53
+f09d9852-d1d9-4468-993d-ec4530d048e2,Qual era a quantia urgente que ele precisava levantar naquela tarde?,A carteira,"A dívida urgente de hoje são uns malditos quatrocentos e tantos mil-réis de
+carros. Nunca demorou tanto a conta, nem ela cresceu tanto, como agora; e, a rigor,
+o credor não lhe punha a faca aos peitos; mas disse-lhe hoje uma palavra azeda,
+com um gesto mau, e  Honório quer pagar-lhe hoje mesmo. Eram cinco horas da
+tarde.",fact,easy,"quatrocentos e tantos mil-réis de
+carros.",2026-09-23 13:54:53,2026-09-23 13:54:53
+afcc4a2a-4004-4b48-a40d-eab22e96d4db,O que ele descobriu ao finalmente examinar o objeto que havia encontrado?,A carteira,"Tudo isso antes de abrir a carteira. Tirou-a do bolso, finalmente, mas com
+medo, quase às escondidas; abriu-a, e ficou trêmulo. Tinha dinheiro, muito dinheiro;
+não contou, mas viu duas notas de duzentos mil-réis, algumas de cinqüenta e vinte;
+calculou uns setecentos mil-réis ou mais; quando menos, seiscentos. Era a dívida
+paga",fact,easy,"Dinheiro, muito dinheiro",2026-09-23 13:56:14,2026-09-23 13:56:14
+76a75ef5-bd2f-49e1-9360-cad3edeec766,"Depois de vencer a hesitação e fazer a contagem, a que soma chegou?",A carteira,"Mas daí a pouco tirou-a outra vez, e abriu-a, com vontade de contar o
+dinheiro. Contar para quê? era dele? Afinal venceu-se e contou: eram setecentos e
+trinta mil-réis. Honório teve um calafrio.",quote,easy,"eram setecentos e
+trinta mil-réis.",2026-09-23 13:57:11,2026-09-23 13:57:11
+1366177e-3a08-4d49-86d8-41f4f0c6c316,A identidade de qual amigo foi revelada pelos cartões guardados no objeto encontrado?,A carteira,"""Se houver um nome, uma indicação qualquer, não posso utilizar-me do
+dinheiro,"" pensou ele.
+
+Esquadrinhou os bolsos da carteira. Achou cartas, que não abriu,
+bilhetinhos dobrados, que não leu, e por fim um cartão de visita; leu o nome; era do
+Gustavo. Mas então, a carteira?... Examinou-a por fora, e pareceu-lhe efetivamente
+do amigo. Voltou ao interior; achou mais dous cartões, mais três, mais cinco. Não
+havia duvidar; era dele.",relationship,medium,De Gustavo,2026-09-23 13:57:59,2026-09-23 13:57:59
+c3f3183a-2d4f-408c-8afe-aeb1c1aa3ae4,O dono já percebera a ausência do objeto antes de Honório devolvê-lo?,A carteira,"Chegando a casa, já ali achou o Gustavo, um pouco preocupado e a própria
+D. Amélia o parecia também. Entrou rindo, e perguntou ao amigo se lhe faltava
+alguma cousa.
+— Nada.
+
+— Nada?
+
+— Por quê?
+
+— Mete a mão no bolso; não te falta nada?
+
+— Falta-me a carteira, disse o Gustavo sem meter a mão no bolso.
+— Sabes se alguém a achou?
+
+— Achei-a eu, disse Honório entregando-lha.",fact,hard,Sim,2026-09-23 13:58:57,2026-09-23 13:58:57
+c811973b-9913-4b46-a08b-df25a898c841,Que natureza tinha a mensagem que D. Amélia destruiu depois de recebê-la de Gustavo?,A carteira,"Honório deu duas voltas, e foi mudar de toilette para o jantar.
+Então Gustavo sacou novamente a carteira, abriu-a, foi a um dos bolsos, tirou
+um dos bilhetinhos, que o outro não quis abrir nem ler, e estendeu-o a D. Amélia,
+que, ansiosa e trêmula, rasgou-o em trinta mil pedaços: era um bilhetinho de amor.",fact,medium,Bilhetinho de amor,2026-09-23 13:59:58,2026-09-23 13:59:58
+c38d41dd-6c90-434a-926c-50f136bd3832,Em que estado emocional a jovem procurou ajuda para entender a mudança de comportamento de Camilo?,A Cartomante,"Foi por esse tempo que Rita, desconfiada e medrosa, correu à cartomante
+para consultá-la sobre a verdadeira causa do procedimento de Camilo.",entity,medium,Desconfiada e medrosa,2026-09-23 16:59:54,2026-09-23 16:59:54
+e0b60c9e-9fcb-44b7-b780-97919679a08a,"Que quantia o consulente entregou à mulher, muito acima do preço habitual da consulta?",A Cartomante,"Camilo tirou uma nota de dez mil-réis, e deu-lha. Os olhos da cartomante
+fuzilaram. O preço usual era dois mil-réis.
+— Vejo bem que o senhor gosta muito dela... E faz bem; ela gosta muito do
+senhor. Vá, vá, tranqüilo. Olhe a escada, é escura; ponha o chapéu...",relationship,medium,dez mil réis,2026-09-23 17:02:43,2026-09-23 17:02:43
+1df9b565-a7cf-4078-baec-3b0d1bb8f3ec,Em que estado Camilo encontrou a mulher ao fundo da sala quando entrou na casa?,A Cartomante,"Entrando, Camilo não pôde sufocar um grito de terror: — ao
+fundo sobre o canapé, estava Rita morta e ensangüentada",entity,medium,morta e ensangüentada,2026-09-23 17:03:41,2026-09-23 17:03:41
+44c15349-c8b7-4abb-9c15-3898ab3f54b6,Como Vilela executou o antigo amigo naquele encontro final?,A Cartomante,"Camilo não pôde sufocar um grito de terror: — ao
+fundo sobre o canapé, estava Rita morta e ensangüentada. Vilela pegou-o pela gola,
+e, com dois tiros de revólver, estirou-o morto no chão.",entity,hard,com dois tiros de revólver,2026-09-23 17:04:09,2026-09-23 17:04:09
+7aecca91-54b4-49ab-a9a0-0faf4163dc7d,O que motivou a zombaria dele quando Rita tentou explicar por que estava inquieta?,A Cartomante,"Hamlet observa a Horácio que há mais cousas no céu e na terra do que
+sonha a nossa filosofia. Era a mesma explicação que dava a bela Rita ao moço
+Camilo, numa sexta-feira de novembro de 1869, quando este ria dela, por ter ido na
+véspera consultar uma cartomante;",relationship,medium,Por ter ido consultar uma cartomante,2026-09-23 17:05:19,2026-09-23 17:05:19
+edf7c5c1-90e1-4b74-a000-6befbee9f99f,A relação entre o jovem envolvido com Rita e o marido dela vinha dos tempos de criança?,A Cartomante,"Vilela, Camilo e Rita, três nomes, uma aventura e nenhuma explicação das
+origens. Vamos a ela. Os dois primeiros eram amigos de infância.",relationship,hard,Sim,2026-09-23 17:06:12,2026-09-23 17:06:12
+9e24577a-19ce-4181-8365-05ea738fdc35,Que mudança de rotina ele adotou para não despertar desconfiança no marido de Rita?,A Cartomante,"Camilo teve medo, e, para
+desviar as suspeitas, começou a rarear as visitas à casa de Vilela. Este notou-lhe as
+ausências. Camilo respondeu que o motivo era uma paixão frívola de rapaz.",entity,hard,Rareou as visitas a casa de vilela,2026-09-23 17:08:11,2026-09-23 17:08:11
+6dbfb278-30ce-4e07-ac39-862f8a63e319,Qual foi a mensagem urgente enviada pelo marido de Rita ao escritório do antigo amigo?,A Cartomante,"No dia seguinte, estando na repartição, recebeu Camilo este bilhete de Vilela:
+""Vem já, já, à nossa casa; preciso falar-te sem demora."" Era mais de meio-dia.
+Camilo saiu logo;",relationship,medium,"""Vem já, já, à nossa casa; preciso falar-te sem demora.""",2026-09-23 17:09:01,2026-09-23 17:09:01
+a71bfec0-5408-40d8-a858-80bcf9b913ef,Como é descrita fisicamente e quanto à origem a mulher que faz a leitura das cartas?,A Cartomante,"A cartomante fê-lo sentar diante da mesa, e sentou-se do lado oposto, com as
+costas para a janela, de maneira que a pouca luz de fora batia em cheio no rosto de
+Camilo. Abriu uma gaveta e tirou um baralho de cartas compridas e enxovalhadas.
+Enquanto as baralhava, rapidamente, olhava para ele, não de rosto, mas por baixo
+dos olhos. Era uma mulher de quarenta anos, italiana, morena e magra, com
+grandes olhos sonsos e agudos",entity,medium,"Era uma mulher de quarenta anos, italiana, morena e magra, com
+grandes olhos sonsos e agudos",2026-09-23 17:11:30,2026-09-23 17:11:30
+799a9be5-71a7-4c17-a82f-ac997dc4a488,Qual foi a previsão que tranquilizou o rapaz a respeito do triângulo amoroso?,A Cartomante,"Camilo tinha os olhos nela. curioso e ansioso.
+— As cartas dizem-me...
+Camilo inclinou-se para beber uma a uma as palavras. Então ela declarou-lhe
+que não tivesse medo de nada. Nada aconteceria nem a um nem a outro; ele, o
+terceiro, ignorava tudo. Não obstante, era indispensável muita cautela: ferviam
+invejas e despeitos. Falou-lhe do amor que os ligava, da beleza de Rita... Camilo
+estava deslumbrado. A cartomante acabou, recolheu as cartas e fechou-as na
+gaveta.",theme,medium,"Que Nada aconteceria nem a um nem a outro; ele, o
+terceiro, ignorava tudo",2026-09-23 17:12:23,2026-09-23 17:12:23
+4fe74f86-69bd-4fd8-8336-bf66f651a1de,De que fonte narrativa vem a história sobre a criação da nova religião pelo Diabo?,A igreja do Diabo,"Conta um velho manuscrito beneditino que o Diabo, em  certo dia, teve a idéia
+de fundar uma igreja",theme,medium,Um velho manuscrito,2026-09-23 13:25:24,2026-09-23 13:25:24
+70d83abd-aca5-4ad8-b0d1-43afd6d26dab,Que estado de espírito Deus demonstra ao questionar por que o adversário demorou tanto a organizar sua instituição?,A igreja do Diabo,"— Quereis que venha anunciar-vos o remate da obra?
+
+— Não é preciso; basta que me digas desde já por que motivo, cansado há
+tanto da tua desorganização, só agora pensaste em fundar uma igreja?",relationship,hard,Cansaço e irritação,2026-09-23 13:27:14,2026-09-23 13:27:14
+be3affd8-f02b-4ce1-b174-45ad8660ca1f,Que imagem popular do Diabo ele rejeita ao se apresentar?,A igreja do Diabo,"— Sim, sou o Diabo, repetia ele; não o Diabo das noites sulfúreas, dos contos
+soníferos, terror das crianças, mas o Diabo verdadeiro e único, o próprio gênio da
+natureza, a que se deu aquele nome para arredá-lo do coração dos homens.
+Vede-me gentil a airoso. Sou  o vosso verdadeiro pai",entity,medium,"O diabos das noites, contos e terror das crianças",2026-09-23 13:28:20,2026-09-23 13:28:20
+669569fe-4b5a-493e-84db-9f4aa1326c4c,Quais vícios tradicionais foram reabilitados como qualidades naturais na nova doutrina?,A igreja do Diabo,"Clamava ele que as virtudes aceitas deviam ser substituídas por outras, que
+eram as naturais e legítimas. A soberba, a luxúria, a preguiça foram reabilitadas, e
+
+5
+assim também a avareza, que declarou não ser mais do que a mãe da economia,
+com a diferença que a mãe era robusta, e a filha uma esgalgada. A ira tinha a
+melhor defesa na existência de Homero; sem o furor de Aquiles, não haveria a
+Ilíada: ""Musa, canta a cólera de Aquiles, filho de Peleu""... O mesmo disse da gula,
+que produziu as melhores páginas de Rabelais, e muitos bons versos do Hissope;
+virtude tão superior, que ninguém se lembra das batalhas de Luculo, mas das suas
+ceias; foi a gula que realmente o fez imortal. Mas, ainda pondo de lado essas razões
+de ordem literária ou histórica, para só mostrar o valor intrínseco daquela virtude,
+quem negaria que era muito melhor sentir na boca e no ventre os bons manjares, em
+grande cópia, do que os maus bocados, ou a saliva do jejum? Pela sua parte o
+Diabo prometia substituir a vinha do Senhor, expressão metafórica, pela vinha do
+Diabo, locução direta e verdadeira, pois não faltaria nunca aos seus com o fruto das
+mais belas cepas do mundo. Quanto à inveja, pregou friamente que era a virtude
+principal, origem de prosperidades infinitas; virtude preciosa, que chegava a suprir
+todas  as outras, e ao próprio talento.",fact,medium,"Soberba, luxuria, preguiça, avazera, ira,gula",2026-09-23 13:31:15,2026-09-23 13:31:15
+14ccad54-9021-4cd5-9a63-abf9661b4f68,O fundador era exclusivista a ponto de exigir uma única disposição de todos?,A igreja do Diabo,"Nada mais curioso, por exemplo, do que a definição que ele dava da fraude.
+Chamava-lhe o braço esquerdo do homem; o braço direito era a força; e concluía:
+muitos homens são canhotos, eis tudo. Ora, ele não exigia que todos fossem
+canhotos; não era exclusivista. Que uns fossem canhotos, outros destros; aceitava a
+todos, menos os que não fossem nada.",quote,easy,Não,2026-09-23 13:33:17,2026-09-23 13:33:17
+575b5afc-f122-456f-bc95-1aeb4c2072fb,Qual princípio de solidariedade humana ele considerava o principal obstáculo a eliminar para concluir sua doutrina?,A igreja do Diabo,"Para rematar a obra, entendeu o Diabo que lhe cumpria cortar por toda a
+solidariedade humana. Com efeito, o amor do próximo era um obstáculo grave à
+nova instituição. Ele mostrou que essa  regra era urna simples invenção de parasitas
+e negociantes insolváveis; não se devia dar ao próximo senão indiferença; em
+alguns casos, ódio ou desprezo",theme,medium,Amor ao próximo,2026-09-23 13:34:08,2026-09-23 13:34:08
+4b0b33a3-7be7-4cb1-bbec-6397107e8a7f,Que contradição no comportamento dos próprios fiéis fez o fundador procurar Deus novamente?,A igreja do Diabo,"Um dia. porém, longos anos depois notou o Diabo que muitos dos seus fiéis,
+às escondidas, praticavam as antigas virtudes. Não as praticavam todas, nem
+integralmente, mas algumas, por partes, e, como digo, às ocultas. Certos glutões
+recolhiam-se a comer frugalmente três ou quatro vezes por ano, justamente em dias
+de preceito católico; muitos avaros davam esmolas, à noite, ou nas ruas mal
+povoadas; vários dilapidadores do erário restituíam-lhe pequenas quantias; os
+fraudulentos falavam, uma ou outra vez, com o coração nas mãos, mas com o
+mesmo rosto dissimulado, para fazer crer que estavam embaçando os outros.
+
+A descoberta assombrou o Diabo. Meteu-se a conhecer mais diretamente o
+mal, e viu que lavrava muito. Alguns casos eram até incompreensíveis, como o de
+um droguista do Levante, que envenenara longamente uma geração inteira, e, com
+o produto das drogas socorria os filhos das vítimas. No Cairo achou um perfeito
+ladrão de camelos, que tapava a cara para ir às mesquitas. O Diabo deu com ele à
+entrada de uma, lançou-lhe em rosto o procedimento; ele negou, dizendo que ia ali
+roubar o camelo de um drogman; roubou-o, com efeito, à vista do Diabo e foi dá-lo
+de presente a um muezim, que rezou por ele a Alá. O manuscrito beneditino cita
+muitas outra  descobertas extraordinárias, entre elas esta, que desorientou
+completamente o Diabo. Um dos seus melhores apóstolos era um calavrês, varão de
+cinqüenta anos, insigne falsificador de documentos, que possuía uma bela casa na
+campanha romana, telas, estátuas, biblioteca, etc. Era a fraude em pessoa; chegava
+a meter-se na cama para não confessar que estava são. Pois esse homem, não só
+não furtava ao jogo, como ainda dava gratificações aos criados. Tendo angariado a
+amizade de um cônego, ia todas as semanas confessar-se com ele, numa capela
+
+7
+solitária; e, conquanto não lhe desvendasse nenhuma das suas ações secretas,
+benzia-se duas vezes, ao ajoelhar-se, e ao levantar-se. O Diabo mal pôde crer
+tamanha aleivosia. Mas não havia duvidar; o caso era verdadeiro.
+
+Não se deteve um instante. O pasmo não lhe deu tempo de refletir, comparar
+e concluir do espetáculo presente alguma cousa análoga ao passado. Voou de novo
+ao céu, trêmulo de raiva, ansioso de conhecer a causa secreta de tão singular
+fenômeno. Deus ouviu-o com infinita complacência; não o interrompeu, não o
+repreendeu, não triunfou, sequer, daquela agonia satânica. Pôs os olhos nele, e
+disse:",fact,hard,"Percebeu a hipocrisia humana em praticar o pecado, mesmo que o fosse bom",2026-09-23 13:38:53,2026-09-23 13:38:53
+3f24a246-cb36-4238-ad0c-65eb7ed61bd5,Em que circunstância o homem morreu depois de ceder a outra pessoa o único meio de salvação?,A igreja do Diabo,"Esse mesmo
+ancião parece enjoado; e sabes tu o que ele fez?
+
+— Já vos disse que não.
+
+— Depois de uma vida honesta, teve uma morte sublime. Colhido em um
+naufrágio, ia salvar-se numa tábua; mas viu um casal de noivos, na flor da vida, que
+se debatiam já com a morte; deu-lhes a tábua de salvação e mergulhou na
+eternidade. Nenhum público: a água e o céu por cima. Onde achas aí a franja de
+algodão?",fact,hard,Naufrágio,2026-09-23 13:40:49,2026-09-23 13:40:49
+f213f56e-7fd4-4e83-ad0f-e43eef3cd27b,Como o personagem define a própria natureza ao falar com o Senhor?,A igreja do Diabo,"— Senhor, eu sou, como sabeis, o espírito que nega.",entity,easy,O espírito que nega,2026-09-23 13:41:25,2026-09-23 13:41:25
+fdd644ab-e032-4886-9706-708ea20a5b2b,A expectativa de adesão em massa à nova instituição acabou se realizando?,A igreja do Diabo,"A previsão do Diabo verificou-se.  Todas as virtudes cuja capa de veludo
+acabava em franja de algodão, uma vez puxadas pela franja, deitavam a capa às
+urtigas e vinham alistar-se na igreja nova. Atrás foram chegando as outras, e o
+tempo abençoou a instituição. A igreja fundara-se; a doutrina propagava-se; não
+havia uma região do globo que não a conhecesse, uma língua que não a traduzisse,
+uma raça que não a amasse. O Diabo alçou brados de triunfo.",theme,medium,Sim,2026-09-23 13:42:25,2026-09-23 13:42:25
+2294eb48-3618-4db1-8ad5-283575440b33,Que comparação célebre é usada para caracterizar o olhar da jovem vizinha de Bentinho?,Dom Casmurro,"Você já reparou nos olhos dela? São assim de cigana
+oblíqua e dissimulada",entity,easy,Olhos de cigana,2026-09-23 14:51:26,2026-09-23 14:51:26
+a4296269-7818-4a02-800d-fcb384fe4fb1,Quem sustentava o compromisso de encaminhar o menino para a vida religiosa?,Dom Casmurro,"—D. Glória, a senhora persiste na idéia de meter o nosso Bentinho no
+seminário? É mais que tempo, e já agora pode haver uma dificuldade.",relationship,medium,D. Glória,2026-09-23 14:52:40,2026-09-23 14:52:40
+a0d7e238-0ddf-4cf7-a262-8cf7cfaaad7c,O companheiro de seminário que se tornaria seu grande amigo tinha mais idade que o narrador?,Dom Casmurro,"Eis aqui outro seminarista. Chamava-se Ezequiel de Sousa Escobar era um
+rapaz esbelto, olhos claros, um pouco fugitivos, como as mãos, como os pés, como
+a fala, como tudo. Quem não estivesse acostumado com ele podia acaso sentir-se
+mal, não sabendo por onde lhe pegasse. Não fitava de rosto, não falava claro nem
+seguido as mãos não apertavam as outras, nem se deixavam apertar delas, por que
+os dedos, sendo delgados e curtos, quando a gente cuidava tê-los entre os seus, já
+não tinha nada. O mesmo digo dos pés, que lia depressa estavam aqui como lá.
+Esta dificuldade em pousar foi a maior obstáculo que achou para tomar os costumes
+do seminário. O sorriso era instantâneo, mas também ria folgado e largo. Uma cousa
+não seria tão fugitiva, como o resto, a reflexão; íamos dar com ele, muita vez, olhos
+enfiados em si, cogitando. Respondia-nos sempre que meditava algum ponto
+espiritual, ou então que recordava a lição da véspera. Quando ele entrou na minha
+intimidade pedia-me freqüentemente explicações e repetições miúdas, e tinha
+memória para guardá-las todas, até as palavras. Talvez esta faculdade prejudicasse
+alguma outra.
+Era mais velho que eu três anos, filho de um advogado de Curitiba,",relationship,hard,Sim,2026-09-23 14:53:54,2026-09-23 14:53:54
+79cd1b65-cf31-4428-8b70-b8c641324a8c,"Fora dos parentes, o protagonista reconhecia possuir outra amizade verdadeira além do colega conhecido na formação religiosa?",Dom Casmurro,"—Escobar, você é meu amigo, eu sou seu amigo também; aqui ao seminário
+você é a pessoa que mais me tem entrado no coração, e lá fora, a não ser a gente
+da família, não tenho propriamente um amigo.",relationship,hard,Não,2026-09-23 14:57:55,2026-09-23 14:57:55
+59693260-43ff-4972-9640-4c60ad0d772b,Os dois seminaristas realmente desejavam seguir a carreira eclesiástica?,Dom Casmurro,"—Escobar, você é capaz de guardar um segredo?
+—Você que pergunta é porque duvida, e nesse caso. ..
+—Desculpe, é um modo de falar. Eu sei que é moço sério, e faço de conta
+que me confesso a um padre.
+—Se precisa de absolvição, está absolvido.
+—Escobar, eu não posso ser padre. Estou aqui, os meus acreditam, e
+esperam; mas eu não posso ser padre.
+—Nem eu, Santiago.
+—Nem você?",relationship,hard,Não,2026-09-23 14:58:33,2026-09-23 14:58:33
+60a1a504-bc55-4b7d-95b1-261be90edb36,A que destino europeu seria necessário viajar para tentar desfazer formalmente o compromisso religioso assumido pela mãe?,Dom Casmurro,"No dia seguinte revelou-me o mistério. Ao primeiro aspecto confesso que
+fiquei deslumbrado. Trazia uma nota de grandeza e de espiritualidade que falava aos
+meus olhos de seminarista. Era não menos que isto. Minha mãe, ao parecer dele,
+estava arrependida do que fizera, e desejaria ver-me cá fora, mas entendia que o
+vínculo moral da promessa a prendia indissoluvelmente. Cumpria rompê-lo, e para
+tanto valia a Escritura, com o poder de desligar dado aos apóstolos. Assim que, ele e
+eu iríamos a Roma pedir a absolvição do papa... Que me parecia?",fact,hard,Roma,2026-09-23 15:03:58,2026-09-23 15:03:58
+80c0ea2e-3a91-4ce4-96d2-bc74fd8ce92a,Que conselho bíblico é lembrado pelo narrador ao refletir sobre o perigo de ensinar malícia à esposa por meio do ciúme?,Dom Casmurro,"se soubesse dos meus primeiros ciúmes, dir-me-ia, como no
+seu cap. IX, vers. 1: ""Não tenhas ciúmes de tua mulher para que ela não se meta a
+enganar-te com a malícia que aprender de ti""",quote,medium,"""Não tenhas ciúmes de tua mulher para que ela não se meta a
+enganar-te com a malícia que aprender de ti""",2026-09-23 15:08:02,2026-09-23 15:08:02
+e534a118-fa2b-4127-aea3-e0319b2f04ff,Quem havia planejado inicialmente entregar ao amigo do seminário o papel de padrinho da criança?,Dom Casmurro,"Era minha idéia que Escobar fosse padrinho do pequeno; a madrinha devia
+ser e seria minha mãe. Mas a primeira parte se trocou por intervenção do tio Cosme,
+que, ao ver a criança, disse-lhe entre outros carinhos:
+—Anda, toma a bênção a teu padrinho, velhaco.
+E, voltando-se para mim:
+—Não desisto do favor; e há de ser depressa o batizado, antes que a minha
+doença me leve de vez.
+Contei discretamente a anedota a Escobar, para que ele me compreendesse
+e desculpasse; riu-se e não se magoou. Fez mais, quis que o almoço do batizado
+fosse na chácara dele, e foi. Eu ainda tentei espaçar a cerimônia a ver se tio Cosme
+sucumbia primeiro à doença, mas parece que esta era mais de aborrecer que de
+matar. Não houve remédio senão levar o menino à pia, onde se lhe deu o nome de
+Ezequiel; era o de Escobar",relationship,hard,De bentinho,2026-09-23 15:09:43,2026-09-23 15:09:43
+28b69146-3ef9-4364-8e35-f8c2fc7fe9d8,O modo de olhar do menino fazia sua mãe recordar quais duas figuras ligadas ao passado da família?,Dom Casmurro,"—Você já reparou que Ezequiel tem nos olhos uma expressão esquisita?
+perguntou-me Capitu. Só vi duas pessoas assim, um amigo de papai e o defunto
+Escobar. Olha, Ezequiel; olha firme, assim, vira para o lado de papai, não precisa
+revirar os olhos, assim, assim...",location,hard,Pai de Capitu  e Escobar,2026-09-23 15:11:23,2026-09-23 15:11:23
+e04d51f7-35e9-4ae5-b442-f8775c7ec879,Os dois adolescentes chegaram a prometer exclusividade matrimonial um ao outro para o futuro?,Dom Casmurro,"—Não há de ser assim, continuei. Dizem que não estamos em idade de casar,
+que somos crianças, criançolas,—já ouvi dizer criançolas. Bem; mas dous ou três
+anos passam depressa. Você jura uma cousa? lura que só há de casar comigo?
+Capitu não hesitou em jurar, e até lhe vi as faces vermelhas de prazer. Jurou
+duas vezes e uma terceira:
+—Ainda que você case com outra, cumprirei o meu juramento, não casando
+nunca.
+—Que eu case com outra?
+—Tudo pode ser. Bentinho. Você pode achar outra moça que lhe queira,
+apaixonar-se por ela e casar. Quem sou eu para você lembrar-se de mim nessa
+ocasião?
+—Mas eu também juro! Juro, Capitu, juro por Deus Nosso Senhor que só me
+casarei com você. Basta isto?",relationship,hard,Sim,2026-09-23 15:13:27,2026-09-23 15:13:27
+89c8a7ff-355e-4014-86a0-d9e7096a6f00,"Segundo o bicheiro, que hábito do jogador explicava a baixa frequência de acertos?",Jogo do Bicho,"Camilo recordou-lhe o dito; o bicheiro soltou uma gargalhada.
+    — Não, compadre; eu não posso adivinhar. Aquilo foi pura brincadeira. Oxalá que eu
+lhe pudesse dar um prêmio. A águia dá; não é comum, mas dá.
+    — Mas porque é que eu ainda não acertei com ela?
+    — Isso não sei; eu não posso dar conselhos, mas quero crer que você, compadre, não
+tem paciência no mesmo bicho, não joga com certa constância. Troca muito. É por isso
+
+que poucas vezes tem acertado.",theme,hard,Porque troca muito de bicho,2026-09-23 17:18:16,2026-09-23 17:18:16
+2f31388a-5713-4dbc-9b8d-b53b6c24ebcd,Que palavra ligada à aposta invadia o trabalho do funcionário quando ele copiava os números do documento?,Jogo do Bicho,"Camilo ia calculando os números e descrendo da sorte. O documento tinha algarismos;
+ele errou-os muita vez, por causa do atropelo em que uns e outros lhe andavam no
+cérebro. A troca era fácil; os seus vinham mais vezes ao papel que os do documento
+original. E o pior é que ele não dava por isso, escrevia o leão em vez de transcrever a
+soma exata das toneladas de pólvora...",theme,medium,Escrevia leão,2026-09-23 17:25:39,2026-09-23 17:25:39
+ad9075e1-17b0-4296-a9aa-da5738fc5319,"Ao se irritar no trabalho, até onde imaginou levar o superior usando de forma jocosa um verbo burocrático?",Jogo do Bicho,"Camilo teve vontade de prorrogar o chefe até ao mar, se lhe era lícito dar tal uso ao
+verbo e ao regulamento. Voltou à mesa, pegou de uma folha de papel e começou a
+
+escrever o requerimento de demissão",relationship,medium,prorrogar o chefe até ao mar,2026-09-23 17:27:07,2026-09-23 17:27:07
+4172dcbb-3ee5-4aa1-9975-9c33a77f1f1a,Que conjunto de comida e bebida o comerciante acabou convencendo o apostador a levar para casa?,Jogo do Bicho,"confeiteiro veio ajudá-lo, e, notando a incerteza de Camilo entre mesa e sobremesa,
+resolveu vender-lhe ambas as cousas. Começou por um pastelão, “um rico pastelão, que
+enchia os olhos, antes de encher a boca e o estômago”. A sobremesa foi “um rico pudim”,
+em que havia escrito, com  letras de massa branca este viva eterno: “Viva a esperança!”.
+A alegria de Camilo foi tanta e tão estrepitosa que o homem não teve remédio senão
+oferecer-lhe vinho também, uma ou duas garrafas. Duas.",relationship,medium,"Um pastelao, um pudim e duas garrafas de vinho",2026-09-23 17:40:14,2026-09-23 17:40:14
+24c012f4-9e25-45d1-a51c-55e55f80990f,Que presente ele decidiu comprar para a esposa depois de já estar no bonde?,Jogo do Bicho,"Estava tão contente com o jantar que levava e o espanto da mulher, nem se lembrou
+de presentear Joaninha com alguma jóia. Esta idéia só o assaltou no bonde, andando;
+desceu e voltou a pé, a buscar um mimo de ouro, um broche que fosse, com uma pedra
+preciosa.",relationship,medium,com um broche de ouro com pedra preciosa,2026-09-23 17:43:27,2026-09-23 17:43:27
+6f708891-67ea-40fb-8b3b-21d5ae5d7fc1,"Depois de experimentar vários métodos para escolher números, qual símbolo passou a adotar de modo persistente?",Jogo do Bicho,"Camilo apoderou-se daquele processo de adotar um bicho, e jogar nele
+até estafá-lo: era ir pelos números adventícios. Por exemplo, entrava por uma rua com os
+olhos no chão, dava quarenta, sessenta, oitenta passos, erguia repentinamente os olhos e
+fitava a primeira casa à direita ou à esquerda, tomava o número e ia dali ao bicho
+correspondente. Tinha já gasto o processo de números escritos e postos dentro do
+chapéu, o de um bilhete do Tesouro — cousa rara — e cem outras formas, que se
+repetiam ou se  completavam. Em todo caso, ia descambando na impaciência e variava
+muito. Um dia resolveu fixar-se no leão;",theme,easy,No leão,2026-09-23 17:47:17,2026-09-23 17:47:17
+92cbfc06-c340-4422-b215-a1bbd09d2c2d,"Por que ele registrava entradas e saídas, mas evitava confrontar as duas colunas?",Jogo do Bicho,"Camilo escrevia efetivamente a despesa e a receita, mas não as comparava para não
+conhecer a diferença. Não queria saber do deficit",theme,medium,Não queria saber do deficit,2026-09-23 17:49:15,2026-09-23 17:49:15
+e2a1a9a1-dd7b-4d01-a284-0b317c8f1e25,"Como funcionava a aposta descrita no conto, em que um número convencional determinava o resultado?",Jogo do Bicho,"Camilo, pela primeira vez, jogou no
+bicho. Jogar no bicho não é um eufemismo como matar o bicho. O jogador escolhe um
+número, que convencionalmente representa um bicho, e se tal número acerta de ser o
+final da sorte grande, todos os que arriscaram nele os seus vinténs ganham, e todos os
+que fiaram dos outros perdem. Começou a vinténs e dizem que está em contos de réis;
+mas, vamos ao nosso caso.",theme,medium,Escolher um número que representa um bicho,2026-09-23 17:53:50,2026-09-23 17:53:50
+3db3613c-b3b8-4499-8318-b70ab7fa6cf5,"Mesmo após sucessivas tentativas frustradas, ele continuava acreditando que poderia vencer?",Jogo do Bicho,"Camilo tinha fé. A fé abala as montanhas. Tentou o gato, depois o cão, depois o
+avestruz; não havendo jogado neles, podia ser que... Não pôde ser; a fortuna igualou os
+três animais em não lhes fazer dar nada. Não queria ir pelos palpites dos jornais, como
+faziam alguns amigos",theme,medium,Sim,2026-09-23 17:54:40,2026-09-23 17:54:40
+5a202966-2f5f-4d2b-8fa1-19b25b9bedb0,Ele aceitava mudar seus cálculos quando interpretava algum acontecimento como um sinal superior?,Jogo do Bicho,"Camilo deixou-se ir com os seus cálculos. Quando muito, cedia a certas
+indicações que pareciam vir do céu",theme,easy,sim,2026-09-23 17:55:31,2026-09-23 17:55:31
+301bbf36-4258-4710-a20c-3507fea386e2,A quem o narrador dedica as memórias logo antes de iniciar o relato póstumo?,Memórias Póstumas de Brás Cubas,"AO VERME QUE PRIMEIRO ROEU AS FRIAS CARNES DO MEU CADÁVER
+DEDICO COMO SAUDOSA LEMBRANÇA ESTAS MEMÓRIAS PÓSTUMAS",theme,easy,Um verme,2026-09-23 19:19:09,2026-09-23 19:19:09
+84e8bc4a-112a-4ec4-8b35-e330a1412dfb,"Qual enfermidade encerrou a vida do narrador, embora ele atribua parte da culpa a uma grande ideia?",Memórias Póstumas de Brás Cubas,"Morri de uma pneumonia; mas se lhe disser que foi menos a pneumonia, do
+que uma idéia grandiosa e útil, a causa da minha morte, é possível que o leitor me
+não creia, e todavia é verdade.",theme,medium,pneumonia,2026-09-23 19:21:54,2026-09-23 19:21:54
+b110fda5-121d-47c9-ba30-7fcc5a904ef2,Como ele batizou a invenção medicinal com que sonhava obter glória e lucro?,Memórias Póstumas de Brás Cubas,"Essa idéia era nada menos que a invenção de um medicamento sublime, um
+emplasto anti-hipocondríaco, destinado a aliviar a nossa melancólica humanidade.
+Na petição de privilégio que então redigi, chamei a atenção do governo para esse
+resultado, verdadeiramente cristão. Todavia, não neguei aos amigos as vantagens
+pecuniárias que deviam resultar da distribuição de um produto de tamanhos e tão
+profundos efeitos. Agora, porém, que estou cá do outro lado da vida, posso
+confessar tudo: o que me influiu principalmente foi o gosto de ver impressas nos
+jornais, mostradores, folhetos, esquinas, e enfim nas caixinhas do remédio, estas
+três palavras: Emplasto Brás Cubas.",theme,easy,Emplasto Brás Cubas,2026-09-23 19:24:16,2026-09-23 19:24:16
+deee6449-b0b6-4547-99d8-cb049067eb46,Qual antepassado é apresentado como origem da linhagem do narrador no século XVIII?,Memórias Póstumas de Brás Cubas,"O fundador de minha família foi um certo Damião Cubas, que floresceu
+na primeira metade do século XVIII.",entity,medium,Damião Cubas,2026-09-23 19:25:07,2026-09-23 19:25:07
+fc1b0347-f2bd-4ee1-b6f7-7d74f4fc20c1,Qual foi a última 'negativa' que o narrador considerou uma vantagem ao fazer o balanço da própria existência?,Memórias Póstumas de Brás Cubas,"E imaginará mal;
+porque ao chegar a este outro lado do mistério, achei-me com um pequeno saldo,
+que é a derradeira negativa deste capítulo de negativas: — Não tive filhos, não
+transmitia nenhuma criatura o legado da nossa miséria.",theme,hard,"— Não tive filhos, não
+transmitia nenhuma criatura o legado da nossa miséria.",2026-09-23 19:30:29,2026-09-23 19:30:29
+49266857-99ad-40db-b2ed-d4e7ebb102cf,Quem venceu o narrador tanto na disputa amorosa quanto na oportunidade política?,Memórias Póstumas de Brás Cubas,"o Lobo Neves, um homem que não era mais esbelto que
+eu, nem mais elegante, nem mais lido, nem mais simpático, e todavia foi quem me
+arrebatou Virgília e a candidatura",entity,medium,Lobo Neves,2026-09-23 19:31:49,2026-09-23 19:31:49
+1124986b-0594-43c0-9776-3d2064c257f3,"Dentro da filosofia de Quincas Borba, como deve ser entendida a experiência do sofrimento?",Memórias Póstumas de Brás Cubas,"A dor, segundo o Humanitismo, é uma pura ilusão. Quando
+a criança é ameaçada por um pau, antes mesmo de ter sido espancada, fecha os
+olhos e treme; essa predisposição é que constitui a base da ilusão humana, herdada
+e transmitida",theme,medium,Pura ilusão,2026-09-23 19:37:41,2026-09-23 19:37:41
+716d1844-7ebf-4228-8a29-71848f009b47,Com quem se casara a irmã de Brás Cubas?,Memórias Póstumas de Brás Cubas,"Sabina, casada com o Cotrim",entity,easy,Cotrim,2026-09-23 19:39:02,2026-09-23 19:39:02
+9185f01d-0b05-4660-ae61-9ca7bb912c7f,"Em que ocasiões ela costumava comparecer aos templos, apesar de não frequentar missa regularmente aos domingos?",Memórias Póstumas de Brás Cubas,"Virgília era um pouco religiosa. Não ouvia
+missa aos domingos, é verdade, e creio até que só ia às igrejas em dia de festa, e
+quando havia lugar vago em alguma tribuna",theme,medium,Em dias de festa e lugar vago na tribuna,2026-09-23 19:42:00,2026-09-23 19:42:00
+58bd0e2a-7cab-470d-ac72-2659eb761c2e,De qual autoridade colonial veio a antiga prataria que entrou na família do narrador?,Memórias Póstumas de Brás Cubas,"Tínhamos falado na prata, a velha prataria do tempo de Dom José I, a porção
+mais grave da herança, já pelo lavor, já pela vetustez, já pela origem da propriedade;
+
+52
+dizia meu pai que o Conde da Cunha, quando vice-rei do Brasil, a dera de presente
+a meu bisavô Luís Cubas.",theme,hard,vice-rei do Brasil,2026-09-23 19:45:00,2026-09-23 19:45:00
+7a1153a2-a104-4cd0-9a5a-934aaf1f4ea0,Em que celebração do calendário cristão se passa a madrugada em que o narrador fica acordado?,Missa do Galo,"Era noite de Natal. Havendo ajustado com um vizinho
+irmos à missa do galo, preferi não dormir;",time,easy,Noite de natal,2026-09-23 14:18:06,2026-09-23 14:18:06
+b9242c48-2755-4229-afc9-829d9083de3c,Na residência de qual funcionário público o jovem estava hospedado durante sua passagem pela Corte?,Missa do Galo,A casa em que eu estava hospedado era a do escrivão Meneses,relationship,easy,escrivão Meneses,2026-09-23 14:19:48,2026-09-23 14:19:48
+7bde6236-685d-4392-927f-4f8fada7ee25,As ausências semanais do chefe da casa estavam ligadas a um relacionamento extraconjugal?,Missa do Galo,"Meneses trazia amores com uma senhora, separada do marido, e
+dormia fora de casa uma vez por semana. Conceição padecera, a princípio, com a existência
+da comborça; mas afinal, resignara-se, acostumara-se, e acabou achando que era muito
+direito.",relationship,hard,Sim,2026-09-23 14:20:50,2026-09-23 14:20:50
+f18e15d0-82e0-4fe7-8ab6-506d19433527,Que temperamento o narrador atribui à esposa de Meneses ao recordar sua maneira de suportar os acontecimentos?,Missa do Galo,"Boa Conceição! Chamavam-lhe ""a santa"", e fazia jus ao título, tão facilmente suportava os
+esquecimentos do marido. Em verdade, era um temperamento moderado, sem extremos,
+nem grandes lágrimas, nem grandes risos. No capítulo de que trato, dava para maometana;
+aceitaria um harém, com as aparências salvas. Deus me perdoe, se a julgo mal. Tudo nela
+era atenuado e passivo. O próprio rosto era mediano, nem bonito nem feio. Era o que
+chamamos uma pessoa simpática. Não dizia mal de ninguém, perdoava tudo. Não sabia
+odiar; pode ser até que não soubesse amar.",entity,hard,Passiva e monotona,2026-09-23 14:21:57,2026-09-23 14:21:57
+75ba679d-dc79-45d3-8831-95c0e2736ed8,"A que publicação o narrador atribui, com alguma incerteza, a versão em português do romance que lia?",Missa do Galo,"Tinha comigo um romance, Os Três Mosqueteiros, velha tradução creio do Jornal do
+Comércio.",theme,hard,Jornal do comércio,2026-09-23 14:23:15,2026-09-23 14:23:15
+49799d33-f43a-41d1-937e-5eabea101430,Que roupa e aparência ela apresentava ao surgir da alcova enquanto o jovem lia?,Missa do Galo,"Conceição entrou na sala, arrastando as chinelinhas da alcova. Vestia um roupão branco,
+mal apanhado na cintura. Sendo magra, tinha um ar de visão romântica, não disparatada
+com o meu livro de aventuras.",quote,easy,vestindo roupão braco mal apanhado,2026-09-23 14:25:04,2026-09-23 14:25:04
+cc8ca909-2c4d-4b4f-b1e4-2fa73aa8b9b4,Qual escritor é associado ao romance citado durante a conversa na sala?,Missa do Galo,"Justamente: é muito bonito.
+— Gosta de romances?
+— Gosto.
+— Já leu a Moreninha?
+— Do Dr. Macedo? Tenho lá em Mangaratiba.",description,hard,Dr. Macedo,2026-09-23 14:25:58,2026-09-23 14:25:58
+3b614066-e2db-4e65-af72-bc369bc40b76,A imagem de Cleópatra aparecia em que tipo de objeto decorativo da sala?,Missa do Galo,"— Estes quadros estão ficando velhos. Já pedi a Chiquinho para comprar outros.
+Chiquinho era o marido. Os quadros falavam do principal negócio deste homem. Um
+representava ""Cleópatra""; não me recordo o assunto do outro, mas eram mulheres. Vulgares
+ambos; naquele tempo não me pareciam feios.",quote,hard,Um dos quadros,2026-09-23 14:28:28,2026-09-23 14:28:28
+2be6c09d-5412-4ca7-bddb-54076e08dadf,Por que o hóspede preferiu ficar pronto na sala enquanto todos da casa se recolhiam?,Missa do Galo,"mas fiquei até o Natal para ver ""a missa do galo na
+Corte"". A família recolheu-se à hora do costume; eu meti-me na sala da frente, vestido e
+pronto",theme,hard,Para assistir a missa do galo na corte,2026-09-23 14:33:04,2026-09-23 14:33:04
+0dcccd51-c1cf-489e-96a0-77c3bd3e49ed,Por que aquele diálogo noturno permaneceu tão vivo na memória do narrador muitos anos depois?,Missa do Galo,"E não saía daquela posição, que me enchia de gosto, tão perto ficavam as nossas caras.
+Realmente, não era preciso falar alto para ser ouvido: cochichávamos os dous, eu mais que
+ela, porque falava mais; ela, às vezes, ficava séria, muito séria, com a testa um pouco
+franzida. Afinal, cansou, trocou de atitude e de lugar. Deu volta à mesa e veio sentar-se do
+meu lado, no canapé. Voltei-me e pude ver, a furto, o bico das chinelas; mas foi só o tempo
+que ela gastou em sentar-se, o roupão era comprido e cobriu-as logo. Recordo-me que eram
+pretas. Conceição disse baixinho:",relationship,hard,"A conversa marcou Nogueira porque despertou nele uma forte atração por Conceição e criou uma intimidade ambígua que, mesmo anos depois, ele não conseguiu compreender completamente",2026-09-23 14:36:55,2026-09-23 14:36:55
+f7ee8544-f641-4268-b5b4-1e606f3a47f5,Que atividade ele dizia ser sua única ocupação ao recusar cargos oferecidos pela monarquia?,O Alienista,"As crônicas da vila de Itaguaí dizem que em tempos remotos vivera ali um
+certo médico, o Dr. Simão Bacamarte, filho da nobreza da terra e o maior dos
+médicos do Brasil, de Portugal e das Espanhas. Estudara em Coimbra e Pádua. Aos
+trinta e quatro anos regressou ao Brasil, não podendo el-rei alcançar dele que
+ficasse em Coimbra, regendo a universidade, ou em Lisboa, expedindo os negócios
+da monarquia.
+—A ciência, disse ele a Sua Majestade, é o meu emprego único; Itaguaí é o
+meu universo.",entity,medium,A ciência,2026-09-23 15:29:38,2026-09-23 15:29:38
+39cfb174-678b-4b63-81c9-275efd4bc542,Com quem o cientista obcecado pela mente humana se casou?,O Alienista,"As crônicas da vila de Itaguaí dizem que em tempos remotos vivera ali um
+certo médico, o Dr. Simão Bacamarte, filho da nobreza da terra e o maior dos
+médicos do Brasil, de Portugal e das Espanhas. Estudara em Coimbra e Pádua. Aos
+trinta e quatro anos regressou ao Brasil, não podendo el-rei alcançar dele que
+ficasse em Coimbra, regendo a universidade, ou em Lisboa, expedindo os negócios
+da monarquia.
+—A ciência, disse ele a Sua Majestade, é o meu emprego único; Itaguaí é o
+meu universo.
+Dito isso, meteu-se em Itaguaí, e entregou-se de corpo e alma ao estudo da
+ciência, alternando as curas com as leituras, e demonstrando os teoremas com
+cataplasmas. Aos quarenta anos casou com D. Evarista da Costa e Mascarenhas,
+senhora de vinte e cinco anos, viúva de um juiz de fora",relationship,medium,D. Evarista da Costa e Mascarenhas,2026-09-23 15:31:36,2026-09-23 15:31:36
+40253cc5-7c0f-43dd-bace-727ec907b6e3,Qual aspecto do ser humano ele afirmou merecer prioritariamente a atenção de um médico?,O Alienista,"—A saúde da alma, bradou ele, é a ocupação mais digna do médico.",quote,easy,A saúde da alma,2026-09-23 15:34:18,2026-09-23 15:34:18
+3bd83d19-ff10-412c-a5c8-9be153c34b16,Como passou a ser chamado o estabelecimento psiquiátrico cujas janelas tinham uma cor inédita na vila?,O Alienista,"A Casa Verde foi o nome dado ao asilo, por alusão à cor das janelas, que
+pela primeira vez apareciam verdes em Itaguaí.",location,medium,Casa Verde,2026-09-23 15:35:19,2026-09-23 15:35:19
+d6d0ae3d-4381-464a-9adf-3f0ea0adb182,Qual amigo e comensal do médico exercia o ofício de boticário em Itaguaí?,O Alienista,"—Do verdadeiro médico, emendou Crispim Soares, boticário da vila, e um dos
+seus amigos e comensais.",entity,easy,Crispim Soares,2026-09-23 15:37:10,2026-09-23 15:37:10
+6bcbb0c6-64f0-40d5-980b-69860fea70f6,"Que investigação científica justificava, para o alienista, a criação daquele estabelecimento?",O Alienista,"O principal nesta minha obra da Casa Verde é estudar
+profundamente a loucura, os seus diversos graus, classificar-lhe os casos, descobrir
+enfim a causa do fenômeno e o remédio universal.",location,medium,Estudar a loucura,2026-09-23 15:37:55,2026-09-23 15:37:55
+35a8f38e-0051-46d1-88ac-3f437a072e59,"Que traço de caráter, segundo Padre Lopes, impedia o médico de reconhecer os próprios méritos?",O Alienista,"A assembléia insistiu; o alienista resistiu; finalmente o Padre Lopes. explicou
+tudo com este conceito digno de um observador:
+—Sabe a razão por que não vê as suas elevadas qualidades, que aliás todos
+nós admiramos? É porque tem ainda uma qualidade que realça as outras:—a
+modéstia.",relationship,hard,Porque era modesto demais,2026-09-23 15:41:07,2026-09-23 15:41:07
+b4cc2124-dd90-41fe-848c-61a54a54041a,Qual foi o número de vítimas fatais informado ao médico após o confronto do dia anterior?,O Alienista,"—Quantos mortos e feridos houve ontem no conflito? perguntou Simão
+Bacamarte depois de uns três minutos.
+O barbeiro ficou espantado da pergunta, mas respondeu logo que onze
+mortos e vinte e cinco feridos.
+—Onze mortos e vinte e cinco feridos!",quote,hard,Onze mortos,2026-09-23 15:41:56,2026-09-23 15:41:56
+cb115e06-61cb-4719-9254-7eff58af6706,"Segundo as estatísticas apresentadas à Câmara, que fração dos habitantes da vila havia sido internada?",O Alienista,"De fato o alienista oficiara à Câmara expondo: — 1': que verificara das
+estatísticas da vila e da Casa Verde que quatro quintos da população estavam
+aposentados naquele estabelecimento",location,hard,quatro quintos,2026-09-23 15:44:18,2026-09-23 15:44:18
+3f8d9135-3547-41ae-875c-98bcc4edf697,Qual foi a reação emocional do médico quando o estabelecimento finalmente ficou sem internos?,O Alienista,"Agora, se imaginais que o alienista ficou radiante ao ver sair o último hóspede
+da Casa Verde, mostrais com isso que ainda não conheceis o nosso homem. Plus
+ultra! era a sua divisa. Não lhe bastava ter descoberto a teoria verdadeira da loucura;
+não o contentava ter estabelecido em Itaguaí. o reinado da razão. Plus ultra! Não
+ficou alegre, ficou preocupado, cogitativo; alguma coisa lhe dizia que a teoria nova
+tinha, em si mesma, outra e novíssima teoria.",fact,medium,"ficou preocupado, cogitativo",2026-09-23 15:49:37,2026-09-23 15:49:37
+327448cf-a1c9-40e9-9f60-84cfc36c1b9a,Como era chamado o indígena que apareceu certa noite diante do pai do narrador?,O imortal,"UMA NOITE, o chefe indígena — chamava-se Pirajuá — foi à rede de meu pai,",relationship,medium,Pirajuá,2026-09-23 20:02:01,2026-09-23 20:02:01
+d98a4a55-046a-4894-898e-ebeadfefac80,Por que o chefe recusou a possibilidade de prolongar indefinidamente a própria vida?,O imortal,"— Não, disse ele; Pirajuá não bebe, Pirajuá quer morrer. Está cansado, viu muita lua,
+muita lua. Pirajuá quer descansar na terra, está aborrecido. Mas Pirajuá quer deixar este
+segredo a guerreiro branco; está aqui; foi feito por um velho pajé de longe, muito longe...
+Guerreiro branco bebe, não morre mais.",theme,medium,Pirajuá estava cansado e queria morrer,2026-09-23 20:04:19,2026-09-23 20:04:19
+e3886ae9-0aca-4c5f-905d-a80fd6e40509,Que mudança no estado civil foi anunciada à mulher pelo curandeiro local?,O imortal,O curandeiro do lugar anunciou a Maracujá que ia ficar viúva.,relationship,medium,Que ia ficar viúva,2026-09-23 20:06:22,2026-09-23 20:06:22
+ef056b3d-ae25-4eca-9194-377bce17bb52,O que levou o pai do narrador a considerar finalmente experimentar a substância secreta?,O imortal,"Alta noite, lembrou-se do elixir, e perguntou a si mesmo se não era acertado tentá-lo.
+Já agora a morte era certa, que perderia ele com a experiência?",theme,medium,Porque a morte parecia certa,2026-09-23 20:07:05,2026-09-23 20:07:05
+8dc14745-2572-4cfe-8646-cc9e62b4dd18,A seriedade do médico acabou convencendo os dois ouvintes também sobre a eficácia da doutrina médica que ele defendia?,O imortal,"O coronel e o tabelião ficaram algum tempo calados, sem saber que pensassem da
+famosa história; mas a seriedade do médico era tão profunda, que não havia duvidar.
+Creram no caso, e creram também definitivamente na homeopatia.",theme,medium,Sim,2026-09-23 20:11:38,2026-09-23 20:11:38
+faa0b692-31ba-4234-bfc2-ecc26c9650d6,Qual era a forma completa do nome do homem conhecido de maneira abreviada como Rui de Leão?,O imortal,"Rui de Leão, ou antes Rui Garcia de Meireles e Castro Azevedo de Leão",entity,medium,Rui Garcia de Meireles e Castro Azevedo de Leão,2026-09-23 20:15:21,2026-09-23 20:15:21
+5f0655bd-fb1a-4aee-b75c-3aa61a8c7ae8,Por que uma sentença sem prazo de término seria pior para ele do que para um condenado comum?,O imortal,"e condenou-o a cárcere
+perpétuo. Meu pai ficou aterrado. Na verdade, a prisão perpétua para ele devia ser a
+cousa mais horrorosa do mundo. Prometeu, o mesmo Prometeu foi desencadeado... Não
+me interrompa, sr. Linhares, depois direi quem foi esse Prometeu. Mas, repito: ele foi
+desencadeado, enquanto que meu pai estava nas mãos do Santo Ofício, sem esperança.
+Por outro lado, ele refletiu consigo que, se era eterno, não o era o Santo Ofício. O Santo
+Ofício há de acabar um dia, e os seus cárceres, e então ficarei livre",theme,hard,Porque era imortal,2026-09-23 20:16:40,2026-09-23 20:16:40
+9ae47812-c858-417d-becb-aac0541a5501,Em que ano teria vindo ao mundo o homem cuja história espantou o coronel e o tabelião?,O imortal,"senhor, replicou o dr. Leão, de um modo grave e triste; foi em 1600.     Estupefação dos
+ouvintes, que eram dous, o coronel Bertioga, e o tabelião da vila, João Linhares. A vila era
+na província fluminense; suponhamos Itaboraí ou Sapucaia. Quanto à data, não tenho
+dúvida em dizer que foi no ano de 1855, uma noite de novembro, escura como breu,
+quente como um forno, passante de nove horas. Tudo silêncio. O lugar em que os três
+estavam era a varanda que dava para o terreiro. Um lampião de luz frouxa, pendurado de
+um prego, sublinhava a escuridão exterior. De quando em quando, gania um seco e
+áspero vento, mesclando-se ao som monótono de uma cachoeira próxima. Tal era o
+quadro e o momento, quando o dr. Leão insistiu nas primeiras palavras da narrativa.
+— Não, senhor; nasceu em 1600.",time,hard,Nasceu em 1600,2026-09-23 20:22:57,2026-09-23 20:22:57
+f65b1a9b-57e1-487c-b737-20681b7986be,A vida do líder indígena terminou pouco depois de transmitir ao estrangeiro o conhecimento sobre a substância?,O imortal,"Pirajuá sentiu o espontâneo da palavra de meu pai, e agradeceu-lha; mas abanou a
+cabeça.
+    — Não, disse ele; Pirajuá não bebe, Pirajuá quer morrer. Está cansado, viu muita lua,
+muita lua. Pirajuá quer descansar na terra, está aborrecido. Mas Pirajuá quer deixar este
+segredo a guerreiro branco; está aqui; foi feito por um velho pajé de longe, muito longe...
+Guerreiro branco bebe, não morre mais.
+    Dizendo isto, tornou a tapar a boca do boião, e foi metê-lo outra vez dentro da igaçaba.
+
+Meu pai fechou depois a boca da mesma igaçaba, e repôs a  pedra em cima. O primeiro
+clarão do sol vinha apontando. Voltaram para casa depressa; antes mesmo de tomar a
+rede, Pirajuá faleceu.",theme,medium,"Sim, Pirajuá faleceu antes de chegarem em casa",2026-09-23 20:27:16,2026-09-23 20:27:16
+6b227d0d-f2bf-4aca-bff9-8734665fda84,Que conspiração política passou a contar com a participação do imortal por influência de Lady Ema?,O imortal,"Lady Ema fez com que Rui de Leão entrasse daí a pouco na conspiração que deu em
+resultado a invasão da Inglaterra, a guerra civil, e a morte enfim  dos principais cabos da
+rebelião.",theme,medium,Na conspiração que resultou na invasão da inglaterra,2026-09-23 20:28:20,2026-09-23 20:28:20
+449aed6a-5d9e-487a-be9e-cd0f814504be,Que outro ser disputava com Rubião a afeição do filósofo?,Quincas Borba,"Rubião achou um rival no coração de Quincas Borba, — um cão, um bonito
+cão, meio tamanho, pêlo cor de chumbo, malhado de preto.",theme,easy,Um cão,2026-09-23 18:16:10,2026-09-23 18:16:10
+7dfe3eac-2793-41c1-92f6-c30d32f05159,O filósofo já havia lido o relato memorialístico narrado por Brás Cubas?,Quincas Borba,"Este Quincas Borba, se acaso me fizeste o favor de ler as Memórias
+Póstumas de Brás Cubas,",theme,medium,Sim,2026-09-23 18:20:55,2026-09-23 18:20:55
+9fc787df-fee4-430b-8f49-6a92343de9c5,"Segundo a explicação apresentada, seria aceitável atribuir a um animal um nome normalmente usado por pessoas?",Quincas Borba,"existe também no cão, e este pode assim receber um nome
+de gente, seja cristão ou muçulmano...",theme,medium,Sim,2026-09-23 18:22:12,2026-09-23 18:22:12
+d8c648c2-bd78-4493-a3de-6f64871cdcf6,O filósofo formalizou legalmente suas últimas vontades antes de voltar tranquilo para casa?,Quincas Borba,"Quincas Borba registrou o testamento, com as formalidades do
+estilo, e tornou tranqüilo para casa.",theme,easy,Sim,2026-09-23 18:28:26,2026-09-23 18:28:26
+d9f5d786-6d97-4292-8ade-dc697c143613,Qual obrigação acompanhava a transferência integral da herança para Rubião?,Quincas Borba,"tudo finalmente passava às mãos do Rubião,
+sem desvios, sem deixas a nenhuma pessoa, nem esmolas, nem dívidas. Uma só
+condição havia no testamento, a de guardar o herdeiro consigo o seu pobre cachorro
+Quincas Borba, nome que lhe deu por motivo da grande afeição que lhe tinha",quote,medium,Guardar o herdeiro cão quincas borba consigo,2026-09-23 18:32:15,2026-09-23 18:32:15
+b21762f1-ef62-4ab8-a20b-e55412b46fd4,Qual foi o destino final do cachorro após adoecer e procurar o dono?,Quincas Borba,"o fim do Quincas Borba, que adoeceu também, ganiu
+infinitamente, fugiu desvairado em busca do dono, e amanheceu morto na rua, três
+dias depois.",theme,medium,Fugiu desvairado e amanheceu morto no rua,2026-09-23 18:39:20,2026-09-23 18:39:20
+38a757ab-c75f-4125-9c54-6650123d30e2,"O que o médico dizia em público sobre a recuperação do doente, e qual era seu prognóstico real em particular?",Quincas Borba,"A opinião ostensiva do médico era que a doença do Quincas Borba iria saindo
+devagar. Um dia, o nosso Rubião, acompanhando o médico até à porta da rua,
+perguntou-lhe qual era o verdadeiro estado do amigo. Ouviu que estava perdido,
+completamente perdido; mas, que o fosse animando. Para que tornar-lhe a morte
+mais aflitiva pela certeza?...",theme,medium,"Que iria saindo devagar, estando perdido o seu estado",2026-09-23 18:44:03,2026-09-23 18:44:03
+a74020a5-461f-448a-9f68-2f9cd318455d,Qual mulher foi escolhida para receber o cão que Rubião decidiu afastar de si?,Quincas Borba,"Rubião ordenou a um escravo que levasse o
+cachorro de presente à comadre Angélica",theme,medium,À comadre angelica,2026-09-23 18:47:34,2026-09-23 18:47:34
+493ff269-b5b5-4339-8543-d26562ee0206,Qual cidade ele decidiu visitar por cerca de um mês antes de regressar?,Quincas Borba,"Quincas Borba acordou com a resolução de ir ao Rio de
+Janeiro, voltaria no fim de um mês",entity,easy,Ao rio de janeiro,2026-09-23 18:59:11,2026-09-23 18:59:11
+bd87c6bb-990d-44c8-bd1f-2b5543e7773f,Que cuidado funerário o herdeiro deveria garantir ao animal depois de sua morte?,Quincas Borba,"impunha-lhe a condição, quando morresse o cachorro, de lhe
+dar sepultura decente em terreno próprio, que cobriria de flores e plantas cheirosas;",theme,medium,Dar lhe sepultura decente,2026-09-23 19:00:23,2026-09-23 19:00:23

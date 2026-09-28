@@ -8,7 +8,6 @@ import yaml
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, model_validator
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ENV_PATH = PROJECT_ROOT / "config" / ".env"
 DEFAULT_YAML_PATH = PROJECT_ROOT / "config" / "config.yaml"
@@ -35,6 +34,7 @@ class StorageConfig(BaseModel):
     bronze_bucket: str = "acartomante-bronze"
     silver_bucket: str = "acartomante-silver"
     embedding_indexes_bucket: str = "acartomante-indexes"
+    benchmarks_bucket: str = "acartomante-benchmarks"
 
 
 class ColetaneaConfig(BaseModel):
@@ -97,9 +97,7 @@ class SilverConfig(BaseModel):
     pipeline_version: int = Field(default=1, ge=1)
     tokenizers: dict[str, ChunkTokenizerConfig]
     chunking: SilverChunkingConfig
-    semantic: SilverSemanticConfig = Field(
-        default_factory=SilverSemanticConfig
-    )
+    semantic: SilverSemanticConfig = Field(default_factory=SilverSemanticConfig)
 
     @model_validator(mode="after")
     def validate_tokenizer(self):
@@ -170,9 +168,7 @@ class EmbeddingConfig(BaseModel):
         EmbeddingModelConfig,
     ]
 
-    index: EmbeddingIndexConfig = Field(
-        default_factory=EmbeddingIndexConfig
-    )
+    index: EmbeddingIndexConfig = Field(default_factory=EmbeddingIndexConfig)
 
     execution: EmbeddingExecutionConfig = Field(
         default_factory=EmbeddingExecutionConfig
@@ -190,12 +186,110 @@ class EmbeddingConfig(BaseModel):
         return self
 
 
+class RetrievalIndexConfig(BaseModel):
+    release: str = "default"
+    index_id: str | None = None
+
+
+class BM25RetrievalConfig(BaseModel):
+    top_k: int = Field(default=10, gt=0)
+
+
+class DenseRetrievalConfig(BaseModel):
+    top_k: int = Field(default=10, gt=0)
+
+
+class DenseCrossEncoderRetrievalConfig(BaseModel):
+    candidate_k: int = Field(default=25, gt=0)
+    top_k: int = Field(default=10, gt=0)
+    model: str = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
+    revision: str = "main"
+
+    @model_validator(mode="after")
+    def validate_candidate_k(self):
+        if self.candidate_k < self.top_k:
+            raise ValueError(
+                "retrievals.dense_cross_encoder.candidate_k deve ser >= top_k."
+            )
+        return self
+
+
+class RetrievalStrategiesConfig(BaseModel):
+    bm25: BM25RetrievalConfig = Field(default_factory=BM25RetrievalConfig)
+    dense: DenseRetrievalConfig = Field(default_factory=DenseRetrievalConfig)
+    dense_cross_encoder: DenseCrossEncoderRetrievalConfig = Field(
+        default_factory=DenseCrossEncoderRetrievalConfig
+    )
+
+
+class RetrievalBenchmarkConfig(BaseModel):
+    evidence_min_coverage: float = Field(default=0.60, ge=0, le=1)
+    warmup_runs: int = Field(default=3, ge=0)
+
+
+
+class GenerationConfig(BaseModel):
+    provider: Literal["ollama"] = "ollama"
+    model: str = "llama3:latest"
+    base_url: str = "http://localhost:11434"
+
+    temperature: float = Field(
+        default=0.1,
+        ge=0,
+        le=2,
+    )
+
+    top_p: float = Field(
+        default=0.9,
+        gt=0,
+        le=1,
+    )
+
+    max_tokens: int = Field(
+        default=512,
+        gt=0,
+    )
+
+    num_ctx: int = Field(
+        default=8192,
+        gt=0,
+    )
+
+    timeout_seconds: float = Field(
+        default=120,
+        gt=0,
+    )
+
+    keep_alive: str = "10m"
+
+    max_context_chars: int = Field(
+        default=18000,
+        gt=0,
+    )
+
+
 class AppConfig(BaseModel):
     environment: EnvironmentConfig
     storage: StorageConfig
     bronze: BronzeConfig
     silver: SilverConfig
     embedding: EmbeddingConfig
+    retrieval_strategy: Literal["bm25", "dense", "dense_cross_encoder"] = (
+        "dense_cross_encoder"
+    )
+    retrieval_index: RetrievalIndexConfig = Field(default_factory=RetrievalIndexConfig)
+    retrievals: RetrievalStrategiesConfig = Field(
+        default_factory=RetrievalStrategiesConfig
+    )
+    retrieval_benchmark: RetrievalBenchmarkConfig = Field(
+        default_factory=RetrievalBenchmarkConfig
+    )
+    generation: GenerationConfig = Field(default_factory=GenerationConfig)
+
+    @property
+    def retrieval(self) -> RetrievalIndexConfig:
+        """Compatibilidade com IndexResolver/ReleaseManager."""
+        return self.retrieval_index
 
 
 class ConfigManager:
@@ -229,71 +323,32 @@ class ConfigManager:
             yaml_config,
             dict,
         ):
-            raise ValueError(
-                "config.yaml deve possuir um objeto YAML na raiz."
-            )
+            raise ValueError("config.yaml deve possuir um objeto YAML na raiz.")
 
         environment_values = {
-            "RUSTFS_ENDPOINT": os.getenv(
-                "RUSTFS_ENDPOINT"
-            ),
-            "RUSTFS_ACCESS_KEY": os.getenv(
-                "RUSTFS_ACCESS_KEY"
-            ),
-            "RUSTFS_SECRET_KEY": os.getenv(
-                "RUSTFS_SECRET_KEY"
-            ),
-            "QDRANT_URL": os.getenv(
-                "QDRANT_URL"
-            ),
-            "QDRANT_API_KEY": os.getenv(
-                "QDRANT_API_KEY"
-            ),
+            "RUSTFS_ENDPOINT": os.getenv("RUSTFS_ENDPOINT"),
+            "RUSTFS_ACCESS_KEY": os.getenv("RUSTFS_ACCESS_KEY"),
+            "RUSTFS_SECRET_KEY": os.getenv("RUSTFS_SECRET_KEY"),
+            "QDRANT_URL": os.getenv("QDRANT_URL"),
+            "QDRANT_API_KEY": os.getenv("QDRANT_API_KEY"),
         }
 
-        missing = [
-            key
-            for key, value
-            in environment_values.items()
-            if not value
-        ]
+        missing = [key for key, value in environment_values.items() if not value]
 
         if missing:
             raise ValueError(
-                "Variáveis de ambiente "
-                "obrigatórias ausentes: "
-                + ", ".join(missing)
+                "Variáveis de ambiente " "obrigatórias ausentes: " + ", ".join(missing)
             )
 
         environment = {
             "rustfs": {
-                "endpoint": (
-                    environment_values[
-                        "RUSTFS_ENDPOINT"
-                    ]
-                ),
-                "access_key": (
-                    environment_values[
-                        "RUSTFS_ACCESS_KEY"
-                    ]
-                ),
-                "secret_key": (
-                    environment_values[
-                        "RUSTFS_SECRET_KEY"
-                    ]
-                ),
+                "endpoint": (environment_values["RUSTFS_ENDPOINT"]),
+                "access_key": (environment_values["RUSTFS_ACCESS_KEY"]),
+                "secret_key": (environment_values["RUSTFS_SECRET_KEY"]),
             },
             "qdrant": {
-                "url": (
-                    environment_values[
-                        "QDRANT_URL"
-                    ]
-                ),
-                "api_key": (
-                    environment_values[
-                        "QDRANT_API_KEY"
-                    ]
-                ),
+                "url": (environment_values["QDRANT_URL"]),
+                "api_key": (environment_values["QDRANT_API_KEY"]),
             },
         }
 

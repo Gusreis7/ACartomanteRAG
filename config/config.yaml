@@ -3,6 +3,7 @@ storage:
   bronze_bucket: acartomante-bronze
   silver_bucket: acartomante-silver
   embedding_indexes_bucket: acartomante-indexes
+  benchmarks_bucket: acartomante-benchmarks
 
 bronze:
   coletanea:
@@ -30,8 +31,8 @@ silver:
   chunking:
     strategy: hybrid
     tokenizer: roberta_crawl_pt
-    chunk_size: 512
-    overlap: 64
+    chunk_size: 1024
+    overlap: 128
 
   tokenizers:
     roberta_crawl_pt:
@@ -48,7 +49,7 @@ silver:
 
 embedding:
   pipeline_version: 1
-  selected_model: colibri
+  selected_model: qwen3_embedding_06b
 
   models:
     colibri:
@@ -78,3 +79,40 @@ embedding:
   execution:
     device: auto
     batch_size: 32
+
+retrieval_strategy: dense_cross_encoder
+
+retrieval_index:
+  # null: usa a release promovida; preenchido: pin explícito.
+  release: default
+  index_id: null
+
+retrievals:
+  bm25:
+    top_k: 10
+
+  dense:
+    top_k: 10
+
+  dense_cross_encoder:
+    # Dense recupera candidate_k; CrossEncoder entrega top_k.
+    candidate_k: 25
+    top_k: 10
+    model: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
+    revision: main
+
+retrieval_benchmark:
+  evidence_min_coverage: 0.60
+  warmup_runs: 3
+
+generation:
+  provider: ollama
+  model: llama3:latest
+  base_url: http://localhost:11434
+  temperature: 0.1
+  top_p: 0.9
+  max_tokens: 512
+  num_ctx: 8192
+  timeout_seconds: 120
+  keep_alive: 10m
+  max_context_chars: 18000

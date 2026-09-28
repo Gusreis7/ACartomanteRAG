@@ -514,7 +514,7 @@ def main():
     parser.add_argument(
         "--delay",
         type=float,
-        default=0.5,
+        default=2,
         help="Delay entre páginas, em segundos. Padrão: 0.5.",
     )
 

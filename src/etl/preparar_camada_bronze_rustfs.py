@@ -8,8 +8,10 @@ Entrada:
     s3://<raw-bucket>/documents/*.pdf
 
 Saídas:
-    s3://<bronze-bucket>/texts/*.txt
-    s3://<bronze-bucket>/manifests/obras_bronze.parquet
+    s3://<bronze-bucket>/datasets/<bronze_artifact_id>/texts/*.txt
+    s3://<bronze-bucket>/datasets/<bronze_artifact_id>/manifest.parquet
+    s3://<bronze-bucket>/datasets/<bronze_artifact_id>/artifact.json
+    s3://<bronze-bucket>/current.json
 
 A camada Raw não é alterada.
 
@@ -36,9 +38,12 @@ Categorias:
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import re
 import tempfile
 import unicodedata
+import uuid
 from datetime import datetime, timezone
 from collections import Counter
 from difflib import SequenceMatcher
@@ -46,13 +51,13 @@ from pathlib import Path
 
 import pandas as pd
 import pymupdf
-
 from src.config.config_manager import ConfigManager
 from src.storage.rustfs_manager import RustFSManager
 
 DEFAULT_RAW_MANIFEST_KEY = "manifests/obras_raw.parquet"
-DEFAULT_BRONZE_MANIFEST_KEY = "manifests/obras_bronze.parquet"
-DEFAULT_BRONZE_TEXT_PREFIX = "texts"
+BRONZE_ARTIFACT_VERSION = 1
+BRONZE_DATASETS_PREFIX = "datasets"
+BRONZE_CURRENT_KEY = "current.json"
 
 DEFAULT_SIMILARIDADE_THRESHOLD = 0.1
 DEFAULT_QTD_TITULOS_COLETANEA = 2
@@ -100,20 +105,12 @@ def parse_args() -> argparse.Namespace:
         "--env-file",
         type=Path,
         default=None,
-        help=(
-            "Sobrescreve o .env padrão do ConfigManager. "
-            "Se omitido, usa config/.env."
-        ),
     )
 
     parser.add_argument(
         "--config-file",
         type=Path,
         default=None,
-        help=(
-            "Sobrescreve o YAML padrão do ConfigManager. "
-            "Se omitido, usa config/config.yaml."
-        ),
     )
 
     return parser.parse_args()
@@ -819,6 +816,37 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def build_bronze_artifact_id() -> str:
+    stamp = datetime.now(
+        timezone.utc
+    ).strftime("%Y%m%dT%H%M%SZ")
+
+    suffix = uuid.uuid4().hex[:8]
+
+    return (
+        f"bronze_v{BRONZE_ARTIFACT_VERSION}_"
+        f"{stamp}_{suffix}"
+    )
+
+
+def salvar_json_rustfs(
+    storage: RustFSManager,
+    bucket: str,
+    key: str,
+    payload: dict,
+) -> None:
+    storage.upload_bytes(
+        bucket=bucket,
+        key=key,
+        data=json.dumps(
+            payload,
+            ensure_ascii=False,
+            indent=2,
+        ).encode("utf-8"),
+        content_type="application/json",
+    )
+
+
 def normalizar_titulo_deduplicacao(titulo: str) -> str:
     """
     Normalização conservadora usada somente para agrupar versões
@@ -1009,21 +1037,63 @@ def main() -> None:
     if args.config_file is not None:
         config_kwargs["yaml_file"] = args.config_file
 
-    config = ConfigManager.load(**config_kwargs)
+    config = ConfigManager.load(
+        **config_kwargs
+    )
+
+    storage = RustFSManager.from_config(
+        config.environment.rustfs
+    )
 
     raw_bucket = config.storage.raw_bucket
     bronze_bucket = config.storage.bronze_bucket
 
-    storage = RustFSManager.from_config(config.environment.rustfs)
+    coletanea_config = config.bronze.coletanea
+    carta_config = config.bronze.carta
+    poema_config = config.bronze.poema
+    teatro_config = config.bronze.teatro
 
-    if not storage.bucket_exists(raw_bucket):
-        raise RuntimeError(f"Bucket Raw não encontrado: {raw_bucket}")
+    if not storage.bucket_exists(
+        raw_bucket
+    ):
+        raise RuntimeError(
+            "Bucket Raw não encontrado: "
+            f"{raw_bucket}"
+        )
 
-    storage.create_bucket(bronze_bucket)
+    storage.create_bucket(
+        bronze_bucket
+    )
 
-    print(f"[+] Bucket Raw:    {raw_bucket}")
-    print(f"[+] Bucket Bronze: {bronze_bucket}")
-    print(f"[+] Lendo manifest Raw: " f"s3://{raw_bucket}/{DEFAULT_RAW_MANIFEST_KEY}")
+    bronze_artifact_id = (
+        build_bronze_artifact_id()
+    )
+
+    bronze_dataset_prefix = (
+        f"{BRONZE_DATASETS_PREFIX}/"
+        f"{bronze_artifact_id}"
+    )
+    bronze_text_prefix = (
+        f"{bronze_dataset_prefix}/texts"
+    )
+    bronze_manifest_key = (
+        f"{bronze_dataset_prefix}/"
+        "manifest.parquet"
+    )
+    bronze_artifact_key = (
+        f"{bronze_dataset_prefix}/"
+        "artifact.json"
+    )
+
+    print(
+        "[+] Bronze artifact: "
+        f"{bronze_artifact_id}"
+    )
+
+    print(
+        "[+] Lendo manifest Raw: "
+        f"s3://{raw_bucket}/{DEFAULT_RAW_MANIFEST_KEY}"
+    )
 
     raw_manifest = carregar_parquet_rustfs(
         storage=storage,
@@ -1054,7 +1124,7 @@ def main() -> None:
             bronze_key = bronze_object_key(
                 document_id=document_id,
                 titulo=titulo,
-                prefix=DEFAULT_BRONZE_TEXT_PREFIX,
+                prefix=bronze_text_prefix,
             )
 
             print(f"[{indice + 1}/{len(df)}] {titulo}")
@@ -1063,6 +1133,9 @@ def main() -> None:
 
             registro.update(
                 {
+                    "bronze_artifact_id": (
+                        bronze_artifact_id
+                    ),
                     "source_document_id": document_id,
                     "source_raw_bucket": raw_bucket,
                     "source_raw_object_key": raw_object_key,
@@ -1151,7 +1224,7 @@ def main() -> None:
 
         resultado_carta = avaliar_carta(
             texto=texto,
-            qtd_assinaturas_minima=(config.bronze.carta.min_assinaturas),
+            qtd_assinaturas_minima=(carta_config.min_assinaturas),
         )
 
         resultado_coletanea = avaliar_coletanea(
@@ -1159,24 +1232,32 @@ def main() -> None:
             titulo_atual=titulo,
             titulos_normalizados=titulos_normalizados,
             titulos_info=titulos_info,
-            similaridade_threshold=(config.bronze.coletanea.similaridade_threshold),
-            qtd_titulos_coletanea=(config.bronze.coletanea.qtd_titulos_minima),
-            tamanho_fragmento=(config.bronze.coletanea.tamanho_fragmento),
-            tamanho_minimo_fragmento=(config.bronze.coletanea.tamanho_minimo_fragmento),
+            similaridade_threshold=(coletanea_config.similaridade_threshold),
+            qtd_titulos_coletanea=(coletanea_config.qtd_titulos_minima),
+            tamanho_fragmento=(coletanea_config.tamanho_fragmento),
+            tamanho_minimo_fragmento=(coletanea_config.tamanho_minimo_fragmento),
         )
 
         resultado_teatro = avaliar_estrutura_teatral(
             texto=texto,
-            min_repeticoes_locutor=(config.bronze.teatro.min_repeticoes_locutor),
-            min_locutores=(config.bronze.teatro.min_locutores),
-            min_turnos=(config.bronze.teatro.min_turnos),
-            min_pct_locutores_recorrentes=(config.bronze.teatro.min_pct_locutores),
+            min_repeticoes_locutor=(
+                teatro_config.min_repeticoes_locutor
+            ),
+            min_locutores=(
+                teatro_config.min_locutores
+            ),
+            min_turnos=(
+                teatro_config.min_turnos
+            ),
+            min_pct_locutores_recorrentes=(
+                teatro_config.min_pct_locutores
+            ),
         )
 
         resultado_poema = avaliar_estrutura_poetica(
             texto=texto,
-            max_palavras_linha=(config.bronze.poema.max_palavras_linha),
-            min_pct_linhas_curtas=(config.bronze.poema.min_pct_linhas_curtas),
+            max_palavras_linha=(poema_config.max_palavras_linha),
+            min_pct_linhas_curtas=(poema_config.min_pct_linhas_curtas),
         )
 
         if is_critica:
@@ -1208,6 +1289,7 @@ def main() -> None:
     )
 
     colunas_preferidas = [
+        "bronze_artifact_id",
         "source_document_id",
         "titulo",
         "autor",
@@ -1242,21 +1324,142 @@ def main() -> None:
         .reset_index(drop=True)
     )
 
+    sucessos = int(
+        df_manifest[
+            "status_bronze"
+        ].eq(
+            "success"
+        ).sum()
+    )
+
+    erros = int(
+        df_manifest[
+            "status_bronze"
+        ].eq(
+            "erro"
+        ).sum()
+    )
+
     salvar_parquet_rustfs(
         storage=storage,
         bucket=bronze_bucket,
-        key=DEFAULT_BRONZE_MANIFEST_KEY,
+        key=bronze_manifest_key,
         df=df_manifest,
+    )
+
+    bronze_manifest_bytes = (
+        storage.download_bytes(
+            bucket=bronze_bucket,
+            key=bronze_manifest_key,
+        )
+    )
+
+    bronze_manifest_sha256 = (
+        hashlib.sha256(
+            bronze_manifest_bytes
+        ).hexdigest()
+    )
+
+    created_at_utc = utc_now()
+
+    salvar_json_rustfs(
+        storage=storage,
+        bucket=bronze_bucket,
+        key=bronze_artifact_key,
+        payload={
+            "artifact_version": (
+                BRONZE_ARTIFACT_VERSION
+            ),
+            "bronze_artifact_id": (
+                bronze_artifact_id
+            ),
+            "created_at_utc": (
+                created_at_utc
+            ),
+            "source_raw_bucket": (
+                raw_bucket
+            ),
+            "source_raw_manifest_key": (
+                DEFAULT_RAW_MANIFEST_KEY
+            ),
+            "bronze_bucket": (
+                bronze_bucket
+            ),
+            "dataset_prefix": (
+                bronze_dataset_prefix
+            ),
+            "text_prefix": (
+                bronze_text_prefix
+            ),
+            "manifest_key": (
+                bronze_manifest_key
+            ),
+            "manifest_sha256": (
+                bronze_manifest_sha256
+            ),
+            "documents": int(
+                len(df_manifest)
+            ),
+            "documents_success": (
+                sucessos
+            ),
+            "documents_error": (
+                erros
+            ),
+            "bronze_config": (
+                config.bronze.model_dump(
+                    mode="json"
+                )
+            ),
+        },
+    )
+
+    # Só troca o ponteiro quando o artifact
+    # inteiro foi persistido com sucesso.
+    salvar_json_rustfs(
+        storage=storage,
+        bucket=bronze_bucket,
+        key=BRONZE_CURRENT_KEY,
+        payload={
+            "bronze_artifact_id": (
+                bronze_artifact_id
+            ),
+            "manifest_key": (
+                bronze_manifest_key
+            ),
+            "artifact_key": (
+                bronze_artifact_key
+            ),
+            "manifest_sha256": (
+                bronze_manifest_sha256
+            ),
+            "updated_at_utc": (
+                created_at_utc
+            ),
+        },
     )
 
     print()
     print("[OK] Camada Bronze criada.")
-    print(f"     Textos: s3://{bronze_bucket}/" f"{DEFAULT_BRONZE_TEXT_PREFIX}/")
-    print(f"     Manifest: s3://{bronze_bucket}/" f"{DEFAULT_BRONZE_MANIFEST_KEY}")
-
-    sucessos = df_manifest["status_bronze"].eq("success").sum()
-
-    erros = df_manifest["status_bronze"].eq("erro").sum()
+    print(
+        f"     Artifact: "
+        f"{bronze_artifact_id}"
+    )
+    print(
+        f"     Textos: s3://"
+        f"{bronze_bucket}/"
+        f"{bronze_text_prefix}/"
+    )
+    print(
+        f"     Manifest: s3://"
+        f"{bronze_bucket}/"
+        f"{bronze_manifest_key}"
+    )
+    print(
+        f"     Current: s3://"
+        f"{bronze_bucket}/"
+        f"{BRONZE_CURRENT_KEY}"
+    )
 
     print()
     print(f"[+] Sucessos: {sucessos}")

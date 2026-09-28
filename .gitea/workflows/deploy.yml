@@ -29,6 +29,10 @@ jobs:
       RUSTFS_CONSOLE_PORT: 9001
       QDRANT_HTTP_PORT: 6333
 
+      # Deve apontar para o índice produzido pela execução
+      # que este deploy pretende promover.
+      INDEX_ID: ${{ vars.ACARTOMANTE_INDEX_ID }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,6 +61,13 @@ jobs:
       - name: Deploy production
         run: |
           docker compose up             --detach             --wait             --wait-timeout 120             --remove-orphans
+
+      - name: Promote production release
+        env:
+          BRANCH_NAME: main
+        run: |
+          chmod +x .gitea/scripts/promote_release.sh
+          .gitea/scripts/promote_release.sh
 
       - name: Show production services
         run: docker compose ps
