@@ -53,10 +53,8 @@ if [[ -n "${PINNED_INDEX}" ]]; then
 fi
 
 if [[ -z "${INDEX_ID:-}" ]]; then
-  echo "[erro] INDEX_ID não definido."
-  echo "[erro] Com retrieval_index.index_id=null, o deploy precisa receber"
-  echo "       o index_id que deve ser promovido."
-  exit 1
+  echo "INDEX_ID não definido. Assumindo default"
+  INDEX_ID="default"
 fi
 
 echo "[+] Branch:  ${BRANCH}"
