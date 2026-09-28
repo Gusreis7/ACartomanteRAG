@@ -34,7 +34,7 @@ cfg = (
 )
 
 value = (
-    cfg.get("retrieval")
+    cfg.get("retrieval_index")
     or {}
 ).get("index_id")
 
@@ -47,14 +47,14 @@ PYCFG
 )"
 
 if [[ -n "${PINNED_INDEX}" ]]; then
-  echo "[skip] retrieval.index_id pinado em '${PINNED_INDEX}'."
+  echo "[skip] retrieval_index.index_id pinado em '${PINNED_INDEX}'."
   echo "[skip] A release '${RELEASE}' não será alterada."
   exit 0
 fi
 
 if [[ -z "${INDEX_ID:-}" ]]; then
   echo "[erro] INDEX_ID não definido."
-  echo "[erro] Com retrieval.index_id=null, o deploy precisa receber"
+  echo "[erro] Com retrieval_index.index_id=null, o deploy precisa receber"
   echo "       o index_id que deve ser promovido."
   exit 1
 fi
