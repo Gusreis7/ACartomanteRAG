@@ -104,3 +104,15 @@ retrievals:
 retrieval_benchmark:
   evidence_min_coverage: 0.60
   warmup_runs: 3
+
+generation:
+  provider: ollama
+  model: llama3:latest
+  base_url: http://localhost:11434
+  temperature: 0.1
+  top_p: 0.9
+  max_tokens: 512
+  num_ctx: 8192
+  timeout_seconds: 120
+  keep_alive: 10m
+  max_context_chars: 18000

@@ -227,6 +227,47 @@ class RetrievalBenchmarkConfig(BaseModel):
     warmup_runs: int = Field(default=3, ge=0)
 
 
+
+class GenerationConfig(BaseModel):
+    provider: Literal["ollama"] = "ollama"
+    model: str = "llama3:latest"
+    base_url: str = "http://localhost:11434"
+
+    temperature: float = Field(
+        default=0.1,
+        ge=0,
+        le=2,
+    )
+
+    top_p: float = Field(
+        default=0.9,
+        gt=0,
+        le=1,
+    )
+
+    max_tokens: int = Field(
+        default=512,
+        gt=0,
+    )
+
+    num_ctx: int = Field(
+        default=8192,
+        gt=0,
+    )
+
+    timeout_seconds: float = Field(
+        default=120,
+        gt=0,
+    )
+
+    keep_alive: str = "10m"
+
+    max_context_chars: int = Field(
+        default=18000,
+        gt=0,
+    )
+
+
 class AppConfig(BaseModel):
     environment: EnvironmentConfig
     storage: StorageConfig
@@ -243,8 +284,7 @@ class AppConfig(BaseModel):
     retrieval_benchmark: RetrievalBenchmarkConfig = Field(
         default_factory=RetrievalBenchmarkConfig
     )
-
-    retrieval: RetrievalConfig
+    generation: GenerationConfig = Field(default_factory=GenerationConfig)
 
     @property
     def retrieval(self) -> RetrievalIndexConfig:
