@@ -30,9 +30,9 @@ silver:
 
   chunking:
     strategy: hybrid
-    tokenizer: bertimbau
-    chunk_size: 256
-    overlap: 32
+    tokenizer: roberta_crawl_pt
+    chunk_size: 1024
+    overlap: 128
 
   tokenizers:
     roberta_crawl_pt:
@@ -80,9 +80,27 @@ embedding:
     device: auto
     batch_size: 32
 
-retrieval:
-  # null: usa release promovida pelo CI/ambiente.
-  # preenchido: pin explícito/rollback.
+retrieval_strategy: dense_cross_encoder
+
+retrieval_index:
+  # null: usa a release promovida; preenchido: pin explícito.
   release: default
   index_id: null
 
+retrievals:
+  bm25:
+    top_k: 10
+
+  dense:
+    top_k: 10
+
+  dense_cross_encoder:
+    # Dense recupera candidate_k; CrossEncoder entrega top_k.
+    candidate_k: 25
+    top_k: 10
+    model: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
+    revision: main
+
+retrieval_benchmark:
+  evidence_min_coverage: 0.60
+  warmup_runs: 3
