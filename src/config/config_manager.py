@@ -186,9 +186,45 @@ class EmbeddingConfig(BaseModel):
         return self
 
 
-class RetrievalConfig(BaseModel):
+class RetrievalIndexConfig(BaseModel):
     release: str = "default"
     index_id: str | None = None
+
+
+class BM25RetrievalConfig(BaseModel):
+    top_k: int = Field(default=10, gt=0)
+
+
+class DenseRetrievalConfig(BaseModel):
+    top_k: int = Field(default=10, gt=0)
+
+
+class DenseCrossEncoderRetrievalConfig(BaseModel):
+    candidate_k: int = Field(default=25, gt=0)
+    top_k: int = Field(default=10, gt=0)
+    model: str = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
+    revision: str = "main"
+
+    @model_validator(mode="after")
+    def validate_candidate_k(self):
+        if self.candidate_k < self.top_k:
+            raise ValueError(
+                "retrievals.dense_cross_encoder.candidate_k deve ser >= top_k."
+            )
+        return self
+
+
+class RetrievalStrategiesConfig(BaseModel):
+    bm25: BM25RetrievalConfig = Field(default_factory=BM25RetrievalConfig)
+    dense: DenseRetrievalConfig = Field(default_factory=DenseRetrievalConfig)
+    dense_cross_encoder: DenseCrossEncoderRetrievalConfig = Field(
+        default_factory=DenseCrossEncoderRetrievalConfig
+    )
+
+
+class RetrievalBenchmarkConfig(BaseModel):
+    evidence_min_coverage: float = Field(default=0.60, ge=0, le=1)
+    warmup_runs: int = Field(default=3, ge=0)
 
 
 class AppConfig(BaseModel):
@@ -197,9 +233,24 @@ class AppConfig(BaseModel):
     bronze: BronzeConfig
     silver: SilverConfig
     embedding: EmbeddingConfig
-    retrieval: RetrievalConfig
+    retrieval_strategy: Literal["bm25", "dense", "dense_cross_encoder"] = (
+        "dense_cross_encoder"
+    )
+    retrieval_index: RetrievalIndexConfig = Field(default_factory=RetrievalIndexConfig)
+    retrievals: RetrievalStrategiesConfig = Field(
+        default_factory=RetrievalStrategiesConfig
+    )
+    retrieval_benchmark: RetrievalBenchmarkConfig = Field(
+        default_factory=RetrievalBenchmarkConfig
+    )
 
     retrieval: RetrievalConfig
+
+    @property
+    def retrieval(self) -> RetrievalIndexConfig:
+        """Compatibilidade com IndexResolver/ReleaseManager."""
+        return self.retrieval_index
+
 
 class ConfigManager:
     @classmethod
