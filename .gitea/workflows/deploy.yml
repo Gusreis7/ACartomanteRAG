@@ -25,6 +25,8 @@ jobs:
       # Docker Compose / production deployment
       RUSTFS_VOLUME: /home/gustavo/Volumes/rustfs
       QDRANT_VOLUME: /home/gustavo/Volumes/qdrant
+      REDIS_VOLUME: /home/gustavo/Volumes/redis
+      
       RUSTFS_API_PORT: 9000
       RUSTFS_CONSOLE_PORT: 9001
       QDRANT_HTTP_PORT: 6333
@@ -49,7 +51,8 @@ jobs:
         run: |
           mkdir -p \
             "$RUSTFS_VOLUME" \
-            "$QDRANT_VOLUME"
+            "$QDRANT_VOLUME" \
+            "$REDIS_VOLUME"
 
       - name: Validate Docker Compose
         run: |

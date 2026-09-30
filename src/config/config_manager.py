@@ -24,9 +24,21 @@ class QdrantConfig(BaseModel):
     api_key: str
 
 
+class RedisEnvironmentConfig(BaseModel):
+    url: str | None = None
+
+
 class EnvironmentConfig(BaseModel):
     rustfs: RustFSConfig
     qdrant: QdrantConfig
+    redis: RedisEnvironmentConfig = Field(
+        default_factory=RedisEnvironmentConfig
+    )
+
+    @property
+    def redis_url(self) -> str | None:
+        """Compatibilidade temporária com o runtime v1 já aplicado."""
+        return self.redis.url
 
 
 class StorageConfig(BaseModel):
@@ -204,6 +216,7 @@ class DenseCrossEncoderRetrievalConfig(BaseModel):
     top_k: int = Field(default=10, gt=0)
     model: str = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
     revision: str = "main"
+    device: str = "cpu"
 
     @model_validator(mode="after")
     def validate_candidate_k(self):
@@ -267,6 +280,33 @@ class GenerationConfig(BaseModel):
         gt=0,
     )
 
+    max_parallel: int = Field(
+        default=2,
+        gt=0,
+    )
+
+    acquire_timeout_seconds: float = Field(
+        default=15,
+        gt=0,
+    )
+
+
+
+class ApiConfig(BaseModel):
+    host: str = "0.0.0.0"
+    port: int = Field(
+        default=8000,
+        gt=0,
+        le=65535,
+    )
+
+
+class ChatConfig(BaseModel):
+    history_turns: int = Field(
+        default=3,
+        gt=0,
+    )
+
 
 class AppConfig(BaseModel):
     environment: EnvironmentConfig
@@ -290,6 +330,8 @@ class AppConfig(BaseModel):
     def retrieval(self) -> RetrievalIndexConfig:
         """Compatibilidade com IndexResolver/ReleaseManager."""
         return self.retrieval_index
+    api: ApiConfig = Field(default_factory=ApiConfig)
+    chat: ChatConfig = Field(default_factory=ChatConfig)
 
 
 class ConfigManager:
@@ -331,9 +373,22 @@ class ConfigManager:
             "RUSTFS_SECRET_KEY": os.getenv("RUSTFS_SECRET_KEY"),
             "QDRANT_URL": os.getenv("QDRANT_URL"),
             "QDRANT_API_KEY": os.getenv("QDRANT_API_KEY"),
+            "REDIS_URL": os.getenv("REDIS_URL"),
         }
 
-        missing = [key for key, value in environment_values.items() if not value]
+        required_environment_keys = (
+            "RUSTFS_ENDPOINT",
+            "RUSTFS_ACCESS_KEY",
+            "RUSTFS_SECRET_KEY",
+            "QDRANT_URL",
+            "QDRANT_API_KEY",
+        )
+
+        missing = [
+            key
+            for key in required_environment_keys
+            if not environment_values[key]
+        ]
 
         if missing:
             raise ValueError(
@@ -349,6 +404,9 @@ class ConfigManager:
             "qdrant": {
                 "url": (environment_values["QDRANT_URL"]),
                 "api_key": (environment_values["QDRANT_API_KEY"]),
+            },
+            "redis": {
+                "url": environment_values["REDIS_URL"],
             },
         }
 

@@ -29,6 +29,7 @@ jobs:
       # Docker Compose / CI deployment
       RUSTFS_VOLUME: /tmp/acartomante-ci-${{ gitea.run_number }}/rustfs
       QDRANT_VOLUME: /tmp/acartomante-ci-${{ gitea.run_number }}/qdrant
+      REDIS_VOLUME: /tmp/acartomante-ci-${{ gitea.run_number }}/redis
       RUSTFS_API_PORT: 9003
       RUSTFS_CONSOLE_PORT: 9004
       QDRANT_HTTP_PORT: 6335
@@ -48,7 +49,7 @@ jobs:
 
       - name: Prepare CI storage
         run: |
-          mkdir -p "$RUSTFS_VOLUME" "$QDRANT_VOLUME"
+          mkdir -p "$RUSTFS_VOLUME" "$QDRANT_VOLUME" "$REDIS_VOLUME"
 
       - name: Validate Docker Compose
         run: docker compose config --quiet

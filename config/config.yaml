@@ -4,53 +4,43 @@ storage:
   silver_bucket: acartomante-silver
   embedding_indexes_bucket: acartomante-indexes
   benchmarks_bucket: acartomante-benchmarks
-
+  
 bronze:
   coletanea:
-    similaridade_threshold: 0.10
+    similaridade_threshold: 0.1
     qtd_titulos_minima: 2
     tamanho_fragmento: 1000
     tamanho_minimo_fragmento: 100
-
   carta:
     min_assinaturas: 5
-
   poema:
     max_palavras_linha: 10
     min_pct_linhas_curtas: 0.85
-
   teatro:
     min_repeticoes_locutor: 3
     min_locutores: 2
     min_turnos: 10
     min_pct_locutores: 0.91
-
 silver:
   pipeline_version: 1
-
   chunking:
     strategy: hybrid
     tokenizer: roberta_crawl_pt
     chunk_size: 1024
     overlap: 128
-
   tokenizers:
     roberta_crawl_pt:
       model: eduagarcia/RoBERTaCrawlPT-base
       revision: main
-
     bertimbau:
       model: neuralmind/bert-base-portuguese-cased
       revision: main
-
   semantic:
     min_capitulos: 2
     min_mediana_chars: 200
-
 embedding:
   pipeline_version: 1
   selected_model: qwen3_embedding_06b
-
   models:
     colibri:
       backend: sentence_transformers
@@ -61,7 +51,6 @@ embedding:
       document_prompt_name: document
       query_prompt_name: query
       truncate_dim: null
-
     qwen3_embedding_06b:
       backend: sentence_transformers
       model: Qwen/Qwen3-Embedding-0.6B
@@ -71,40 +60,30 @@ embedding:
       document_prompt_name: document
       query_prompt_name: query
       truncate_dim: null
-
   index:
     normalize_embeddings: false
     distance: cosine
-
   execution:
-    device: auto
+    device: cpu
     batch_size: 32
-
 retrieval_strategy: dense_cross_encoder
-
 retrieval_index:
-  # null: usa a release promovida; preenchido: pin explícito.
   release: default
   index_id: null
-
 retrievals:
   bm25:
     top_k: 10
-
   dense:
     top_k: 10
-
   dense_cross_encoder:
-    # Dense recupera candidate_k; CrossEncoder entrega top_k.
     candidate_k: 25
     top_k: 10
     model: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
     revision: main
-
+    device: cpu
 retrieval_benchmark:
-  evidence_min_coverage: 0.60
+  evidence_min_coverage: 0.6
   warmup_runs: 3
-
 generation:
   provider: ollama
   model: llama3:latest
@@ -116,3 +95,10 @@ generation:
   timeout_seconds: 120
   keep_alive: 10m
   max_context_chars: 18000
+  max_parallel: 2
+  acquire_timeout_seconds: 15
+api:
+  host: 0.0.0.0
+  port: 8000
+chat:
+  history_turns: 3
