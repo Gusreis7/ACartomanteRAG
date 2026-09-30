@@ -1,7 +1,6 @@
 services:
   redis:
     image: redis/redis-stack-server:7.4.0-v8
-    container_name: acartomante-redis
     restart: unless-stopped
     environment:
       REDIS_ARGS: "--appendonly yes --appendfsync everysec"
