@@ -9,6 +9,10 @@ const titleEl = document.querySelector("#conversation-title");
 const listEl = document.querySelector("#conversation-list");
 const toast = document.querySelector("#toast");
 const sidebar = document.querySelector("#chat-sidebar");
+const evidenceTable = document.querySelector("#evidence-table");
+const evidenceSpread = document.querySelector("#evidence-spread");
+const evidenceTableCount = document.querySelector("#evidence-table-count");
+const evidenceTableClose = document.querySelector("#evidence-table-close");
 
 let sending = false;
 
@@ -43,46 +47,129 @@ function scrollToBottom(behavior = "smooth") {
   scrollEl.scrollTo({ top: scrollEl.scrollHeight, behavior });
 }
 
-function evidenceNode(evidences = []) {
-  if (!evidences.length) return null;
+function evidenceCardNode(evidence, index) {
+  const card = document.createElement("button");
+  card.type = "button";
+  card.className = "evidence-card";
+  card.setAttribute("aria-pressed", "false");
+  card.setAttribute("aria-label", `Virar evidência ${index + 1}`);
+  card.style.setProperty("--deal-order", index);
 
-  const details = document.createElement("details");
-  details.className = "evidence-drawer";
+  const inner = document.createElement("span");
+  inner.className = "evidence-card-inner";
 
-  const summary = document.createElement("summary");
-  summary.textContent = `${evidences.length} ${evidences.length === 1 ? "evidência consultada" : "evidências consultadas"}`;
-  details.appendChild(summary);
+  const back = document.createElement("span");
+  back.className = "evidence-card-face evidence-card-back";
 
-  const list = document.createElement("div");
-  list.className = "evidence-list";
+  const backNumber = document.createElement("span");
+  backNumber.className = "evidence-card-number";
+  backNumber.textContent = String(index + 1).padStart(2, "0");
 
-  evidences.forEach((evidence, index) => {
-    const item = document.createElement("article");
-    item.className = "evidence-item";
+  const sigil = document.createElement("span");
+  sigil.className = "evidence-card-sigil";
+  sigil.setAttribute("aria-hidden", "true");
+  sigil.innerHTML = '<i></i><b>✦</b><i></i>';
 
-    const heading = document.createElement("div");
-    heading.className = "evidence-heading";
+  const backLabel = document.createElement("span");
+  backLabel.className = "evidence-card-back-label";
+  backLabel.textContent = "EVIDÊNCIA";
 
-    const number = document.createElement("span");
-    number.textContent = String(index + 1).padStart(2, "0");
+  back.append(backNumber, sigil, backLabel);
 
-    const source = document.createElement("strong");
-    const pieces = [evidence.work, evidence.section].filter(Boolean);
-    source.textContent = pieces.join(" · ") || "Trecho recuperado";
-    heading.append(number, source);
+  const front = document.createElement("span");
+  front.className = "evidence-card-face evidence-card-front";
 
-    const excerpt = document.createElement("p");
-    excerpt.textContent = evidence.excerpt || "";
+  const frontNumber = document.createElement("span");
+  frontNumber.className = "evidence-card-front-number";
+  frontNumber.textContent = `Carta ${String(index + 1).padStart(2, "0")}`;
 
-    const code = document.createElement("small");
-    code.textContent = evidence.chunk_id ? `chunk ${evidence.chunk_id}` : "";
+  const source = document.createElement("strong");
+  const pieces = [evidence.work, evidence.section].filter(Boolean);
+  source.textContent = pieces.join(" · ") || "Trecho recuperado";
 
-    item.append(heading, excerpt, code);
-    list.appendChild(item);
+  const excerpt = document.createElement("span");
+  excerpt.className = "evidence-card-excerpt";
+  excerpt.textContent = evidence.excerpt || "Trecho sem conteúdo textual disponível.";
+
+  const metadata = document.createElement("span");
+  metadata.className = "evidence-card-metadata";
+
+  if (evidence.evidence_id) {
+    const id = document.createElement("span");
+    id.textContent = `id ${evidence.evidence_id}`;
+    metadata.appendChild(id);
+  }
+
+  if (evidence.chunk_id) {
+    const chunk = document.createElement("span");
+    chunk.textContent = `chunk ${evidence.chunk_id}`;
+    metadata.appendChild(chunk);
+  }
+
+  front.append(frontNumber, source, excerpt, metadata);
+  inner.append(back, front);
+  card.appendChild(inner);
+
+  card.addEventListener("click", () => {
+    const flipped = card.classList.toggle("is-flipped");
+    card.setAttribute("aria-pressed", String(flipped));
+    card.setAttribute(
+      "aria-label",
+      flipped
+        ? `Ocultar evidência ${index + 1}`
+        : `Virar evidência ${index + 1}`,
+    );
   });
 
-  details.appendChild(list);
-  return details;
+  return card;
+}
+
+function openEvidenceTable(evidences = []) {
+  if (!evidences.length || !evidenceTable || !evidenceSpread) return;
+
+  const cards = evidences.slice(0, 10);
+  evidenceSpread.replaceChildren();
+
+  cards.forEach((evidence, index) => {
+    evidenceSpread.appendChild(evidenceCardNode(evidence, index));
+  });
+
+  evidenceTableCount.textContent = `${cards.length} ${cards.length === 1 ? "carta" : "cartas"} sobre a mesa`;
+  evidenceTable.showModal();
+
+  requestAnimationFrame(() => {
+    evidenceSpread.querySelectorAll(".evidence-card").forEach((card, index) => {
+      window.setTimeout(() => card.classList.add("is-dealt"), index * 65);
+    });
+  });
+}
+
+function evidenceTriggerNode(evidences = []) {
+  if (!evidences.length) return null;
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "evidence-trigger-shell";
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "evidence-trigger";
+
+  const mark = document.createElement("span");
+  mark.className = "evidence-trigger-mark";
+  mark.setAttribute("aria-hidden", "true");
+  mark.textContent = "✦";
+
+  const label = document.createElement("span");
+  label.textContent = "Mostre-me as evidências";
+
+  const count = document.createElement("small");
+  const visibleCount = Math.min(evidences.length, 10);
+  count.textContent = `${visibleCount} ${visibleCount === 1 ? "carta" : "cartas"}`;
+
+  button.append(mark, label, count);
+  button.addEventListener("click", () => openEvidenceTable(evidences));
+  wrapper.appendChild(button);
+  return wrapper;
 }
 
 function addMessage(role, content, evidences = [], options = {}) {
@@ -103,7 +190,7 @@ function addMessage(role, content, evidences = [], options = {}) {
   text.textContent = content;
   bubble.appendChild(text);
 
-  const evidence = role === "assistant" ? evidenceNode(evidences) : null;
+  const evidence = role === "assistant" ? evidenceTriggerNode(evidences) : null;
   if (evidence) bubble.appendChild(evidence);
 
   article.append(meta, bubble);
@@ -248,6 +335,12 @@ document.querySelector("#new-chat")?.addEventListener("click", async () => {
 
 document.querySelector("#sidebar-toggle")?.addEventListener("click", () => {
   sidebar.classList.toggle("is-open");
+});
+
+evidenceTableClose?.addEventListener("click", () => evidenceTable.close());
+
+evidenceTable?.addEventListener("click", (event) => {
+  if (event.target === evidenceTable) evidenceTable.close();
 });
 
 const queryPrompt = new URLSearchParams(window.location.search).get("q");

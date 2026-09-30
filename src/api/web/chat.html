@@ -87,6 +87,28 @@
     </main>
   </div>
 
+  <dialog class="evidence-table" id="evidence-table" aria-labelledby="evidence-table-title">
+    <div class="evidence-table-shell">
+      <header class="evidence-table-header">
+        <div>
+          <p class="eyebrow">a cartomante dispõe as fontes</p>
+          <h2 id="evidence-table-title">Mesa de evidências</h2>
+          <p class="evidence-table-hint" id="evidence-table-hint">
+            Escolha uma carta. Vire apenas as que desejar consultar.
+          </p>
+        </div>
+        <button class="evidence-table-close" id="evidence-table-close" type="button" aria-label="Fechar mesa de evidências">×</button>
+      </header>
+
+      <div class="evidence-spread" id="evidence-spread" aria-live="polite"></div>
+
+      <footer class="evidence-table-footer">
+        <span id="evidence-table-count">0 cartas sobre a mesa</span>
+        <span>cada carta corresponde a um trecho recuperado</span>
+      </footer>
+    </div>
+  </dialog>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="/assets/chat.js" defer></script>
 </body>
