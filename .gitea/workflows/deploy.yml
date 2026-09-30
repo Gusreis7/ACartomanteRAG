@@ -30,6 +30,7 @@ jobs:
       RUSTFS_API_PORT: 9000
       RUSTFS_CONSOLE_PORT: 9001
       QDRANT_HTTP_PORT: 6333
+      REDIS_PORT: 6379
 
       # Deve apontar para o índice produzido pela execução
       # que este deploy pretende promover.
