@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171711">
+  <title>Cartomante RAG</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body class="home-page">
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="site-header shell">
+    <a class="brand" href="/" aria-label="Cartomante RAG — início">
+      <span class="brand-mark" aria-hidden="true">✦</span>
+      <span>Cartomante <em>RAG</em></span>
+    </a>
+    <div class="header-status" title="Interface do motor de consulta literária">
+      <span class="status-dot"></span>
+      <span>oráculo conectado</span>
+    </div>
+  </header>
+
+  <main class="home-shell shell">
+    <section class="hero-copy" aria-labelledby="hero-title">
+      <p class="eyebrow">Machado de Assis · memória · recuperação · linguagem</p>
+      <h1 id="hero-title">Consulte as obras.<br><span>Leia entre as linhas.</span></h1>
+      <p class="hero-description">
+        Um oráculo literário construído sobre a obra machadiana. Faça uma pergunta,
+        percorra os trechos recuperados e converse com o acervo por meio do RAG.
+      </p>
+
+      <div class="hero-actions">
+        <button class="button button-primary" id="start-chat" type="button">
+          <span>Iniciar consulta</span>
+          <span aria-hidden="true">→</span>
+        </button>
+        <button class="button button-ghost" id="focus-suggestions" type="button">
+          Ver presságios
+        </button>
+      </div>
+
+      <div class="recent-block" id="recent-block" hidden>
+        <div class="section-heading">
+          <span>Consultas recentes</span>
+          <span class="section-line"></span>
+        </div>
+        <div class="recent-list" id="recent-list"></div>
+      </div>
+    </section>
+
+    <section class="oracle-stage" aria-label="Mesa de cartomancia">
+      <div class="halo halo-one" aria-hidden="true"></div>
+      <div class="halo halo-two" aria-hidden="true"></div>
+
+      <div class="tarot-card tarot-card-left" aria-hidden="true">
+        <div class="card-corner">XVIII</div>
+        <div class="moon-glyph">☾</div>
+        <div class="card-stars">✦ · ✧ · ✦</div>
+        <div class="card-label">a dúvida</div>
+      </div>
+
+      <article class="palm-card">
+        <div class="palm-card-head">
+          <span>Leitura nº 001</span>
+          <span>acervo machadiano</span>
+        </div>
+
+        <svg class="palm-svg" viewBox="0 0 300 360" role="img" aria-label="Ilustração estilizada de uma mão para leitura de palma">
+          <defs>
+            <filter id="roughen">
+              <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="1" result="noise"/>
+              <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.7"/>
+            </filter>
+          </defs>
+          <g filter="url(#roughen)">
+            <path class="palm-outline" d="M104 317c-20-24-27-47-25-74l4-51c1-11 2-23 1-34l-3-57c0-12 6-20 15-20 10 0 15 8 16 20l4 57 2-93c0-13 6-21 16-21 11 0 16 9 16 22l-1 90 7-106c1-12 7-20 17-19 10 1 15 10 14 22l-6 110 10-83c2-12 9-18 18-17 10 2 14 11 12 22l-13 102 20-49c5-12 14-17 23-13 9 4 11 14 6 26l-31 76c-8 20-15 42-18 64l-4 29c-2 17-14 29-31 29h-41c-13 0-23-5-28-12z"/>
+            <path class="palm-line palm-line-life" d="M113 177c32-19 71 0 78 34 5 28-8 60-39 79"/>
+            <path class="palm-line" d="M103 209c28-9 64-7 100 12"/>
+            <path class="palm-line" d="M111 239c31 8 55 26 69 53"/>
+            <path class="palm-line" d="M144 166c8 30 10 68 3 112"/>
+            <path class="palm-line palm-line-faint" d="M167 183c18 19 30 44 35 72"/>
+          </g>
+          <circle class="palm-node" cx="146" cy="167" r="4"/>
+          <circle class="palm-node" cx="103" cy="209" r="3"/>
+          <circle class="palm-node" cx="203" cy="221" r="3"/>
+        </svg>
+
+        <div class="palm-caption">
+          <span>memória</span><i></i><span>indício</span><i></i><span>resposta</span>
+        </div>
+      </article>
+
+      <div class="tarot-card tarot-card-right" aria-hidden="true">
+        <div class="card-corner">I</div>
+        <div class="eye-glyph">
+          <span class="eye-ring"><span class="eye-dot"></span></span>
+        </div>
+        <div class="card-stars">✧ · ✦ · ✧</div>
+        <div class="card-label">a palavra</div>
+      </div>
+
+      <div class="tech-seal" aria-hidden="true">
+        <span>R</span>
+        <small>retrieval<br>augmented<br>generation</small>
+      </div>
+    </section>
+  </main>
+
+  <section class="omens shell" id="omens" aria-labelledby="omens-title">
+    <div class="section-heading centered">
+      <span id="omens-title">Perguntas para abrir a mesa</span>
+      <span class="section-line"></span>
+    </div>
+    <div class="omen-grid">
+      <button class="omen-card" type="button" data-prompt="Quem é Capitu e como ela é apresentada em Dom Casmurro?">
+        <span class="omen-number">01</span>
+        <strong>Quem é Capitu?</strong>
+        <span>Personagem, descrição e passagens relacionadas.</span>
+      </button>
+      <button class="omen-card" type="button" data-prompt="Como Machado de Assis trabalha a dúvida e a memória em Dom Casmurro?">
+        <span class="omen-number">02</span>
+        <strong>Dúvida & memória</strong>
+        <span>Procure ecos de um tema em diferentes trechos.</span>
+      </button>
+      <button class="omen-card" type="button" data-prompt="Encontre passagens de Machado de Assis sobre ciúme e explique o contexto.">
+        <span class="omen-number">03</span>
+        <strong>Um tema no acervo</strong>
+        <span>Recupere evidências e converse a partir delas.</span>
+      </button>
+    </div>
+  </section>
+
+  <footer class="site-footer shell">
+    <span>Cartomante RAG</span>
+    <span>FastAPI · LangGraph · Qdrant · Redis · Ollama</span>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/assets/home.js" defer></script>
+</body>
+</html>

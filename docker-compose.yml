@@ -1,12 +1,11 @@
 services:
   redis:
     image: redis/redis-stack-server:7.4.0-v8
-    container_name: acartomante-redis
     restart: unless-stopped
     environment:
       REDIS_ARGS: "--appendonly yes --appendfsync everysec"
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:${REDIS_PORT}:6379"
     volumes:
       - ${REDIS_VOLUME}:/data
     healthcheck:
