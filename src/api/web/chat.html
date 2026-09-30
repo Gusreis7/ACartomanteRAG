@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171711">
+  <title>Consulta · Cartomante RAG</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body class="chat-page">
+  <div class="grain" aria-hidden="true"></div>
+
+  <div class="chat-layout">
+    <aside class="chat-sidebar" id="chat-sidebar">
+      <a class="brand sidebar-brand" href="/">
+        <span class="brand-mark" aria-hidden="true">✦</span>
+        <span>Cartomante <em>RAG</em></span>
+      </a>
+
+      <button class="button button-primary new-chat-button" id="new-chat" type="button">
+        <span aria-hidden="true">＋</span>
+        Nova consulta
+      </button>
+
+      <div class="sidebar-label">Consultas desta sessão</div>
+      <nav class="conversation-list" id="conversation-list" aria-label="Conversas"></nav>
+
+      <div class="sidebar-oracle" aria-hidden="true">
+        <div class="mini-eye"><span></span></div>
+        <p>O texto guarda<br>mais de um destino.</p>
+      </div>
+    </aside>
+
+    <main class="chat-main">
+      <header class="chat-header">
+        <button class="sidebar-toggle" id="sidebar-toggle" type="button" aria-label="Abrir conversas">☰</button>
+        <div>
+          <p class="chat-kicker">consulta em curso</p>
+          <h1 id="conversation-title">Nova conversa</h1>
+        </div>
+        <a class="header-home" href="/">mesa inicial</a>
+      </header>
+
+      <section class="message-scroll" id="message-scroll" aria-live="polite">
+        <div class="chat-empty" id="chat-empty">
+          <div class="empty-symbol" aria-hidden="true">
+            <span>☾</span>
+            <i></i>
+            <span>✦</span>
+          </div>
+          <p class="eyebrow">a mesa está aberta</p>
+          <h2>Que pergunta você traz?</h2>
+          <p>
+            A Cartomante buscará passagens no acervo e responderá a partir
+            dos trechos recuperados. As evidências ficam disponíveis sob cada leitura.
+          </p>
+          <div class="empty-suggestions">
+            <button type="button" data-chat-prompt="Quem é Capitu?">Quem é Capitu?</button>
+            <button type="button" data-chat-prompt="Fale sobre a ironia em Machado de Assis.">Ironia machadiana</button>
+            <button type="button" data-chat-prompt="Encontre um trecho sobre memória e explique o contexto.">Memória e contexto</button>
+          </div>
+        </div>
+
+        <div class="messages" id="messages"></div>
+      </section>
+
+      <footer class="composer-shell">
+        <form class="composer" id="composer">
+          <div class="composer-ornament" aria-hidden="true">✧</div>
+          <textarea
+            id="message-input"
+            rows="1"
+            maxlength="4000"
+            placeholder="Pergunte às obras de Machado de Assis..."
+            aria-label="Mensagem"
+          ></textarea>
+          <button class="send-button" id="send-button" type="submit" aria-label="Enviar mensagem">
+            <span>Enviar</span>
+            <span aria-hidden="true">↗</span>
+          </button>
+        </form>
+        <div class="composer-meta">
+          <span>Enter envia · Shift + Enter quebra linha</span>
+          <span id="runtime-status"><i></i> motor disponível</span>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/assets/chat.js" defer></script>
+</body>
+</html>
