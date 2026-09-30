@@ -10,7 +10,6 @@ def build_context(
     *,
     max_chars: int,
 ) -> tuple[str, list[dict[str, Any]]]:
-    """Constrói contexto citável [E1], [E2] sob orçamento simples."""
     max_chars = max(int(max_chars), 1)
     blocks: list[str] = []
     evidences: list[dict[str, Any]] = []
@@ -19,6 +18,7 @@ def build_context(
     for index, hit in enumerate(hits, start=1):
         evidence_id = f"E{index}"
         metadata = hit.metadata or {}
+
         work = _first(
             metadata,
             ("titulo", "documento", "obra", "canonical_work"),
@@ -36,20 +36,18 @@ def build_context(
         )
         category = _first(metadata, ("categoria", "category"))
 
-        header = [
+        header_lines = [
             f"[{evidence_id}]",
             f"Obra: {work}" if work else "Obra: não informada",
         ]
         if section:
-            header.append(f"Seção: {section}")
+            header_lines.append(f"Seção: {section}")
         if category:
-            header.append(f"Categoria: {category}")
-        header.append(f"Chunk ID: {hit.chunk_id}")
+            header_lines.append(f"Categoria: {category}")
+        header_lines.append(f"Chunk ID: {hit.chunk_id}")
 
-        prefix = "\n".join(header) + "\nTrecho: "
-        separator = "\n\n"
-        remaining = max_chars - used_chars - len(prefix) - len(separator)
-
+        prefix = "\n".join(header_lines) + "\nTrecho: "
+        remaining = max_chars - used_chars - len(prefix) - 2
         if remaining <= 0:
             break
 
@@ -61,9 +59,10 @@ def build_context(
                 text += " …"
             truncated = True
 
-        block = prefix + text + separator
+        block = prefix + text + "\n\n"
         blocks.append(block)
         used_chars += len(block)
+
         evidences.append(
             {
                 "evidence_id": evidence_id,
@@ -72,6 +71,7 @@ def build_context(
                 "obra": work,
                 "secao": section,
                 "categoria": category,
+                "excerpt": text,
                 "truncated": truncated,
             }
         )
@@ -85,10 +85,7 @@ def build_context(
     return "".join(blocks).strip(), evidences
 
 
-def _first(
-    metadata: dict[str, Any],
-    keys: tuple[str, ...],
-) -> str | None:
+def _first(metadata: dict[str, Any], keys: tuple[str, ...]) -> str | None:
     for key in keys:
         value = metadata.get(key)
         if value is None:

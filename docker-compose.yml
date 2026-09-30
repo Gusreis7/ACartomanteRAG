@@ -1,4 +1,21 @@
 services:
+  redis:
+    image: redis/redis-stack-server:7.4.0-v8
+    container_name: acartomante-redis
+    restart: unless-stopped
+    environment:
+      REDIS_ARGS: "--appendonly yes --appendfsync everysec"
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - ${REDIS_VOLUME}:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 3s
+
   qdrant:
     image: qdrant/qdrant:v1.19.1
 
@@ -74,3 +91,4 @@ services:
       start_period: 20s
 
     restart: unless-stopped
+
