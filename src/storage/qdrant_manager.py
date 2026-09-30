@@ -176,3 +176,41 @@ class QdrantManager:
 
     def close(self) -> None:
         self.client.close()
+
+
+def check_qdrant_collection_ready(
+    *,
+    url: str,
+    api_key: str | None,
+    collection_name: str,
+    timeout_seconds: float = 5.0,
+) -> None:
+    """
+    Verifica Qdrant + collection sem inicializar embedder ou reranker.
+    Levanta exceção quando o serviço, autenticação ou collection falhar.
+    """
+    from urllib.parse import quote
+
+    import httpx
+
+    base_url = url.rstrip("/")
+    encoded_collection = quote(collection_name, safe="")
+
+    headers: dict[str, str] = {}
+    if api_key:
+        headers["api-key"] = api_key
+
+    response = httpx.get(
+        f"{base_url}/collections/{encoded_collection}",
+        headers=headers,
+        timeout=timeout_seconds,
+    )
+
+    if response.status_code == 404:
+        raise ValueError(
+            "Collection Qdrant não encontrada: "
+            f"{collection_name}"
+        )
+
+    response.raise_for_status()
+
