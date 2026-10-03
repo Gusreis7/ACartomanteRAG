@@ -1,0 +1,528 @@
+﻿query_id,canonical_work,query,evidence_text,query_type,difficulty,gold_answer_original,mcq_answer,option_A,option_A_class,option_B,option_B_class,option_C,option_C_class,option_D,option_D_class,option_E,option_E_class,correct_option,status
+9dd2a609-264f-4c79-bad0-7c87cd8d9017,A carteira,Que hábitos domésticos vinham comprometendo a situação econômica do advogado?,"segundo as
+circunstâncias, e as dele não podiam ser piores. Gastos de família excessivos, a
+princípio por servir a parentes, e depois por agradar à mulher, que vivia aborrecida
+da solidão; baile daqui, jantar dali, chapéus, leques, tanta cousa mais, que não havia
+remédio senão ir descontando o futuro.",theme,medium,Gastos familiares,Gastos familiares excessivos para ajudar parentes e agradar à esposa.,"Gastos altos com parentes, mas sem relação com os desejos da esposa.",ambiguous,Gastos familiares excessivos para ajudar parentes e agradar à esposa.,correct,Compra de imóveis para investimento.,wrong,Perdas em jogos de azar e apostas.,wrong,"Despesas para sustentar a aparência social da casa, não para auxiliar parentes.",ambiguous,B,draft
+a620a339-1e23-4977-8d8b-f6709dbf32b3,A carteira,Ele mantinha uma aparência de sucesso diante dos outros apesar dos problemas profissionais?,"—Tu agora vais bem, não? dizia-lhe ultimamente o Gustavo C..., advogado e
+familiar da casa.
+
+— Agora vou, mentiu o Honório.
+
+A verdade é que ia mal. Poucas causas, de pequena monta, e constituintes
+remissos; por desgraça perdera ultimamente um processo, com que fundara grandes
+esperanças. Não só recebeu pouco, mas até parece que ele lhe tirou alguma cousa
+à reputação jurídica; em todo caso, andavam mofinas nos jornais.",theme,medium,Sim,Sim.,Sim.,correct,Não; ele contava abertamente a todos que estava em dificuldades.,wrong,Não; havia abandonado qualquer tentativa de parecer próspero.,wrong,Só diante dos clientes; entre amigos ele admitia abertamente a crise.,ambiguous,"Tentava parecer estável, mas já não sustentava uma imagem de prosperidade.",ambiguous,A,draft
+3e796b5e-0c17-4d32-93a6-acf1d07160a4,A carteira,Quem era responsável pelo piano que entretinha as visitas à noite?,"e depois ia ouvir os
+trechos de música alemã, que D. Amélia tocava muito bem ao piano, e que o
+Gustavo escutava com indizível prazer, ou jogavam cartas, ou simplesmente
+falavam de política.",description,easy,D. Amélia,D. Amélia.,Uma parente de D. Amélia que costumava tocar para as visitas.,ambiguous,D. Amélia.,correct,Gustavo.,wrong,Honório.,wrong,Uma jovem visitante amiga da família que assumia o piano à noite.,ambiguous,B,draft
+408b2905-3420-423d-9a3f-d8a8a0366ca2,A carteira,"O que provavelmente explicava o choro secreto do advogado, apesar da alegria que demonstrava em público?","D. Amélia não sabia nada; ele não contava nada à mulher, bons ou maus
+negócios. Não contava nada a ninguém. Fingia-se tão alegre como se nadasse em
+um mar de prosperidades. Quando o Gustavo, que ia todas as noites à casa dele,
+dizia uma ou duas pilhérias, ele respondia com três e quatro; e depois ia ouvir os
+trechos de música alemã, que D. Amélia tocava muito bem ao piano, e que o
+Gustavo escutava com indizível prazer, ou jogavam cartas, ou simplesmente
+falavam de política.
+
+Um dia, a mulher foi achá-lo dando muitos beijos à filha, criança de quatro
+anos, e viu-lhe os olhos molhados; ficou espantada, e perguntou-lhe o que era.
+
+— Nada, nada.
+
+Compreende-se que era o medo do futuro e o horror da miséria.
+Mas as esperanças voltavam com facilidade. A idéia de que os dias
+melhores tinham de vir dava-lhe conforto para a luta. Estava com, trinta e quatro
+
+3
+anos; era o princípio da carreira: todos os princípios são difíceis. E toca a trabalhar,
+a esperar, a gastar, pedir fiado ou: emprestado, para pagar mal, e a más horas.",relationship,hard,"Compreende-se que era o medo do futuro e o horror da miséria.
+Mas as esperanças voltavam com facilidade. A idéia de que os dias
+melhores tinham de vir dava-lhe conforto para a luta. Estava com, trinta e quatro",O medo do futuro e o horror da miséria.,O medo do futuro e o horror da miséria.,correct,"O medo de perder prestígio social, mais do que da miséria propriamente dita.",ambiguous,O ciúme explícito de Gustavo.,wrong,A culpa por esconder da esposa a verdadeira extensão das dívidas.,ambiguous,O arrependimento por ter abandonado a advocacia.,wrong,A,draft
+f09d9852-d1d9-4468-993d-ec4530d048e2,A carteira,Qual era a quantia urgente que ele precisava levantar naquela tarde?,"A dívida urgente de hoje são uns malditos quatrocentos e tantos mil-réis de
+carros. Nunca demorou tanto a conta, nem ela cresceu tanto, como agora; e, a rigor,
+o credor não lhe punha a faca aos peitos; mas disse-lhe hoje uma palavra azeda,
+com um gesto mau, e  Honório quer pagar-lhe hoje mesmo. Eram cinco horas da
+tarde.",fact,easy,"quatrocentos e tantos mil-réis de
+carros.",Quatrocentos e tantos mil-réis.,Duzentos mil-réis.,wrong,Trezentos e tantos mil-réis.,ambiguous,Quatrocentos e tantos mil-réis.,correct,Quinhentos mil-réis.,ambiguous,Setecentos e trinta mil-réis.,wrong,C,draft
+afcc4a2a-4004-4b48-a40d-eab22e96d4db,A carteira,O que ele descobriu ao finalmente examinar o objeto que havia encontrado?,"Tudo isso antes de abrir a carteira. Tirou-a do bolso, finalmente, mas com
+medo, quase às escondidas; abriu-a, e ficou trêmulo. Tinha dinheiro, muito dinheiro;
+não contou, mas viu duas notas de duzentos mil-réis, algumas de cinqüenta e vinte;
+calculou uns setecentos mil-réis ou mais; quando menos, seiscentos. Era a dívida
+paga",fact,easy,"Dinheiro, muito dinheiro","Dinheiro, muito dinheiro.",Joias pertencentes a Gustavo.,wrong,Dinheiro misturado a cartas pessoais.,ambiguous,"Dinheiro, muito dinheiro.",correct,Apenas cartas e cartões.,wrong,"Uma grande quantia em dinheiro, mas insuficiente para a dívida urgente.",ambiguous,C,draft
+76a75ef5-bd2f-49e1-9360-cad3edeec766,A carteira,"Depois de vencer a hesitação e fazer a contagem, a que soma chegou?","Mas daí a pouco tirou-a outra vez, e abriu-a, com vontade de contar o
+dinheiro. Contar para quê? era dele? Afinal venceu-se e contou: eram setecentos e
+trinta mil-réis. Honório teve um calafrio.",quote,easy,"eram setecentos e
+trinta mil-réis.",Setecentos e trinta mil-réis.,Setecentos e trinta mil-réis.,correct,Setecentos mil-réis exatos.,ambiguous,Quatrocentos e tantos mil-réis.,wrong,Setecentos e cinquenta mil-réis.,ambiguous,Seiscentos mil-réis exatos.,wrong,A,draft
+1366177e-3a08-4d49-86d8-41f4f0c6c316,A carteira,A identidade de qual amigo foi revelada pelos cartões guardados no objeto encontrado?,"""Se houver um nome, uma indicação qualquer, não posso utilizar-me do
+dinheiro,"" pensou ele.
+
+Esquadrinhou os bolsos da carteira. Achou cartas, que não abriu,
+bilhetinhos dobrados, que não leu, e por fim um cartão de visita; leu o nome; era do
+Gustavo. Mas então, a carteira?... Examinou-a por fora, e pareceu-lhe efetivamente
+do amigo. Voltou ao interior; achou mais dous cartões, mais três, mais cinco. Não
+havia duvidar; era dele.",relationship,medium,De Gustavo,Gustavo.,Gustavo.,correct,O credor de Honório.,wrong,"Um sócio de Gustavo, identificado pelos cartões.",ambiguous,Um parente de Gustavo que frequentava a mesma casa.,ambiguous,D. Amélia.,wrong,A,draft
+c3f3183a-2d4f-408c-8afe-aeb1c1aa3ae4,A carteira,O dono já percebera a ausência do objeto antes de Honório devolvê-lo?,"Chegando a casa, já ali achou o Gustavo, um pouco preocupado e a própria
+D. Amélia o parecia também. Entrou rindo, e perguntou ao amigo se lhe faltava
+alguma cousa.
+— Nada.
+
+— Nada?
+
+— Por quê?
+
+— Mete a mão no bolso; não te falta nada?
+
+— Falta-me a carteira, disse o Gustavo sem meter a mão no bolso.
+— Sabes se alguém a achou?
+
+— Achei-a eu, disse Honório entregando-lha.",fact,hard,Sim,Sim.,Não; acreditava que a carteira ainda estava consigo.,wrong,Não; só percebeu quando Honório lhe entregou a carteira.,wrong,"Ele apenas suspeitava que a carteira estivesse perdida, sem ter certeza.",ambiguous,Sim.,correct,"Só percebeu a perda pouco antes da devolução, ao procurar novamente no bolso.",ambiguous,D,draft
+c811973b-9913-4b46-a08b-df25a898c841,A carteira,Que natureza tinha a mensagem que D. Amélia destruiu depois de recebê-la de Gustavo?,"Honório deu duas voltas, e foi mudar de toilette para o jantar.
+Então Gustavo sacou novamente a carteira, abriu-a, foi a um dos bolsos, tirou
+um dos bilhetinhos, que o outro não quis abrir nem ler, e estendeu-o a D. Amélia,
+que, ansiosa e trêmula, rasgou-o em trinta mil pedaços: era um bilhetinho de amor.",fact,medium,Bilhetinho de amor,Um bilhete de amor.,Uma cobrança de dívida.,wrong,Um bilhete de despedida amorosa.,ambiguous,Uma mensagem de Gustavo propondo um encontro secreto.,ambiguous,Um recado profissional de Honório.,wrong,Um bilhete de amor.,correct,E,draft
+c38d41dd-6c90-434a-926c-50f136bd3832,A Cartomante,Em que estado emocional a jovem procurou ajuda para entender a mudança de comportamento de Camilo?,"Foi por esse tempo que Rita, desconfiada e medrosa, correu à cartomante
+para consultá-la sobre a verdadeira causa do procedimento de Camilo.",entity,medium,Desconfiada e medrosa,Desconfiada e medrosa.,Desconfiada e medrosa.,correct,Furiosa e decidida a romper imediatamente.,wrong,"Ciumenta e desconfiada, mais irritada do que medrosa.",ambiguous,"Ansiosa e esperançosa, embora receasse perder Camilo.",ambiguous,Indiferente e tranquila.,wrong,A,draft
+e0b60c9e-9fcb-44b7-b780-97919679a08a,A Cartomante,"Que quantia o consulente entregou à mulher, muito acima do preço habitual da consulta?","Camilo tirou uma nota de dez mil-réis, e deu-lha. Os olhos da cartomante
+fuzilaram. O preço usual era dois mil-réis.
+— Vejo bem que o senhor gosta muito dela... E faz bem; ela gosta muito do
+senhor. Vá, vá, tranqüilo. Olhe a escada, é escura; ponha o chapéu...",relationship,medium,dez mil réis,Dez mil-réis.,Dois mil-réis.,wrong,Vinte mil-réis.,wrong,Oito mil-réis.,ambiguous,Cinco mil-réis.,ambiguous,Dez mil-réis.,correct,E,draft
+1df9b565-a7cf-4078-baec-3b0d1bb8f3ec,A Cartomante,Em que estado Camilo encontrou a mulher ao fundo da sala quando entrou na casa?,"Entrando, Camilo não pôde sufocar um grito de terror: — ao
+fundo sobre o canapé, estava Rita morta e ensangüentada",entity,medium,morta e ensangüentada,Morta e ensanguentada.,"Desmaiada, mas sem ferimentos.",wrong,Morta e ensanguentada.,correct,"Desmaiada e ensanguentada, aparentemente morta.",ambiguous,Viva e escondida atrás da porta.,wrong,"Morta, mas sem sangue ou ferimentos visíveis.",ambiguous,B,draft
+44c15349-c8b7-4abb-9c15-3898ab3f54b6,A Cartomante,Como Vilela executou o antigo amigo naquele encontro final?,"Camilo não pôde sufocar um grito de terror: — ao
+fundo sobre o canapé, estava Rita morta e ensangüentada. Vilela pegou-o pela gola,
+e, com dois tiros de revólver, estirou-o morto no chão.",entity,hard,com dois tiros de revólver,Com dois tiros de revólver.,Com dois tiros de revólver.,correct,Com um único tiro de revólver.,ambiguous,Com uma facada.,wrong,Estrangulando-o.,wrong,"Com dois tiros de pistola, não de revólver.",ambiguous,A,draft
+7aecca91-54b4-49ab-a9a0-0faf4163dc7d,A Cartomante,O que motivou a zombaria dele quando Rita tentou explicar por que estava inquieta?,"Hamlet observa a Horácio que há mais cousas no céu e na terra do que
+sonha a nossa filosofia. Era a mesma explicação que dava a bela Rita ao moço
+Camilo, numa sexta-feira de novembro de 1869, quando este ria dela, por ter ido na
+véspera consultar uma cartomante;",relationship,medium,Por ter ido consultar uma cartomante,Porque Rita havia consultado uma cartomante.,"Porque Rita tratou como certeza o que ouvira, e não simplesmente por ter consultado a cartomante.",ambiguous,Porque ela havia perdido dinheiro em apostas.,wrong,Porque Rita pretendia deixar Vilela.,wrong,"Porque Camilo considerou absurdo o preço da consulta, mais do que a crença de Rita.",ambiguous,Porque Rita havia consultado uma cartomante.,correct,E,draft
+edf7c5c1-90e1-4b74-a000-6befbee9f99f,A Cartomante,A relação entre o jovem envolvido com Rita e o marido dela vinha dos tempos de criança?,"Vilela, Camilo e Rita, três nomes, uma aventura e nenhuma explicação das
+origens. Vamos a ela. Os dois primeiros eram amigos de infância.",relationship,hard,Sim,Sim.,Não; eram apenas colegas de repartição.,wrong,"Conheciam-se desde a adolescência, não propriamente desde a infância.",ambiguous,A amizade começou apenas quando já eram jovens adultos.,ambiguous,Sim.,correct,Não; conheceram-se apenas depois do casamento de Vilela.,wrong,D,draft
+9e24577a-19ce-4181-8365-05ea738fdc35,A Cartomante,Que mudança de rotina ele adotou para não despertar desconfiança no marido de Rita?,"Camilo teve medo, e, para
+desviar as suspeitas, começou a rarear as visitas à casa de Vilela. Este notou-lhe as
+ausências. Camilo respondeu que o motivo era uma paixão frívola de rapaz.",entity,hard,Rareou as visitas a casa de vilela,Passou a visitar menos a casa de Vilela.,Mudou-se para a casa de Vilela.,wrong,Passou a visitar menos a casa de Vilela.,correct,Parou completamente de visitar a casa por algum tempo.,ambiguous,Passou a visitá-los diariamente.,wrong,"Manteve as visitas, mas passou a ir apenas quando Vilela estava ausente.",ambiguous,B,draft
+6dbfb278-30ce-4e07-ac39-862f8a63e319,A Cartomante,Qual foi a mensagem urgente enviada pelo marido de Rita ao escritório do antigo amigo?,"No dia seguinte, estando na repartição, recebeu Camilo este bilhete de Vilela:
+""Vem já, já, à nossa casa; preciso falar-te sem demora."" Era mais de meio-dia.
+Camilo saiu logo;",relationship,medium,"""Vem já, já, à nossa casa; preciso falar-te sem demora.""","""Vem já, já, à nossa casa; preciso falar-te sem demora.""","""Vem hoje à nossa casa; preciso falar-te com urgência.""",ambiguous,'Rita está doente; venha amanhã.',wrong,'Não apareça mais em nossa casa.',wrong,"""Vem já ao meu escritório; preciso falar-te sem demora.""",ambiguous,"""Vem já, já, à nossa casa; preciso falar-te sem demora.""",correct,E,draft
+a71bfec0-5408-40d8-a858-80bcf9b913ef,A Cartomante,Como é descrita fisicamente e quanto à origem a mulher que faz a leitura das cartas?,"A cartomante fê-lo sentar diante da mesa, e sentou-se do lado oposto, com as
+costas para a janela, de maneira que a pouca luz de fora batia em cheio no rosto de
+Camilo. Abriu uma gaveta e tirou um baralho de cartas compridas e enxovalhadas.
+Enquanto as baralhava, rapidamente, olhava para ele, não de rosto, mas por baixo
+dos olhos. Era uma mulher de quarenta anos, italiana, morena e magra, com
+grandes olhos sonsos e agudos",entity,medium,"Era uma mulher de quarenta anos, italiana, morena e magra, com
+grandes olhos sonsos e agudos","Uma italiana de quarenta anos, morena e magra, com grandes olhos sonsos e agudos.","Uma italiana de cerca de quarenta anos, morena e robusta, de olhos agudos.",ambiguous,"Uma italiana de quarenta anos, morena e magra, com grandes olhos sonsos e agudos.",correct,"Uma portuguesa magra e morena, de cerca de quarenta anos.",ambiguous,"Uma senhora francesa, baixa e de olhos claros.",wrong,"Uma jovem brasileira, loira e robusta.",wrong,B,draft
+799a9be5-71a7-4c17-a82f-ac997dc4a488,A Cartomante,Qual foi a previsão que tranquilizou o rapaz a respeito do triângulo amoroso?,"Camilo tinha os olhos nela. curioso e ansioso.
+— As cartas dizem-me...
+Camilo inclinou-se para beber uma a uma as palavras. Então ela declarou-lhe
+que não tivesse medo de nada. Nada aconteceria nem a um nem a outro; ele, o
+terceiro, ignorava tudo. Não obstante, era indispensável muita cautela: ferviam
+invejas e despeitos. Falou-lhe do amor que os ligava, da beleza de Rita... Camilo
+estava deslumbrado. A cartomante acabou, recolheu as cartas e fechou-as na
+gaveta.",theme,medium,"Que Nada aconteceria nem a um nem a outro; ele, o
+terceiro, ignorava tudo",Que nada aconteceria aos amantes e que Vilela ignorava tudo.,Que Rita abandonaria Camilo naquela semana.,wrong,"Que Vilela desconfiava, mas ainda não tinha provas e nada aconteceria naquele dia.",ambiguous,"Que o romance terminaria sem escândalo, embora Vilela já soubesse de tudo.",ambiguous,Que nada aconteceria aos amantes e que Vilela ignorava tudo.,correct,Que Vilela já descobrira a relação e preparava uma vingança.,wrong,D,draft
+4fe74f86-69bd-4fd8-8336-bf66f651a1de,A igreja do Diabo,De que fonte narrativa vem a história sobre a criação da nova religião pelo Diabo?,"Conta um velho manuscrito beneditino que o Diabo, em  certo dia, teve a idéia
+de fundar uma igreja",theme,medium,Um velho manuscrito,Um velho manuscrito beneditino.,Um sermão de Padre Lopes.,wrong,Um velho manuscrito beneditino.,correct,Uma carta escrita pelo próprio Diabo.,wrong,"Um manuscrito beneditino recente, apresentado como cópia de um texto antigo.",ambiguous,"Uma crônica oral preservada por monges beneditinos, não um manuscrito.",ambiguous,B,draft
+70d83abd-aca5-4ad8-b0d1-43afd6d26dab,A igreja do Diabo,Que estado de espírito Deus demonstra ao questionar por que o adversário demorou tanto a organizar sua instituição?,"— Quereis que venha anunciar-vos o remate da obra?
+
+— Não é preciso; basta que me digas desde já por que motivo, cansado há
+tanto da tua desorganização, só agora pensaste em fundar uma igreja?",relationship,hard,Cansaço e irritação,Cansaço e irritação.,Medo e submissão.,wrong,Cansaço e irritação.,correct,"Surpresa e censura pela demora, mais do que cansaço.",ambiguous,Entusiasmo e admiração.,wrong,Ironia e divertimento diante da desorganização do adversário.,ambiguous,B,draft
+be3affd8-f02b-4ce1-b174-45ad8660ca1f,A igreja do Diabo,Que imagem popular do Diabo ele rejeita ao se apresentar?,"— Sim, sou o Diabo, repetia ele; não o Diabo das noites sulfúreas, dos contos
+soníferos, terror das crianças, mas o Diabo verdadeiro e único, o próprio gênio da
+natureza, a que se deu aquele nome para arredá-lo do coração dos homens.
+Vede-me gentil a airoso. Sou  o vosso verdadeiro pai",entity,medium,"O diabos das noites, contos e terror das crianças","A figura do Diabo das noites sulfúreas, dos contos e do terror das crianças.",A figura medieval de chifres e tridente usada pelos teólogos.,ambiguous,"O Diabo grotesco dos sermões religiosos, não o dos contos infantis.",ambiguous,A imagem de um filósofo racionalista.,wrong,A figura de um santo penitente.,wrong,"A figura do Diabo das noites sulfúreas, dos contos e do terror das crianças.",correct,E,draft
+669569fe-4b5a-493e-84db-9f4aa1326c4c,A igreja do Diabo,Quais vícios tradicionais foram reabilitados como qualidades naturais na nova doutrina?,"Clamava ele que as virtudes aceitas deviam ser substituídas por outras, que
+eram as naturais e legítimas. A soberba, a luxúria, a preguiça foram reabilitadas, e
+
+5
+assim também a avareza, que declarou não ser mais do que a mãe da economia,
+com a diferença que a mãe era robusta, e a filha uma esgalgada. A ira tinha a
+melhor defesa na existência de Homero; sem o furor de Aquiles, não haveria a
+Ilíada: ""Musa, canta a cólera de Aquiles, filho de Peleu""... O mesmo disse da gula,
+que produziu as melhores páginas de Rabelais, e muitos bons versos do Hissope;
+virtude tão superior, que ninguém se lembra das batalhas de Luculo, mas das suas
+ceias; foi a gula que realmente o fez imortal. Mas, ainda pondo de lado essas razões
+de ordem literária ou histórica, para só mostrar o valor intrínseco daquela virtude,
+quem negaria que era muito melhor sentir na boca e no ventre os bons manjares, em
+grande cópia, do que os maus bocados, ou a saliva do jejum? Pela sua parte o
+Diabo prometia substituir a vinha do Senhor, expressão metafórica, pela vinha do
+Diabo, locução direta e verdadeira, pois não faltaria nunca aos seus com o fruto das
+mais belas cepas do mundo. Quanto à inveja, pregou friamente que era a virtude
+principal, origem de prosperidades infinitas; virtude preciosa, que chegava a suprir
+todas  as outras, e ao próprio talento.",fact,medium,"Soberba, luxuria, preguiça, avazera, ira,gula","Soberba, luxúria, preguiça, avareza, ira e gula.","Soberba, luxúria, preguiça, avareza, ira e gula.",correct,"Soberba, luxúria, preguiça, avareza, inveja e gula.",ambiguous,"Humildade, castidade, diligência, generosidade, paciência e temperança.",wrong,"Soberba, luxúria, preguiça, avareza, ira e inveja.",ambiguous,"Fé, esperança, caridade, prudência, justiça e fortaleza.",wrong,A,draft
+14ccad54-9021-4cd5-9a63-abf9661b4f68,A igreja do Diabo,O fundador era exclusivista a ponto de exigir uma única disposição de todos?,"Nada mais curioso, por exemplo, do que a definição que ele dava da fraude.
+Chamava-lhe o braço esquerdo do homem; o braço direito era a força; e concluía:
+muitos homens são canhotos, eis tudo. Ora, ele não exigia que todos fossem
+canhotos; não era exclusivista. Que uns fossem canhotos, outros destros; aceitava a
+todos, menos os que não fossem nada.",quote,easy,Não,Não.,"Exigia uma disposição dominante, embora tolerasse pequenas variações.",ambiguous,"Aceitava diferenças de comportamento, mas cobrava uniformidade moral.",ambiguous,Sim; só aceitava os que seguissem uma única disposição.,wrong,Não.,correct,Sim; todos deveriam agir da mesma maneira.,wrong,D,draft
+575b5afc-f122-456f-bc95-1aeb4c2072fb,A igreja do Diabo,Qual princípio de solidariedade humana ele considerava o principal obstáculo a eliminar para concluir sua doutrina?,"Para rematar a obra, entendeu o Diabo que lhe cumpria cortar por toda a
+solidariedade humana. Com efeito, o amor do próximo era um obstáculo grave à
+nova instituição. Ele mostrou que essa  regra era urna simples invenção de parasitas
+e negociantes insolváveis; não se devia dar ao próximo senão indiferença; em
+alguns casos, ódio ou desprezo",theme,medium,Amor ao próximo,O amor ao próximo.,O amor ao próximo.,correct,A disciplina militar.,wrong,A obediência ao Estado.,wrong,A caridade aos pobres.,ambiguous,O perdão aos inimigos.,ambiguous,A,draft
+4b0b33a3-7be7-4cb1-bbec-6397107e8a7f,A igreja do Diabo,Que contradição no comportamento dos próprios fiéis fez o fundador procurar Deus novamente?,"Um dia. porém, longos anos depois notou o Diabo que muitos dos seus fiéis,
+às escondidas, praticavam as antigas virtudes. Não as praticavam todas, nem
+integralmente, mas algumas, por partes, e, como digo, às ocultas. Certos glutões
+recolhiam-se a comer frugalmente três ou quatro vezes por ano, justamente em dias
+de preceito católico; muitos avaros davam esmolas, à noite, ou nas ruas mal
+povoadas; vários dilapidadores do erário restituíam-lhe pequenas quantias; os
+fraudulentos falavam, uma ou outra vez, com o coração nas mãos, mas com o
+mesmo rosto dissimulado, para fazer crer que estavam embaçando os outros.
+
+A descoberta assombrou o Diabo. Meteu-se a conhecer mais diretamente o
+mal, e viu que lavrava muito. Alguns casos eram até incompreensíveis, como o de
+um droguista do Levante, que envenenara longamente uma geração inteira, e, com
+o produto das drogas socorria os filhos das vítimas. No Cairo achou um perfeito
+ladrão de camelos, que tapava a cara para ir às mesquitas. O Diabo deu com ele à
+entrada de uma, lançou-lhe em rosto o procedimento; ele negou, dizendo que ia ali
+roubar o camelo de um drogman; roubou-o, com efeito, à vista do Diabo e foi dá-lo
+de presente a um muezim, que rezou por ele a Alá. O manuscrito beneditino cita
+muitas outra  descobertas extraordinárias, entre elas esta, que desorientou
+completamente o Diabo. Um dos seus melhores apóstolos era um calavrês, varão de
+cinqüenta anos, insigne falsificador de documentos, que possuía uma bela casa na
+campanha romana, telas, estátuas, biblioteca, etc. Era a fraude em pessoa; chegava
+a meter-se na cama para não confessar que estava são. Pois esse homem, não só
+não furtava ao jogo, como ainda dava gratificações aos criados. Tendo angariado a
+amizade de um cônego, ia todas as semanas confessar-se com ele, numa capela
+
+7
+solitária; e, conquanto não lhe desvendasse nenhuma das suas ações secretas,
+benzia-se duas vezes, ao ajoelhar-se, e ao levantar-se. O Diabo mal pôde crer
+tamanha aleivosia. Mas não havia duvidar; o caso era verdadeiro.
+
+Não se deteve um instante. O pasmo não lhe deu tempo de refletir, comparar
+e concluir do espetáculo presente alguma cousa análoga ao passado. Voou de novo
+ao céu, trêmulo de raiva, ansioso de conhecer a causa secreta de tão singular
+fenômeno. Deus ouviu-o com infinita complacência; não o interrompeu, não o
+repreendeu, não triunfou, sequer, daquela agonia satânica. Pôs os olhos nele, e
+disse:",fact,hard,"Percebeu a hipocrisia humana em praticar o pecado, mesmo que o fosse bom","Os fiéis praticavam às escondidas antigas virtudes, contrariando a doutrina.","Os fiéis praticavam às escondidas antigas virtudes, contrariando a doutrina.",correct,"Os fiéis exibiam virtudes em público, mas continuavam viciosos em segredo.",ambiguous,Deus proibiu diretamente a existência da nova religião.,wrong,Os fiéis abandonaram todos os vícios e fecharam a igreja publicamente.,wrong,"Alguns seguidores praticavam virtudes apenas por interesse, sem escondê-las.",ambiguous,A,draft
+3f24a246-cb36-4238-ad0c-65eb7ed61bd5,A igreja do Diabo,Em que circunstância o homem morreu depois de ceder a outra pessoa o único meio de salvação?,"Esse mesmo
+ancião parece enjoado; e sabes tu o que ele fez?
+
+— Já vos disse que não.
+
+— Depois de uma vida honesta, teve uma morte sublime. Colhido em um
+naufrágio, ia salvar-se numa tábua; mas viu um casal de noivos, na flor da vida, que
+se debatiam já com a morte; deu-lhes a tábua de salvação e mergulhou na
+eternidade. Nenhum público: a água e o céu por cima. Onde achas aí a franja de
+algodão?",fact,hard,Naufrágio,Em um naufrágio.,Em um naufrágio.,correct,"Durante uma tempestade em alto-mar, antes de o navio naufragar.",ambiguous,Em uma batalha terrestre.,wrong,Em um incêndio.,wrong,"Depois de sobreviver ao naufrágio, já em terra firme.",ambiguous,A,draft
+f213f56e-7fd4-4e83-ad0f-e43eef3cd27b,A igreja do Diabo,Como o personagem define a própria natureza ao falar com o Senhor?,"— Senhor, eu sou, como sabeis, o espírito que nega.",entity,easy,O espírito que nega,O espírito que nega.,O espírito que nega.,correct,O anjo da concórdia.,wrong,O espírito que duvida.,ambiguous,"O espírito que contradiz, mas não chega a negar.",ambiguous,O espírito da caridade.,wrong,A,draft
+fdd644ab-e032-4886-9706-708ea20a5b2b,A igreja do Diabo,A expectativa de adesão em massa à nova instituição acabou se realizando?,"A previsão do Diabo verificou-se.  Todas as virtudes cuja capa de veludo
+acabava em franja de algodão, uma vez puxadas pela franja, deitavam a capa às
+urtigas e vinham alistar-se na igreja nova. Atrás foram chegando as outras, e o
+tempo abençoou a instituição. A igreja fundara-se; a doutrina propagava-se; não
+havia uma região do globo que não a conhecesse, uma língua que não a traduzisse,
+uma raça que não a amasse. O Diabo alçou brados de triunfo.",theme,medium,Sim,Sim.,"A adesão cresceu, mas permaneceu restrita a uma única região.",ambiguous,Não; só alguns poucos habitantes aderiram.,wrong,Não; a instituição não conquistou seguidores.,wrong,"A instituição se espalhou, porém sem conquistar a maioria das pessoas.",ambiguous,Sim.,correct,E,draft
+2294eb48-3618-4db1-8ad5-283575440b33,Dom Casmurro,Que comparação célebre é usada para caracterizar o olhar da jovem vizinha de Bentinho?,"Você já reparou nos olhos dela? São assim de cigana
+oblíqua e dissimulada",entity,easy,Olhos de cigana,Olhos de cigana oblíqua e dissimulada.,"Olhos de cigana, oblíquos mas francos.",ambiguous,Olhos de cigana oblíqua e dissimulada.,correct,Olhos de ressaca.,wrong,Olhos de cigana diretos e dissimulados.,ambiguous,Olhos claros e serenos.,wrong,B,draft
+a4296269-7818-4a02-800d-fcb384fe4fb1,Dom Casmurro,Quem sustentava o compromisso de encaminhar o menino para a vida religiosa?,"—D. Glória, a senhora persiste na idéia de meter o nosso Bentinho no
+seminário? É mais que tempo, e já agora pode haver uma dificuldade.",relationship,medium,D. Glória,D. Glória.,Capitu.,wrong,José Dias.,wrong,"O padre Cabral, invocando a promessa feita pela família.",ambiguous,D. Glória.,correct,"Tio Cosme, por considerar o seminário a solução mais segura.",ambiguous,D,draft
+a0d7e238-0ddf-4cf7-a262-8cf7cfaaad7c,Dom Casmurro,O companheiro de seminário que se tornaria seu grande amigo tinha mais idade que o narrador?,"Eis aqui outro seminarista. Chamava-se Ezequiel de Sousa Escobar era um
+rapaz esbelto, olhos claros, um pouco fugitivos, como as mãos, como os pés, como
+a fala, como tudo. Quem não estivesse acostumado com ele podia acaso sentir-se
+mal, não sabendo por onde lhe pegasse. Não fitava de rosto, não falava claro nem
+seguido as mãos não apertavam as outras, nem se deixavam apertar delas, por que
+os dedos, sendo delgados e curtos, quando a gente cuidava tê-los entre os seus, já
+não tinha nada. O mesmo digo dos pés, que lia depressa estavam aqui como lá.
+Esta dificuldade em pousar foi a maior obstáculo que achou para tomar os costumes
+do seminário. O sorriso era instantâneo, mas também ria folgado e largo. Uma cousa
+não seria tão fugitiva, como o resto, a reflexão; íamos dar com ele, muita vez, olhos
+enfiados em si, cogitando. Respondia-nos sempre que meditava algum ponto
+espiritual, ou então que recordava a lição da véspera. Quando ele entrou na minha
+intimidade pedia-me freqüentemente explicações e repetições miúdas, e tinha
+memória para guardá-las todas, até as palavras. Talvez esta faculdade prejudicasse
+alguma outra.
+Era mais velho que eu três anos, filho de um advogado de Curitiba,",relationship,hard,Sim,Sim.,Tinha exatamente a mesma idade de Bentinho.,ambiguous,Não; Bentinho era mais velho.,wrong,"Era mais novo que Bentinho, embora parecesse mais maduro.",ambiguous,Sim.,correct,Tinham exatamente a mesma idade.,wrong,D,draft
+79cd1b65-cf31-4428-8b70-b8c641324a8c,Dom Casmurro,"Fora dos parentes, o protagonista reconhecia possuir outra amizade verdadeira além do colega conhecido na formação religiosa?","—Escobar, você é meu amigo, eu sou seu amigo também; aqui ao seminário
+você é a pessoa que mais me tem entrado no coração, e lá fora, a não ser a gente
+da família, não tenho propriamente um amigo.",relationship,hard,Não,Não.,"Reconhecia José Dias como outro amigo verdadeiro, além de Escobar.",ambiguous,"Tinha outras amizades verdadeiras, apenas menos íntimas que a de Escobar.",ambiguous,Sim; José Dias era descrito como seu melhor amigo.,wrong,Não.,correct,Sim; tinha muitos amigos íntimos fora da família.,wrong,D,draft
+59693260-43ff-4972-9640-4c60ad0d772b,Dom Casmurro,Os dois seminaristas realmente desejavam seguir a carreira eclesiástica?,"—Escobar, você é capaz de guardar um segredo?
+—Você que pergunta é porque duvida, e nesse caso. ..
+—Desculpe, é um modo de falar. Eu sei que é moço sério, e faço de conta
+que me confesso a um padre.
+—Se precisa de absolvição, está absolvido.
+—Escobar, eu não posso ser padre. Estou aqui, os meus acreditam, e
+esperam; mas eu não posso ser padre.
+—Nem eu, Santiago.
+—Nem você?",relationship,hard,Não,Não.,Apenas Bentinho queria ser padre e Escobar insistia em sair.,wrong,Não.,correct,Apenas Escobar desejava seguir a carreira eclesiástica; Bentinho não.,ambiguous,Sim; os dois desejavam ordenar-se.,wrong,Os dois demonstraram vocação inicial e só mudaram de ideia mais tarde.,ambiguous,B,draft
+60a1a504-bc55-4b7d-95b1-261be90edb36,Dom Casmurro,A que destino europeu seria necessário viajar para tentar desfazer formalmente o compromisso religioso assumido pela mãe?,"No dia seguinte revelou-me o mistério. Ao primeiro aspecto confesso que
+fiquei deslumbrado. Trazia uma nota de grandeza e de espiritualidade que falava aos
+meus olhos de seminarista. Era não menos que isto. Minha mãe, ao parecer dele,
+estava arrependida do que fizera, e desejaria ver-me cá fora, mas entendia que o
+vínculo moral da promessa a prendia indissoluvelmente. Cumpria rompê-lo, e para
+tanto valia a Escritura, com o poder de desligar dado aos apóstolos. Assim que, ele e
+eu iríamos a Roma pedir a absolvição do papa... Que me parecia?",fact,hard,Roma,Roma.,Coimbra.,wrong,Roma.,correct,Lisboa.,wrong,Avinhão.,ambiguous,Madri.,ambiguous,B,draft
+80c0ea2e-3a91-4ce4-96d2-bc74fd8ce92a,Dom Casmurro,Que conselho bíblico é lembrado pelo narrador ao refletir sobre o perigo de ensinar malícia à esposa por meio do ciúme?,"se soubesse dos meus primeiros ciúmes, dir-me-ia, como no
+seu cap. IX, vers. 1: ""Não tenhas ciúmes de tua mulher para que ela não se meta a
+enganar-te com a malícia que aprender de ti""",quote,medium,"""Não tenhas ciúmes de tua mulher para que ela não se meta a
+enganar-te com a malícia que aprender de ti""","""Não tenhas ciúmes de tua mulher para que ela não se meta a enganar-te com a malícia que aprender de ti.""","""Não tenhas ciúmes de tua mulher para que ela não se meta a enganar-te com a malícia que aprender de ti.""",correct,'Ama o próximo como a ti mesmo.',wrong,"""Tem ciúmes de tua mulher, para que ela não se meta a enganar-te.""",ambiguous,"""Não tenhas ciúmes de tua mulher, porque a malícia nasce dela, não de ti.""",ambiguous,'Não julgueis para não serdes julgados.',wrong,A,draft
+e534a118-fa2b-4127-aea3-e0319b2f04ff,Dom Casmurro,Quem havia planejado inicialmente entregar ao amigo do seminário o papel de padrinho da criança?,"Era minha idéia que Escobar fosse padrinho do pequeno; a madrinha devia
+ser e seria minha mãe. Mas a primeira parte se trocou por intervenção do tio Cosme,
+que, ao ver a criança, disse-lhe entre outros carinhos:
+—Anda, toma a bênção a teu padrinho, velhaco.
+E, voltando-se para mim:
+—Não desisto do favor; e há de ser depressa o batizado, antes que a minha
+doença me leve de vez.
+Contei discretamente a anedota a Escobar, para que ele me compreendesse
+e desculpasse; riu-se e não se magoou. Fez mais, quis que o almoço do batizado
+fosse na chácara dele, e foi. Eu ainda tentei espaçar a cerimônia a ver se tio Cosme
+sucumbia primeiro à doença, mas parece que esta era mais de aborrecer que de
+matar. Não houve remédio senão levar o menino à pia, onde se lhe deu o nome de
+Ezequiel; era o de Escobar",relationship,hard,De bentinho,Bentinho.,José Dias.,wrong,Tio Cosme.,wrong,"Capitu, que queria Escobar como padrinho.",ambiguous,"D. Glória, por proximidade com a família.",ambiguous,Bentinho.,correct,E,draft
+28b69146-3ef9-4364-8e35-f8c2fc7fe9d8,Dom Casmurro,O modo de olhar do menino fazia sua mãe recordar quais duas figuras ligadas ao passado da família?,"—Você já reparou que Ezequiel tem nos olhos uma expressão esquisita?
+perguntou-me Capitu. Só vi duas pessoas assim, um amigo de papai e o defunto
+Escobar. Olha, Ezequiel; olha firme, assim, vira para o lado de papai, não precisa
+revirar os olhos, assim, assim...",location,hard,Pai de Capitu  e Escobar,Um amigo do pai de Capitu e Escobar.,Tio Cosme e Padre Cabral.,wrong,Um amigo do pai de Capitu e Escobar.,correct,O próprio pai de Capitu e Escobar.,ambiguous,Bentinho e José Dias.,wrong,Bentinho e Escobar.,ambiguous,B,draft
+e04d51f7-35e9-4ae5-b442-f8775c7ec879,Dom Casmurro,Os dois adolescentes chegaram a prometer exclusividade matrimonial um ao outro para o futuro?,"—Não há de ser assim, continuei. Dizem que não estamos em idade de casar,
+que somos crianças, criançolas,—já ouvi dizer criançolas. Bem; mas dous ou três
+anos passam depressa. Você jura uma cousa? lura que só há de casar comigo?
+Capitu não hesitou em jurar, e até lhe vi as faces vermelhas de prazer. Jurou
+duas vezes e uma terceira:
+—Ainda que você case com outra, cumprirei o meu juramento, não casando
+nunca.
+—Que eu case com outra?
+—Tudo pode ser. Bentinho. Você pode achar outra moça que lhe queira,
+apaixonar-se por ela e casar. Quem sou eu para você lembrar-se de mim nessa
+ocasião?
+—Mas eu também juro! Juro, Capitu, juro por Deus Nosso Senhor que só me
+casarei com você. Basta isto?",relationship,hard,Sim,Sim.,Sim.,correct,Não; Capitu recusou qualquer juramento.,wrong,"Prometeram casar-se, mas sem jurar exclusividade um ao outro.",ambiguous,Não; nunca falaram em casamento.,wrong,Só Capitu fez a promessa; Bentinho não a retribuiu.,ambiguous,A,draft
+89c8a7ff-355e-4014-86a0-d9e7096a6f00,Jogo do Bicho,"Segundo o bicheiro, que hábito do jogador explicava a baixa frequência de acertos?","Camilo recordou-lhe o dito; o bicheiro soltou uma gargalhada.
+    — Não, compadre; eu não posso adivinhar. Aquilo foi pura brincadeira. Oxalá que eu
+lhe pudesse dar um prêmio. A águia dá; não é comum, mas dá.
+    — Mas porque é que eu ainda não acertei com ela?
+    — Isso não sei; eu não posso dar conselhos, mas quero crer que você, compadre, não
+tem paciência no mesmo bicho, não joga com certa constância. Troca muito. É por isso
+
+que poucas vezes tem acertado.",theme,hard,Porque troca muito de bicho,Porque ele trocava muito de bicho e não mantinha constância.,Porque apostava sempre no mesmo número.,wrong,Porque ele trocava muito de bicho e não mantinha constância.,correct,"Porque insistia tempo demais no mesmo bicho, mesmo depois de perder.",ambiguous,Porque só jogava quando recebia palpites de jornais.,wrong,"Porque mudava apenas os números, mantendo sempre o mesmo bicho.",ambiguous,B,draft
+2f31388a-5713-4dbc-9b8d-b53b6c24ebcd,Jogo do Bicho,Que palavra ligada à aposta invadia o trabalho do funcionário quando ele copiava os números do documento?,"Camilo ia calculando os números e descrendo da sorte. O documento tinha algarismos;
+ele errou-os muita vez, por causa do atropelo em que uns e outros lhe andavam no
+cérebro. A troca era fácil; os seus vinham mais vezes ao papel que os do documento
+original. E o pior é que ele não dava por isso, escrevia o leão em vez de transcrever a
+soma exata das toneladas de pólvora...",theme,medium,Escrevia leão,Leão.,Leão.,correct,Águia.,wrong,Leoa.,ambiguous,Felino.,ambiguous,Avestruz.,wrong,A,draft
+ad9075e1-17b0-4296-a9aa-da5738fc5319,Jogo do Bicho,"Ao se irritar no trabalho, até onde imaginou levar o superior usando de forma jocosa um verbo burocrático?","Camilo teve vontade de prorrogar o chefe até ao mar, se lhe era lícito dar tal uso ao
+verbo e ao regulamento. Voltou à mesa, pegou de uma folha de papel e começou a
+
+escrever o requerimento de demissão",relationship,medium,prorrogar o chefe até ao mar,Prorrogar o chefe até ao mar.,Promover o chefe a ministro.,wrong,Prorrogar o chefe até ao mar.,correct,Transferir o chefe para outra repartição.,wrong,"Prorrogar o chefe apenas até a praia, não até ao mar.",ambiguous,"Prorrogar o expediente até ao mar, em vez do próprio chefe.",ambiguous,B,draft
+4172dcbb-3ee5-4aa1-9975-9c33a77f1f1a,Jogo do Bicho,Que conjunto de comida e bebida o comerciante acabou convencendo o apostador a levar para casa?,"confeiteiro veio ajudá-lo, e, notando a incerteza de Camilo entre mesa e sobremesa,
+resolveu vender-lhe ambas as cousas. Começou por um pastelão, “um rico pastelão, que
+enchia os olhos, antes de encher a boca e o estômago”. A sobremesa foi “um rico pudim”,
+em que havia escrito, com  letras de massa branca este viva eterno: “Viva a esperança!”.
+A alegria de Camilo foi tanta e tão estrepitosa que o homem não teve remédio senão
+oferecer-lhe vinho também, uma ou duas garrafas. Duas.",relationship,medium,"Um pastelao, um pudim e duas garrafas de vinho","Um pastelão, um pudim e duas garrafas de vinho.","Dois pastéis, frutas e café.",wrong,"Um peru, um bolo e uma garrafa de cerveja.",wrong,"Um pastelão, um pudim e uma garrafa de vinho.",ambiguous,"Um pastelão, dois pudins e duas garrafas de vinho.",ambiguous,"Um pastelão, um pudim e duas garrafas de vinho.",correct,E,draft
+24c012f4-9e25-45d1-a51c-55e55f80990f,Jogo do Bicho,Que presente ele decidiu comprar para a esposa depois de já estar no bonde?,"Estava tão contente com o jantar que levava e o espanto da mulher, nem se lembrou
+de presentear Joaninha com alguma jóia. Esta idéia só o assaltou no bonde, andando;
+desceu e voltou a pé, a buscar um mimo de ouro, um broche que fosse, com uma pedra
+preciosa.",relationship,medium,com um broche de ouro com pedra preciosa,Um broche de ouro com uma pedra preciosa.,Um colar de pérolas.,wrong,Um broche de prata com uma pedra preciosa.,ambiguous,Um anel de ouro com uma pedra preciosa.,ambiguous,Um relógio de prata.,wrong,Um broche de ouro com uma pedra preciosa.,correct,E,draft
+6f708891-67ea-40fb-8b3b-21d5ae5d7fc1,Jogo do Bicho,"Depois de experimentar vários métodos para escolher números, qual símbolo passou a adotar de modo persistente?","Camilo apoderou-se daquele processo de adotar um bicho, e jogar nele
+até estafá-lo: era ir pelos números adventícios. Por exemplo, entrava por uma rua com os
+olhos no chão, dava quarenta, sessenta, oitenta passos, erguia repentinamente os olhos e
+fitava a primeira casa à direita ou à esquerda, tomava o número e ia dali ao bicho
+correspondente. Tinha já gasto o processo de números escritos e postos dentro do
+chapéu, o de um bilhete do Tesouro — cousa rara — e cem outras formas, que se
+repetiam ou se  completavam. Em todo caso, ia descambando na impaciência e variava
+muito. Um dia resolveu fixar-se no leão;",theme,easy,No leão,O leão.,O tigre.,ambiguous,O gato.,wrong,O leão.,correct,A águia.,wrong,"Um felino genérico, sem se fixar em um bicho específico.",ambiguous,C,draft
+92cbfc06-c340-4422-b215-a1bbd09d2c2d,Jogo do Bicho,"Por que ele registrava entradas e saídas, mas evitava confrontar as duas colunas?","Camilo escrevia efetivamente a despesa e a receita, mas não as comparava para não
+conhecer a diferença. Não queria saber do deficit",theme,medium,Não queria saber do deficit,Porque não queria conhecer o déficit.,Porque o chefe proibia a comparação das colunas.,wrong,Porque já sabia que havia déficit e queria apenas escondê-lo da esposa.,ambiguous,Porque não queria conhecer o déficit.,correct,Porque não sabia fazer subtração.,wrong,"Porque temia encontrar um erro de registro, não um prejuízo financeiro.",ambiguous,C,draft
+e2a1a9a1-dd7b-4d01-a284-0b317c8f1e25,Jogo do Bicho,"Como funcionava a aposta descrita no conto, em que um número convencional determinava o resultado?","Camilo, pela primeira vez, jogou no
+bicho. Jogar no bicho não é um eufemismo como matar o bicho. O jogador escolhe um
+número, que convencionalmente representa um bicho, e se tal número acerta de ser o
+final da sorte grande, todos os que arriscaram nele os seus vinténs ganham, e todos os
+que fiaram dos outros perdem. Começou a vinténs e dizem que está em contos de réis;
+mas, vamos ao nosso caso.",theme,medium,Escolher um número que representa um bicho,Escolher um número que convencionalmente representa um bicho e apostar que ele coincida com o final da sorte grande.,Escolher um número que convencionalmente representa um bicho e apostar que ele coincida com o final da sorte grande.,correct,Escolher um bicho e ganhar se qualquer número associado a ele aparecesse em qualquer posição do sorteio.,ambiguous,Sortear diretamente um animal de um saco.,wrong,Apostar primeiro no número final da sorte grande e só depois convertê-lo em um bicho.,ambiguous,Escolher um bicho e receber prêmio independentemente do número sorteado.,wrong,A,draft
+3db3613c-b3b8-4499-8318-b70ab7fa6cf5,Jogo do Bicho,"Mesmo após sucessivas tentativas frustradas, ele continuava acreditando que poderia vencer?","Camilo tinha fé. A fé abala as montanhas. Tentou o gato, depois o cão, depois o
+avestruz; não havendo jogado neles, podia ser que... Não pôde ser; a fortuna igualou os
+três animais em não lhes fazer dar nada. Não queria ir pelos palpites dos jornais, como
+faziam alguns amigos",theme,medium,Sim,Sim.,"Continuava apostando por hábito, mas já não acreditava realmente que venceria.",ambiguous,Sim.,correct,"Acreditava apenas que poderia recuperar parte das perdas, não obter uma vitória.",ambiguous,Não; desistiu após as primeiras perdas.,wrong,Não; passou a considerar o jogo impossível de vencer.,wrong,B,draft
+5a202966-2f5f-4d2b-8fa1-19b25b9bedb0,Jogo do Bicho,Ele aceitava mudar seus cálculos quando interpretava algum acontecimento como um sinal superior?,"Camilo deixou-se ir com os seus cálculos. Quando muito, cedia a certas
+indicações que pareciam vir do céu",theme,easy,sim,Sim.,Não; seguia rigidamente os cálculos sem exceção.,wrong,Não; rejeitava qualquer sinal ou superstição.,wrong,Sim.,correct,"Usava os sinais apenas para confirmar cálculos já feitos, sem alterá-los.",ambiguous,"Mudava os números por conveniência, mas não por interpretar acontecimentos como sinais superiores.",ambiguous,C,draft
+301bbf36-4258-4710-a20c-3507fea386e2,Memórias Póstumas de Brás Cubas,A quem o narrador dedica as memórias logo antes de iniciar o relato póstumo?,"AO VERME QUE PRIMEIRO ROEU AS FRIAS CARNES DO MEU CADÁVER
+DEDICO COMO SAUDOSA LEMBRANÇA ESTAS MEMÓRIAS PÓSTUMAS",theme,easy,Um verme,Ao verme que primeiro roeu as frias carnes de seu cadáver.,"Aos vermes que consumiriam seu corpo, considerados em conjunto.",ambiguous,"Ao verme que roeu o cadáver, sem destacá-lo como o primeiro.",ambiguous,A Virgília.,wrong,Ao verme que primeiro roeu as frias carnes de seu cadáver.,correct,A Quincas Borba.,wrong,D,draft
+84e8bc4a-112a-4ec4-8b35-e330a1412dfb,Memórias Póstumas de Brás Cubas,"Qual enfermidade encerrou a vida do narrador, embora ele atribua parte da culpa a uma grande ideia?","Morri de uma pneumonia; mas se lhe disser que foi menos a pneumonia, do
+que uma idéia grandiosa e útil, a causa da minha morte, é possível que o leitor me
+não creia, e todavia é verdade.",theme,medium,pneumonia,Pneumonia.,"Uma doença pulmonar crônica, sem identificação como pneumonia.",ambiguous,Tuberculose.,wrong,Febre amarela.,wrong,Pneumonia.,correct,Uma bronquite aguda que acabou levando à morte.,ambiguous,D,draft
+b110fda5-121d-47c9-ba30-7fcc5a904ef2,Memórias Póstumas de Brás Cubas,Como ele batizou a invenção medicinal com que sonhava obter glória e lucro?,"Essa idéia era nada menos que a invenção de um medicamento sublime, um
+emplasto anti-hipocondríaco, destinado a aliviar a nossa melancólica humanidade.
+Na petição de privilégio que então redigi, chamei a atenção do governo para esse
+resultado, verdadeiramente cristão. Todavia, não neguei aos amigos as vantagens
+pecuniárias que deviam resultar da distribuição de um produto de tamanhos e tão
+profundos efeitos. Agora, porém, que estou cá do outro lado da vida, posso
+confessar tudo: o que me influiu principalmente foi o gosto de ver impressas nos
+jornais, mostradores, folhetos, esquinas, e enfim nas caixinhas do remédio, estas
+três palavras: Emplasto Brás Cubas.",theme,easy,Emplasto Brás Cubas,Emplasto Brás Cubas.,Emplasto Cubas.,ambiguous,Bálsamo Virgília.,wrong,Emplasto Brás.,ambiguous,Emplasto Brás Cubas.,correct,Elixir Quincas Borba.,wrong,D,draft
+deee6449-b0b6-4547-99d8-cb049067eb46,Memórias Póstumas de Brás Cubas,Qual antepassado é apresentado como origem da linhagem do narrador no século XVIII?,"O fundador de minha família foi um certo Damião Cubas, que floresceu
+na primeira metade do século XVIII.",entity,medium,Damião Cubas,Damião Cubas.,Luís Cubas.,wrong,"Um antepassado chamado Damião, mas não identificado como pertencente aos Cubas.",ambiguous,"Brás Cubas, apresentado como o primeiro fundador da linhagem.",ambiguous,Lobo Neves.,wrong,Damião Cubas.,correct,E,draft
+fc1b0347-f2bd-4ee1-b6f7-7d74f4fc20c1,Memórias Póstumas de Brás Cubas,Qual foi a última 'negativa' que o narrador considerou uma vantagem ao fazer o balanço da própria existência?,"E imaginará mal;
+porque ao chegar a este outro lado do mistério, achei-me com um pequeno saldo,
+que é a derradeira negativa deste capítulo de negativas: — Não tive filhos, não
+transmitia nenhuma criatura o legado da nossa miséria.",theme,hard,"— Não tive filhos, não
+transmitia nenhuma criatura o legado da nossa miséria.","Não ter tido filhos e, assim, não transmitir a ninguém o legado da miséria.","Não ter deixado herdeiros legítimos, embora tivesse filhos.",ambiguous,"Não ter tido filhos e, assim, não transmitir a ninguém o legado da miséria.",correct,Ter enriquecido sem trabalhar.,wrong,"Não ter transmitido sua fortuna aos descendentes, e não a miséria humana.",ambiguous,Ter recuperado Virgília no fim da vida.,wrong,B,draft
+49266857-99ad-40db-b2ed-d4e7ebb102cf,Memórias Póstumas de Brás Cubas,Quem venceu o narrador tanto na disputa amorosa quanto na oportunidade política?,"o Lobo Neves, um homem que não era mais esbelto que
+eu, nem mais elegante, nem mais lido, nem mais simpático, e todavia foi quem me
+arrebatou Virgília e a candidatura",entity,medium,Lobo Neves,Lobo Neves.,Lobo Neves.,correct,"Virgília, que o venceu no amor e também teria influenciado sua derrota política.",ambiguous,"O marido de Virgília, mas apenas na disputa amorosa; a derrota política teria outra causa.",ambiguous,Cotrim.,wrong,Quincas Borba.,wrong,A,draft
+1124986b-0594-43c0-9776-3d2064c257f3,Memórias Póstumas de Brás Cubas,"Dentro da filosofia de Quincas Borba, como deve ser entendida a experiência do sofrimento?","A dor, segundo o Humanitismo, é uma pura ilusão. Quando
+a criança é ameaçada por um pau, antes mesmo de ter sido espancada, fecha os
+olhos e treme; essa predisposição é que constitui a base da ilusão humana, herdada
+e transmitida",theme,medium,Pura ilusão,Como pura ilusão.,Como pura ilusão.,correct,Como uma ilusão apenas nos casos de sofrimento extremo.,ambiguous,Como a única realidade absoluta da existência.,wrong,Como uma realidade necessária para que o Humanitismo se manifeste.,ambiguous,Como castigo divino literal.,wrong,A,draft
+716d1844-7ebf-4228-8a29-71848f009b47,Memórias Póstumas de Brás Cubas,Com quem se casara a irmã de Brás Cubas?,"Sabina, casada com o Cotrim",entity,easy,Cotrim,Cotrim.,Damião Cubas.,wrong,Lobo Neves.,wrong,Um irmão de Cotrim.,ambiguous,Cotrim.,correct,Um sócio comercial de Cotrim.,ambiguous,D,draft
+9185f01d-0b05-4660-ae61-9ca7bb912c7f,Memórias Póstumas de Brás Cubas,"Em que ocasiões ela costumava comparecer aos templos, apesar de não frequentar missa regularmente aos domingos?","Virgília era um pouco religiosa. Não ouvia
+missa aos domingos, é verdade, e creio até que só ia às igrejas em dia de festa, e
+quando havia lugar vago em alguma tribuna",theme,medium,Em dias de festa e lugar vago na tribuna,Em dias de festa e quando havia lugar vago em alguma tribuna.,"Somente em dias de festa, mesmo quando não havia lugar em tribuna.",ambiguous,Somente em funerais de parentes.,wrong,"Quando havia tribuna vaga, inclusive nos domingos comuns.",ambiguous,Em dias de festa e quando havia lugar vago em alguma tribuna.,correct,Todos os domingos pela manhã.,wrong,D,draft
+58bd0e2a-7cab-470d-ac72-2659eb761c2e,Memórias Póstumas de Brás Cubas,De qual autoridade colonial veio a antiga prataria que entrou na família do narrador?,"Tínhamos falado na prata, a velha prataria do tempo de Dom José I, a porção
+mais grave da herança, já pelo lavor, já pela vetustez, já pela origem da propriedade;
+
+52
+dizia meu pai que o Conde da Cunha, quando vice-rei do Brasil, a dera de presente
+a meu bisavô Luís Cubas.",theme,hard,vice-rei do Brasil,"Do Conde da Cunha, vice-rei do Brasil.","Do Conde da Cunha, vice-rei do Brasil.",correct,"Do Marquês de Lavradio, vice-rei do Brasil.",ambiguous,De um governador de Portugal sem ligação com o Brasil.,wrong,De Dom Pedro II.,wrong,"De um governador da capitania do Rio de Janeiro, não de um vice-rei.",ambiguous,A,draft
+7a1153a2-a104-4cd0-9a5a-934aaf1f4ea0,Missa do Galo,Em que celebração do calendário cristão se passa a madrugada em que o narrador fica acordado?,"Era noite de Natal. Havendo ajustado com um vizinho
+irmos à missa do galo, preferi não dormir;",time,easy,Noite de natal,Na noite de Natal.,Na madrugada de 25 para 26 de dezembro.,ambiguous,Na noite de Natal.,correct,Na Sexta-Feira Santa.,wrong,Na noite de Ano-Novo.,wrong,Na noite de 23 para 24 de dezembro.,ambiguous,B,draft
+b9242c48-2755-4229-afc9-829d9083de3c,Missa do Galo,Na residência de qual funcionário público o jovem estava hospedado durante sua passagem pela Corte?,A casa em que eu estava hospedado era a do escrivão Meneses,relationship,easy,escrivão Meneses,Na casa do escrivão Meneses.,Na residência do Dr. Macedo.,wrong,Na casa de um tabelião amigo de Meneses.,ambiguous,Na casa do juiz Nogueira.,wrong,"Na residência de outro escrivão da repartição, não de Meneses.",ambiguous,Na casa do escrivão Meneses.,correct,E,draft
+7bde6236-685d-4392-927f-4f8fada7ee25,Missa do Galo,As ausências semanais do chefe da casa estavam ligadas a um relacionamento extraconjugal?,"Meneses trazia amores com uma senhora, separada do marido, e
+dormia fora de casa uma vez por semana. Conceição padecera, a princípio, com a existência
+da comborça; mas afinal, resignara-se, acostumara-se, e acabou achando que era muito
+direito.",relationship,hard,Sim,Sim.,"As saídas alimentavam suspeitas de infidelidade, mas o relacionamento extraconjugal não era confirmado.",ambiguous,Sim.,correct,Não; eram viagens exclusivamente profissionais.,wrong,Não; ele saía para assistir à missa do galo.,wrong,"A esposa desconfiava de uma amante, embora as ausências fossem por compromissos profissionais.",ambiguous,B,draft
+f18e15d0-82e0-4fe7-8ab6-506d19433527,Missa do Galo,Que temperamento o narrador atribui à esposa de Meneses ao recordar sua maneira de suportar os acontecimentos?,"Boa Conceição! Chamavam-lhe ""a santa"", e fazia jus ao título, tão facilmente suportava os
+esquecimentos do marido. Em verdade, era um temperamento moderado, sem extremos,
+nem grandes lágrimas, nem grandes risos. No capítulo de que trato, dava para maometana;
+aceitaria um harém, com as aparências salvas. Deus me perdoe, se a julgo mal. Tudo nela
+era atenuado e passivo. O próprio rosto era mediano, nem bonito nem feio. Era o que
+chamamos uma pessoa simpática. Não dizia mal de ninguém, perdoava tudo. Não sabia
+odiar; pode ser até que não soubesse amar.",entity,hard,Passiva e monotona,"Moderado, atenuado e passivo.",Eufórico e imprevisível.,wrong,"Moderado e passivo, mas com explosões ocasionais de ciúme.",ambiguous,"Moderado, atenuado e passivo.",correct,"Calmo apenas por aparência, sendo descrito como interiormente enérgico.",ambiguous,Explosivo e ciumento.,wrong,C,draft
+75ba679d-dc79-45d3-8831-95c0e2736ed8,Missa do Galo,"A que publicação o narrador atribui, com alguma incerteza, a versão em português do romance que lia?","Tinha comigo um romance, Os Três Mosqueteiros, velha tradução creio do Jornal do
+Comércio.",theme,hard,Jornal do comércio,Jornal do Comércio.,Correio Mercantil.,wrong,Diário do Rio de Janeiro.,ambiguous,"Uma edição em livro, não uma tradução publicada em jornal.",ambiguous,Jornal do Comércio.,correct,Gazeta de Notícias.,wrong,D,draft
+49799d33-f43a-41d1-937e-5eabea101430,Missa do Galo,Que roupa e aparência ela apresentava ao surgir da alcova enquanto o jovem lia?,"Conceição entrou na sala, arrastando as chinelinhas da alcova. Vestia um roupão branco,
+mal apanhado na cintura. Sendo magra, tinha um ar de visão romântica, não disparatada
+com o meu livro de aventuras.",quote,easy,vestindo roupão braco mal apanhado,"Um roupão branco, mal apanhado na cintura.",Um roupão branco bem ajustado e firmemente preso à cintura.,ambiguous,"Um roupão branco, mal apanhado na cintura.",correct,Um casaco masculino fechado até o pescoço.,wrong,"Um roupão escuro, mal apanhado na cintura.",ambiguous,Um vestido preto de gala.,wrong,B,draft
+cc8ca909-2c4d-4b4f-b1e4-2fa73aa8b9b4,Missa do Galo,Qual escritor é associado ao romance citado durante a conversa na sala?,"Justamente: é muito bonito.
+— Gosta de romances?
+— Gosto.
+— Já leu a Moreninha?
+— Do Dr. Macedo? Tenho lá em Mangaratiba.",description,hard,Dr. Macedo,Dr. Macedo.,Dr. Macedo.,correct,Álvares de Azevedo.,ambiguous,Machado de Assis.,ambiguous,José de Alencar.,wrong,Alexandre Dumas.,wrong,A,draft
+3b614066-e2db-4e65-af72-bc369bc40b76,Missa do Galo,A imagem de Cleópatra aparecia em que tipo de objeto decorativo da sala?,"— Estes quadros estão ficando velhos. Já pedi a Chiquinho para comprar outros.
+Chiquinho era o marido. Os quadros falavam do principal negócio deste homem. Um
+representava ""Cleópatra""; não me recordo o assunto do outro, mas eram mulheres. Vulgares
+ambos; naquele tempo não me pareciam feios.",quote,hard,Um dos quadros,Em um dos quadros da sala.,Em uma gravura solta sobre a mesa.,ambiguous,Na capa do livro que o narrador lia.,wrong,Em uma escultura sobre a mesa.,wrong,"Num retrato emoldurado no quarto, não na sala.",ambiguous,Em um dos quadros da sala.,correct,E,draft
+2be6c09d-5412-4ca7-bddb-54076e08dadf,Missa do Galo,Por que o hóspede preferiu ficar pronto na sala enquanto todos da casa se recolhiam?,"mas fiquei até o Natal para ver ""a missa do galo na
+Corte"". A família recolheu-se à hora do costume; eu meti-me na sala da frente, vestido e
+pronto",theme,hard,Para assistir a missa do galo na corte,Para assistir à missa do galo na Corte.,Para assistir à missa do galo na Corte.,correct,Queria terminar uma conversa combinada com Conceição.,wrong,Para esperar Meneses voltar antes de sair para a missa.,ambiguous,Esperava Meneses voltar de uma viagem.,wrong,Para terminar o romance e só depois decidir se iria à missa.,ambiguous,A,draft
+0dcccd51-c1cf-489e-96a0-77c3bd3e49ed,Missa do Galo,Por que aquele diálogo noturno permaneceu tão vivo na memória do narrador muitos anos depois?,"E não saía daquela posição, que me enchia de gosto, tão perto ficavam as nossas caras.
+Realmente, não era preciso falar alto para ser ouvido: cochichávamos os dous, eu mais que
+ela, porque falava mais; ela, às vezes, ficava séria, muito séria, com a testa um pouco
+franzida. Afinal, cansou, trocou de atitude e de lugar. Deu volta à mesa e veio sentar-se do
+meu lado, no canapé. Voltei-me e pude ver, a furto, o bico das chinelas; mas foi só o tempo
+que ela gastou em sentar-se, o roupão era comprido e cobriu-as logo. Recordo-me que eram
+pretas. Conceição disse baixinho:",relationship,hard,"A conversa marcou Nogueira porque despertou nele uma forte atração por Conceição e criou uma intimidade ambígua que, mesmo anos depois, ele não conseguiu compreender completamente","Porque a conversa criou uma intimidade e atração ambíguas com Conceição, difíceis de compreender mesmo depois.",Porque naquela noite descobriu que Meneses havia morrido.,wrong,Porque aquela foi a última conversa entre os dois antes de uma separação definitiva.,ambiguous,Porque Conceição confessou explicitamente uma relação amorosa.,wrong,"Porque o diálogo esclareceu completamente os sentimentos de Conceição, eliminando qualquer dúvida.",ambiguous,"Porque a conversa criou uma intimidade e atração ambíguas com Conceição, difíceis de compreender mesmo depois.",correct,E,draft
+f7ee8544-f641-4268-b5b4-1e606f3a47f5,O Alienista,Que atividade ele dizia ser sua única ocupação ao recusar cargos oferecidos pela monarquia?,"As crônicas da vila de Itaguaí dizem que em tempos remotos vivera ali um
+certo médico, o Dr. Simão Bacamarte, filho da nobreza da terra e o maior dos
+médicos do Brasil, de Portugal e das Espanhas. Estudara em Coimbra e Pádua. Aos
+trinta e quatro anos regressou ao Brasil, não podendo el-rei alcançar dele que
+ficasse em Coimbra, regendo a universidade, ou em Lisboa, expedindo os negócios
+da monarquia.
+—A ciência, disse ele a Sua Majestade, é o meu emprego único; Itaguaí é o
+meu universo.",entity,medium,A ciência,A ciência.,A política imperial.,wrong,A prática médica.,ambiguous,A pesquisa sobre doenças mentais.,ambiguous,A administração pública.,wrong,A ciência.,correct,E,draft
+39cfb174-678b-4b63-81c9-275efd4bc542,O Alienista,Com quem o cientista obcecado pela mente humana se casou?,"As crônicas da vila de Itaguaí dizem que em tempos remotos vivera ali um
+certo médico, o Dr. Simão Bacamarte, filho da nobreza da terra e o maior dos
+médicos do Brasil, de Portugal e das Espanhas. Estudara em Coimbra e Pádua. Aos
+trinta e quatro anos regressou ao Brasil, não podendo el-rei alcançar dele que
+ficasse em Coimbra, regendo a universidade, ou em Lisboa, expedindo os negócios
+da monarquia.
+—A ciência, disse ele a Sua Majestade, é o meu emprego único; Itaguaí é o
+meu universo.
+Dito isso, meteu-se em Itaguaí, e entregou-se de corpo e alma ao estudo da
+ciência, alternando as curas com as leituras, e demonstrando os teoremas com
+cataplasmas. Aos quarenta anos casou com D. Evarista da Costa e Mascarenhas,
+senhora de vinte e cinco anos, viúva de um juiz de fora",relationship,medium,D. Evarista da Costa e Mascarenhas,D. Evarista da Costa e Mascarenhas.,D. Conceição.,wrong,D. Evarista de Castro e Mascarenhas.,ambiguous,D. Evarista da Costa e Mascarenhas.,correct,D. Evarista da Costa e Soares.,ambiguous,Comadre Angélica.,wrong,C,draft
+40253cc5-7c0f-43dd-bace-727ec907b6e3,O Alienista,Qual aspecto do ser humano ele afirmou merecer prioritariamente a atenção de um médico?,"—A saúde da alma, bradou ele, é a ocupação mais digna do médico.",quote,easy,A saúde da alma,A saúde da alma.,"A saúde do corpo, por refletir diretamente o estado da alma.",ambiguous,"O equilíbrio entre corpo e alma, sem prioridade para a alma.",ambiguous,A saúde da alma.,correct,A aparência física.,wrong,A saúde financeira.,wrong,C,draft
+3bd83d19-ff10-412c-a5c8-9be153c34b16,O Alienista,Como passou a ser chamado o estabelecimento psiquiátrico cujas janelas tinham uma cor inédita na vila?,"A Casa Verde foi o nome dado ao asilo, por alusão à cor das janelas, que
+pela primeira vez apareciam verdes em Itaguaí.",location,medium,Casa Verde,Casa Verde.,Santa Casa de Itaguaí.,wrong,Casa Verde.,correct,Casa das Janelas Verdes.,ambiguous,Casa Azul.,wrong,"Casa da Saúde, chamada de verde apenas informalmente.",ambiguous,B,draft
+d6d0ae3d-4381-464a-9adf-3f0ea0adb182,O Alienista,Qual amigo e comensal do médico exercia o ofício de boticário em Itaguaí?,"—Do verdadeiro médico, emendou Crispim Soares, boticário da vila, e um dos
+seus amigos e comensais.",entity,easy,Crispim Soares,Crispim Soares.,Crispim Soares.,correct,Padre Lopes.,wrong,Um irmão de Crispim Soares que também trabalhava com remédios.,ambiguous,Um ajudante da botica de Crispim Soares.,ambiguous,Porfírio.,wrong,A,draft
+6bcbb0c6-64f0-40d5-980b-69860fea70f6,O Alienista,"Que investigação científica justificava, para o alienista, a criação daquele estabelecimento?","O principal nesta minha obra da Casa Verde é estudar
+profundamente a loucura, os seus diversos graus, classificar-lhe os casos, descobrir
+enfim a causa do fenômeno e o remédio universal.",location,medium,Estudar a loucura,"Estudar profundamente a loucura, seus graus, causas e possível remédio.","Estudar profundamente a loucura, seus graus, causas e possível remédio.",correct,"Estudar apenas as causas da loucura, sem classificá-la nem buscar remédio.",ambiguous,Criar uma escola de medicina para a Câmara.,wrong,"Classificar os casos pela gravidade, deixando de lado causas e tratamento.",ambiguous,Tratar apenas doenças contagiosas.,wrong,A,draft
+35a8f38e-0051-46d1-88ac-3f437a072e59,O Alienista,"Que traço de caráter, segundo Padre Lopes, impedia o médico de reconhecer os próprios méritos?","A assembléia insistiu; o alienista resistiu; finalmente o Padre Lopes. explicou
+tudo com este conceito digno de um observador:
+—Sabe a razão por que não vê as suas elevadas qualidades, que aliás todos
+nós admiramos? É porque tem ainda uma qualidade que realça as outras:—a
+modéstia.",relationship,hard,Porque era modesto demais,A modéstia.,A vaidade.,wrong,A timidez.,ambiguous,A preguiça.,wrong,A humildade religiosa.,ambiguous,A modéstia.,correct,E,draft
+b4cc2124-dd90-41fe-848c-61a54a54041a,O Alienista,Qual foi o número de vítimas fatais informado ao médico após o confronto do dia anterior?,"—Quantos mortos e feridos houve ontem no conflito? perguntou Simão
+Bacamarte depois de uns três minutos.
+O barbeiro ficou espantado da pergunta, mas respondeu logo que onze
+mortos e vinte e cinco feridos.
+—Onze mortos e vinte e cinco feridos!",quote,hard,Onze mortos,Onze mortos.,Vinte e cinco mortos.,wrong,Dez mortos e onze feridos.,ambiguous,Onze mortos.,correct,Quatro mortos.,wrong,Doze mortos.,ambiguous,C,draft
+cb115e06-61cb-4719-9254-7eff58af6706,O Alienista,"Segundo as estatísticas apresentadas à Câmara, que fração dos habitantes da vila havia sido internada?","De fato o alienista oficiara à Câmara expondo: — 1': que verificara das
+estatísticas da vila e da Casa Verde que quatro quintos da população estavam
+aposentados naquele estabelecimento",location,hard,quatro quintos,Quatro quintos da população.,Metade da população.,wrong,Quatro quintos da população.,correct,Três quartos da população.,ambiguous,Dois terços da população.,ambiguous,Um quinto da população.,wrong,B,draft
+3f8d9135-3547-41ae-875c-98bcc4edf697,O Alienista,Qual foi a reação emocional do médico quando o estabelecimento finalmente ficou sem internos?,"Agora, se imaginais que o alienista ficou radiante ao ver sair o último hóspede
+da Casa Verde, mostrais com isso que ainda não conheceis o nosso homem. Plus
+ultra! era a sua divisa. Não lhe bastava ter descoberto a teoria verdadeira da loucura;
+não o contentava ter estabelecido em Itaguaí. o reinado da razão. Plus ultra! Não
+ficou alegre, ficou preocupado, cogitativo; alguma coisa lhe dizia que a teoria nova
+tinha, em si mesma, outra e novíssima teoria.",fact,medium,"ficou preocupado, cogitativo",Ficou preocupado e cogitativo.,Ficou preocupado e cogitativo.,correct,Ficou radiante e encerrou os estudos.,wrong,"Ficou aliviado, embora ainda pensativo.",ambiguous,"Ficou satisfeito com o resultado, mas intrigado com a ausência de internos.",ambiguous,Entrou em pânico e fugiu de Itaguaí.,wrong,A,draft
+327448cf-a1c9-40e9-9f60-84cfc36c1b9a,O imortal,Como era chamado o indígena que apareceu certa noite diante do pai do narrador?,"UMA NOITE, o chefe indígena — chamava-se Pirajuá — foi à rede de meu pai,",relationship,medium,Pirajuá,Pirajuá.,Rui de Leão.,wrong,Pirajuá.,correct,Piraju.,ambiguous,Piraçu.,ambiguous,Maracujá.,wrong,B,draft
+d98a4a55-046a-4894-898e-ebeadfefac80,O imortal,Por que o chefe recusou a possibilidade de prolongar indefinidamente a própria vida?,"— Não, disse ele; Pirajuá não bebe, Pirajuá quer morrer. Está cansado, viu muita lua,
+muita lua. Pirajuá quer descansar na terra, está aborrecido. Mas Pirajuá quer deixar este
+segredo a guerreiro branco; está aqui; foi feito por um velho pajé de longe, muito longe...
+Guerreiro branco bebe, não morre mais.",theme,medium,Pirajuá estava cansado e queria morrer,Porque estava cansado de viver e queria morrer.,Porque temia que o elixir fosse venenoso.,wrong,Porque estava cansado de viver e queria morrer.,correct,"Porque temia viver tempo demais, embora ainda quisesse prolongar a vida por alguns anos.",ambiguous,Porque pretendia vender o segredo aos portugueses.,wrong,"Porque considerava a imortalidade uma violação religiosa, não por cansaço de viver.",ambiguous,B,draft
+e3886ae9-0aca-4c5f-905d-a80fd6e40509,O imortal,Que mudança no estado civil foi anunciada à mulher pelo curandeiro local?,O curandeiro do lugar anunciou a Maracujá que ia ficar viúva.,relationship,medium,Que ia ficar viúva,Que ela ficaria viúva.,"Que ficaria separada do marido, mas ele continuaria vivo.",ambiguous,Que ela se casaria novamente naquele dia.,wrong,"Que o marido a abandonaria, tornando-a sozinha sem enviuvar.",ambiguous,Que ela ficaria viúva.,correct,Que o marido ficaria imortal imediatamente.,wrong,D,draft
+ef056b3d-ae25-4eca-9194-377bce17bb52,O imortal,O que levou o pai do narrador a considerar finalmente experimentar a substância secreta?,"Alta noite, lembrou-se do elixir, e perguntou a si mesmo se não era acertado tentá-lo.
+Já agora a morte era certa, que perderia ele com a experiência?",theme,medium,Porque a morte parecia certa,Porque a morte parecia certa e ele achou que não tinha nada a perder.,"Porque queria testar a substância por curiosidade, apesar do risco.",ambiguous,Porque acreditou na promessa de cura antes de considerar a morte provável.,ambiguous,Porque Pirajuá ordenou que bebesse.,wrong,Porque queria provar que a substância era falsa.,wrong,Porque a morte parecia certa e ele achou que não tinha nada a perder.,correct,E,draft
+8dc14745-2572-4cfe-8646-cc9e62b4dd18,O imortal,A seriedade do médico acabou convencendo os dois ouvintes também sobre a eficácia da doutrina médica que ele defendia?,"O coronel e o tabelião ficaram algum tempo calados, sem saber que pensassem da
+famosa história; mas a seriedade do médico era tão profunda, que não havia duvidar.
+Creram no caso, e creram também definitivamente na homeopatia.",theme,medium,Sim,Sim.,Não; continuaram rejeitando a homeopatia.,wrong,Sim.,correct,"Aceitaram a história narrada, mas continuaram céticos quanto à doutrina médica.",ambiguous,"Convenceram-se da doutrina médica, mas não da história contada pelo médico.",ambiguous,Não; expulsaram o médico por considerá-lo impostor.,wrong,B,draft
+faa0b692-31ba-4234-bfc2-ecc26c9650d6,O imortal,Qual era a forma completa do nome do homem conhecido de maneira abreviada como Rui de Leão?,"Rui de Leão, ou antes Rui Garcia de Meireles e Castro Azevedo de Leão",entity,medium,Rui Garcia de Meireles e Castro Azevedo de Leão,Rui Garcia de Meireles e Castro Azevedo de Leão.,Rui de Meneses Azevedo da Cunha.,wrong,Rui Garcia de Meireles e Castro Azevedo de Melo.,ambiguous,Rui Garcia de Sousa e Castro de Leão.,wrong,Rui Garcia de Meireles e Castro Azevedo de Leão.,correct,Rui Manuel de Meireles e Castro Azevedo de Leão.,ambiguous,D,draft
+5f0655bd-fb1a-4aee-b75c-3aa61a8c7ae8,O imortal,Por que uma sentença sem prazo de término seria pior para ele do que para um condenado comum?,"e condenou-o a cárcere
+perpétuo. Meu pai ficou aterrado. Na verdade, a prisão perpétua para ele devia ser a
+cousa mais horrorosa do mundo. Prometeu, o mesmo Prometeu foi desencadeado... Não
+me interrompa, sr. Linhares, depois direi quem foi esse Prometeu. Mas, repito: ele foi
+desencadeado, enquanto que meu pai estava nas mãos do Santo Ofício, sem esperança.
+Por outro lado, ele refletiu consigo que, se era eterno, não o era o Santo Ofício. O Santo
+Ofício há de acabar um dia, e os seus cárceres, e então ficarei livre",theme,hard,Porque era imortal,"Porque, sendo imortal, a prisão perpétua poderia durar indefinidamente para ele.",Porque ele era o carcereiro responsável pela prisão.,wrong,"Porque a sentença não admitiria revisão judicial, independentemente de sua imortalidade.",ambiguous,"Porque a imortalidade faria a pena durar alguns séculos, mas não indefinidamente.",ambiguous,Porque a sentença previa execução no dia seguinte.,wrong,"Porque, sendo imortal, a prisão perpétua poderia durar indefinidamente para ele.",correct,E,draft
+9ae47812-c858-417d-becb-aac0541a5501,O imortal,Em que ano teria vindo ao mundo o homem cuja história espantou o coronel e o tabelião?,"senhor, replicou o dr. Leão, de um modo grave e triste; foi em 1600.     Estupefação dos
+ouvintes, que eram dous, o coronel Bertioga, e o tabelião da vila, João Linhares. A vila era
+na província fluminense; suponhamos Itaboraí ou Sapucaia. Quanto à data, não tenho
+dúvida em dizer que foi no ano de 1855, uma noite de novembro, escura como breu,
+quente como um forno, passante de nove horas. Tudo silêncio. O lugar em que os três
+estavam era a varanda que dava para o terreiro. Um lampião de luz frouxa, pendurado de
+um prego, sublinhava a escuridão exterior. De quando em quando, gania um seco e
+áspero vento, mesclando-se ao som monótono de uma cachoeira próxima. Tal era o
+quadro e o momento, quando o dr. Leão insistiu nas primeiras palavras da narrativa.
+— Não, senhor; nasceu em 1600.",time,hard,Nasceu em 1600,1600.,1601.,ambiguous,1855.,wrong,1600.,correct,1700.,wrong,1599.,ambiguous,C,draft
+f65b1a9b-57e1-487c-b737-20681b7986be,O imortal,A vida do líder indígena terminou pouco depois de transmitir ao estrangeiro o conhecimento sobre a substância?,"Pirajuá sentiu o espontâneo da palavra de meu pai, e agradeceu-lha; mas abanou a
+cabeça.
+    — Não, disse ele; Pirajuá não bebe, Pirajuá quer morrer. Está cansado, viu muita lua,
+muita lua. Pirajuá quer descansar na terra, está aborrecido. Mas Pirajuá quer deixar este
+segredo a guerreiro branco; está aqui; foi feito por um velho pajé de longe, muito longe...
+Guerreiro branco bebe, não morre mais.
+    Dizendo isto, tornou a tapar a boca do boião, e foi metê-lo outra vez dentro da igaçaba.
+
+Meu pai fechou depois a boca da mesma igaçaba, e repôs a  pedra em cima. O primeiro
+clarão do sol vinha apontando. Voltaram para casa depressa; antes mesmo de tomar a
+rede, Pirajuá faleceu.",theme,medium,"Sim, Pirajuá faleceu antes de chegarem em casa",Sim; Pirajuá morreu antes mesmo de chegarem em casa.,Sim; Pirajuá morreu antes mesmo de chegarem em casa.,correct,Pirajuá sobreviveu por alguns meses depois de transmitir o segredo.,ambiguous,"Pirajuá chegou em casa, recuperou-se e só morreu muito tempo depois.",ambiguous,Não; bebeu o elixir e tornou-se imortal.,wrong,Não; viveu muitos anos depois.,wrong,A,draft
+6b227d0d-f2bf-4aca-bff9-8734665fda84,O imortal,Que conspiração política passou a contar com a participação do imortal por influência de Lady Ema?,"Lady Ema fez com que Rui de Leão entrasse daí a pouco na conspiração que deu em
+resultado a invasão da Inglaterra, a guerra civil, e a morte enfim  dos principais cabos da
+rebelião.",theme,medium,Na conspiração que resultou na invasão da inglaterra,Na conspiração que culminou na invasão da Inglaterra e em guerra civil.,Na Inconfidência Mineira.,wrong,"Uma conspiração que tentou invadir a Inglaterra, mas foi contida antes de provocar guerra civil.",ambiguous,Na conspiração que culminou na invasão da Inglaterra e em guerra civil.,correct,Uma conspiração interna que provocou guerra civil sem qualquer invasão da Inglaterra.,ambiguous,Na conspiração que proclamou a independência do Brasil.,wrong,C,draft
+449aed6a-5d9e-487a-be9e-cd0f814504be,Quincas Borba,Que outro ser disputava com Rubião a afeição do filósofo?,"Rubião achou um rival no coração de Quincas Borba, — um cão, um bonito
+cão, meio tamanho, pêlo cor de chumbo, malhado de preto.",theme,easy,Um cão,Um cão.,Um cavalo de estimação.,ambiguous,Um cão.,correct,Um papagaio.,wrong,Um sobrinho de Quincas Borba.,wrong,Um gato que vivia com o filósofo.,ambiguous,B,draft
+7dfe3eac-2793-41c1-92f6-c30d32f05159,Quincas Borba,O filósofo já havia lido o relato memorialístico narrado por Brás Cubas?,"Este Quincas Borba, se acaso me fizeste o favor de ler as Memórias
+Póstumas de Brás Cubas,",theme,medium,Sim,Sim.,Não; as duas histórias não têm qualquer ligação.,wrong,"Conhecia Brás Cubas, mas não havia lido suas memórias.",ambiguous,"Tinha ouvido falar do relato memorialístico, sem chegar a lê-lo.",ambiguous,Não; ele desconhecia completamente Brás Cubas.,wrong,Sim.,correct,E,draft
+9fc787df-fee4-430b-8f49-6a92343de9c5,Quincas Borba,"Segundo a explicação apresentada, seria aceitável atribuir a um animal um nome normalmente usado por pessoas?","existe também no cão, e este pode assim receber um nome
+de gente, seja cristão ou muçulmano...",theme,medium,Sim,Sim.,"O texto admitiria apenas apelidos derivados de nomes humanos, não nomes humanos propriamente ditos.",ambiguous,Não; o cão só poderia receber nome de outro animal.,wrong,Não; nomes humanos seriam exclusivos de pessoas.,wrong,"Um nome de pessoa poderia ser usado só como brincadeira, não como nome real do animal.",ambiguous,Sim.,correct,E,draft
+d8c648c2-bd78-4493-a3de-6f64871cdcf6,Quincas Borba,O filósofo formalizou legalmente suas últimas vontades antes de voltar tranquilo para casa?,"Quincas Borba registrou o testamento, com as formalidades do
+estilo, e tornou tranqüilo para casa.",theme,easy,Sim,Sim.,"Escreveu as últimas vontades, mas não chegou a formalizá-las legalmente.",ambiguous,Não; rasgou o testamento antes de registrá-lo.,wrong,Formalizou o testamento apenas depois de voltar para casa.,ambiguous,Sim.,correct,Não; deixou apenas instruções verbais.,wrong,D,draft
+d9f5d786-6d97-4292-8ade-dc697c143613,Quincas Borba,Qual obrigação acompanhava a transferência integral da herança para Rubião?,"tudo finalmente passava às mãos do Rubião,
+sem desvios, sem deixas a nenhuma pessoa, nem esmolas, nem dívidas. Uma só
+condição havia no testamento, a de guardar o herdeiro consigo o seu pobre cachorro
+Quincas Borba, nome que lhe deu por motivo da grande afeição que lhe tinha",quote,medium,Guardar o herdeiro cão quincas borba consigo,Manter consigo o cão Quincas Borba.,Manter o cão apenas até encontrar outro tutor.,ambiguous,Vender todos os bens e doar o dinheiro.,wrong,Manter consigo o cão Quincas Borba.,correct,Mudar-se imediatamente para Barbacena.,wrong,"Sustentar o animal financeiramente, sem obrigação de mantê-lo consigo.",ambiguous,C,draft
+b21762f1-ef62-4ab8-a20b-e55412b46fd4,Quincas Borba,Qual foi o destino final do cachorro após adoecer e procurar o dono?,"o fim do Quincas Borba, que adoeceu também, ganiu
+infinitamente, fugiu desvairado em busca do dono, e amanheceu morto na rua, três
+dias depois.",theme,medium,Fugiu desvairado e amanheceu morto no rua,Fugiu desvairado procurando o dono e amanheceu morto na rua.,"Morreu tranquilamente dentro de casa, ao lado de Rubião.",wrong,Foi sacrificado pelo médico.,wrong,"Fugiu procurando o dono, mas foi encontrado vivo na manhã seguinte.",ambiguous,Morreu em casa antes de conseguir sair à procura do dono.,ambiguous,Fugiu desvairado procurando o dono e amanheceu morto na rua.,correct,E,draft
+38a757ab-c75f-4125-9c54-6650123d30e2,Quincas Borba,"O que o médico dizia em público sobre a recuperação do doente, e qual era seu prognóstico real em particular?","A opinião ostensiva do médico era que a doença do Quincas Borba iria saindo
+devagar. Um dia, o nosso Rubião, acompanhando o médico até à porta da rua,
+perguntou-lhe qual era o verdadeiro estado do amigo. Ouviu que estava perdido,
+completamente perdido; mas, que o fosse animando. Para que tornar-lhe a morte
+mais aflitiva pela certeza?...",theme,medium,"Que iria saindo devagar, estando perdido o seu estado","Em público dizia que melhoraria devagar; em particular, que estava completamente perdido.","Em público dizia que melhoraria devagar; em particular, que estava completamente perdido.",correct,"Dizia em público que morreria naquela noite, mas em segredo esperava cura total.",wrong,Em público e em privado afirmava que a cura seria imediata.,wrong,Em público dizia que estava perdido; em particular admitia uma recuperação lenta.,ambiguous,"Falava em recuperação lenta tanto em público quanto em particular, sem prognóstico terminal reservado.",ambiguous,A,draft
+a74020a5-461f-448a-9f68-2f9cd318455d,Quincas Borba,Qual mulher foi escolhida para receber o cão que Rubião decidiu afastar de si?,"Rubião ordenou a um escravo que levasse o
+cachorro de presente à comadre Angélica",theme,medium,À comadre angelica,Comadre Angélica.,D. Evarista.,wrong,Comadre Angélica.,correct,Uma sobrinha da comadre Angélica.,ambiguous,Uma vizinha de Rubião indicada pela comadre.,ambiguous,Sofia.,wrong,B,draft
+493ff269-b5b5-4339-8543-d26562ee0206,Quincas Borba,Qual cidade ele decidiu visitar por cerca de um mês antes de regressar?,"Quincas Borba acordou com a resolução de ir ao Rio de
+Janeiro, voltaria no fim de um mês",entity,easy,Ao rio de janeiro,Rio de Janeiro.,Itaguaí.,wrong,Petrópolis.,ambiguous,Niterói.,ambiguous,Rio de Janeiro.,correct,São Paulo.,wrong,D,draft
+bd87c6bb-990d-44c8-bd1f-2b5543e7773f,Quincas Borba,Que cuidado funerário o herdeiro deveria garantir ao animal depois de sua morte?,"impunha-lhe a condição, quando morresse o cachorro, de lhe
+dar sepultura decente em terreno próprio, que cobriria de flores e plantas cheirosas;",theme,medium,Dar lhe sepultura decente,"Dar ao cão uma sepultura decente em terreno próprio, com flores e plantas cheirosas.","Dar ao cão sepultura decente em terreno alheio, sem exigência de flores.",ambiguous,Abandonar o corpo na rua.,wrong,"Enterrá-lo em terreno próprio, mas sem qualquer cuidado posterior com flores ou plantas.",ambiguous,Mandar empalhar o animal.,wrong,"Dar ao cão uma sepultura decente em terreno próprio, com flores e plantas cheirosas.",correct,E,draft
