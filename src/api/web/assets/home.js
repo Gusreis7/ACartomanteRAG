@@ -3,6 +3,7 @@ const recentBlock = document.querySelector("#recent-block");
 const recentList = document.querySelector("#recent-list");
 const toast = document.querySelector("#toast");
 
+
 function showToast(message) {
   toast.textContent = message;
   toast.classList.add("is-visible");
@@ -78,10 +79,6 @@ async function loadRecent() {
 }
 
 startButton?.addEventListener("click", () => createConversation());
-
-document.querySelector("#focus-suggestions")?.addEventListener("click", () => {
-  document.querySelector("#omens")?.scrollIntoView({ behavior: "smooth", block: "center" });
-});
 
 document.querySelectorAll("[data-prompt]").forEach((button) => {
   button.addEventListener("click", () => createConversation(button.dataset.prompt || ""));

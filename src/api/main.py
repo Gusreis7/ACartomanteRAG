@@ -6,6 +6,8 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from src.api.lifespan import lifespan
+from src.api.reading import router as reading_router
+from src.api.recommendations import router as recommendation_router
 from src.api.routes import router as api_router
 from src.api.views import WEB_ROOT, router as view_router
 
@@ -27,4 +29,6 @@ app.mount(
     name="assets",
 )
 app.include_router(view_router)
+app.include_router(reading_router)
+app.include_router(recommendation_router)
 app.include_router(api_router)
