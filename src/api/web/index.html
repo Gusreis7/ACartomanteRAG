@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#171711">
   <title>Cartomante RAG</title>
-  <link rel="stylesheet" href="/assets/styles.css">
+  <link rel="stylesheet" href="/assets/styles.css?v=free-reading-7">
 </head>
 <body class="home-page">
   <div class="grain" aria-hidden="true"></div>
@@ -35,9 +35,10 @@
           <span>Iniciar consulta</span>
           <span aria-hidden="true">→</span>
         </button>
-        <button class="button button-ghost" id="focus-suggestions" type="button">
-          Ver presságios
-        </button>
+        <a class="button button-ghost" id="open-reading" href="/reading">
+          <span>Tirar uma leitura</span>
+          <span aria-hidden="true">→</span>
+        </a>
       </div>
 
       <div class="recent-block" id="recent-block" hidden>
@@ -137,6 +138,6 @@
   </footer>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="/assets/home.js" defer></script>
+  <script src="/assets/home.js?v=free-reading-3" defer></script>
 </body>
 </html>

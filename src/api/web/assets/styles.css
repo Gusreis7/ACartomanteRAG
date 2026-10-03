@@ -591,6 +591,1073 @@ a { color: inherit; }
   .evidence-table-footer { padding-inline: 5px; flex-direction: column; gap: 5px; }
 }
 
+
+
+/* ==========================================================
+   LEITURA GRATUITA · RECOMENDAÇÃO DE OBRAS
+   ========================================================== */
+.free-reading { padding-block: 18px 96px; }
+.reading-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, .72fr);
+  gap: 54px;
+  align-items: end;
+  margin-bottom: 22px;
+}
+.reading-intro .eyebrow { margin-bottom: 10px; }
+.reading-intro h2 {
+  margin: 0;
+  font-size: clamp(39px, 5vw, 62px);
+  font-weight: 500;
+  line-height: .95;
+  letter-spacing: -.035em;
+}
+.reading-intro > p {
+  margin: 0 0 3px;
+  max-width: 500px;
+  color: var(--ink-soft);
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+.reading-table {
+  position: relative;
+  overflow: hidden;
+  padding: 30px clamp(22px, 4vw, 54px) 20px;
+  border: 1px solid rgba(215,189,123,.42);
+  box-shadow: 0 24px 65px rgba(29,24,15,.2), inset 0 0 0 7px rgba(215,189,123,.035);
+  background:
+    radial-gradient(circle at 50% 35%, rgba(215,189,123,.10), transparent 19rem),
+    linear-gradient(135deg, rgba(31,66,58,.98), rgba(14,43,37,.99));
+}
+.reading-table::before,
+.reading-table::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  border: 1px solid rgba(215,189,123,.16);
+  border-radius: 50%;
+}
+.reading-table::before { width: 520px; height: 520px; left: 50%; top: 48%; transform: translate(-50%,-50%); }
+.reading-table::after { width: 650px; height: 650px; left: 50%; top: 48%; transform: translate(-50%,-50%); border-style: dashed; opacity: .45; }
+.reading-table-ornament {
+  position: relative;
+  z-index: 2;
+  margin-bottom: 20px;
+  text-align: center;
+  color: rgba(215,189,123,.72);
+  font-size: 12px;
+  letter-spacing: .7em;
+}
+
+.reading-deck {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 220px));
+  justify-content: center;
+  gap: clamp(20px, 5vw, 58px);
+  perspective: 1500px;
+}
+.reading-card {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  min-width: 0;
+  position: relative;
+  cursor: pointer;
+  perspective: 1200px;
+  opacity: 0;
+  transform: translateY(-24px) rotate(-2deg) scale(.965);
+  transition: opacity .34s ease, transform .34s ease, filter .24s ease;
+  transition-delay: calc(var(--reading-order, 0) * 75ms);
+  outline: none;
+}
+.reading-card:nth-child(2) { transform: translateY(-24px) rotate(1.2deg) scale(.965); }
+.reading-card:nth-child(3) { transform: translateY(-24px) rotate(-.8deg) scale(.965); }
+.reading-card.is-dealt { opacity: 1; transform: translateY(0) rotate(0) scale(1); }
+.reading-card:not(.is-locked):not(.is-flipped):hover { transform: translateY(-8px) rotate(-.5deg) scale(1.015); }
+.reading-card:focus-visible { outline: 2px solid var(--gold-light); outline-offset: 6px; }
+.reading-card.is-locked { cursor: default; filter: saturate(.65) brightness(.78); opacity: .62; }
+.reading-card.is-locked .reading-card-inner { transform: scale(.975); }
+.reading-card-placeholder { cursor: wait; }
+.reading-card-placeholder .reading-card-back-label { animation: readingPulse 1.2s ease-in-out infinite alternate; }
+@keyframes readingPulse { from { opacity: .42; } to { opacity: 1; } }
+
+.reading-card-inner {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform .72s cubic-bezier(.2,.72,.2,1);
+}
+.reading-card.is-flipped .reading-card-inner { transform: rotateY(180deg); }
+.reading-card-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  display: flex;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border: 1px solid rgba(215,189,123,.72);
+  box-shadow: 0 22px 42px rgba(0,0,0,.30);
+}
+.reading-card-back {
+  padding: 15px;
+  align-items: center;
+  justify-content: space-between;
+  flex-direction: column;
+  color: var(--gold-light);
+  background:
+    linear-gradient(45deg, transparent 47%, rgba(215,189,123,.12) 48% 52%, transparent 53%),
+    linear-gradient(-45deg, transparent 47%, rgba(215,189,123,.07) 48% 52%, transparent 53%),
+    radial-gradient(circle at center, rgba(215,189,123,.13), transparent 38%),
+    var(--wine-dark);
+  background-size: 28px 28px, 28px 28px, auto, auto;
+}
+.reading-card-back::before,
+.reading-card-front::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border: 1px solid rgba(215,189,123,.50);
+  pointer-events: none;
+}
+.reading-card-back::after,
+.reading-card-front::after {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border: 1px solid rgba(215,189,123,.17);
+  pointer-events: none;
+}
+.reading-card-number,
+.reading-card-back-label {
+  position: relative;
+  z-index: 1;
+  align-self: stretch;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+.reading-card-back-label { text-align: center; font-size: 7px; letter-spacing: .25em; }
+.reading-card-sigil {
+  position: relative;
+  z-index: 1;
+  width: 82%;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 10px;
+  align-items: center;
+}
+.reading-card-sigil i { position: relative; height: 1px; background: rgba(215,189,123,.58); }
+.reading-card-sigil i::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  transform: translateY(-50%) rotate(45deg);
+  border: 1px solid var(--gold-light);
+  background: var(--wine-dark);
+}
+.reading-card-sigil i:first-child::after { right: 0; }
+.reading-card-sigil i:last-child::after { left: 0; }
+.reading-card-sigil b {
+  width: 66px;
+  height: 66px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--gold-light);
+  border-radius: 50%;
+  box-shadow: 0 0 0 8px rgba(215,189,123,.045), 0 0 0 16px rgba(215,189,123,.025);
+  font-size: 21px;
+  font-weight: 400;
+}
+
+.reading-card-front {
+  transform: rotateY(180deg);
+  padding: 28px 24px 22px;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  color: var(--gold-light);
+  background:
+    radial-gradient(circle at 50% 29%, rgba(215,189,123,.10), transparent 9rem),
+    linear-gradient(155deg, #4b1927 0%, var(--wine-dark) 72%);
+}
+.reading-card-front-kicker {
+  position: relative;
+  z-index: 1;
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: rgba(215,189,123,.65);
+}
+.reading-card-title {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  margin: auto 0 10px;
+  color: var(--gold-light);
+  font-family: "Cormorant Garamond", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+  font-size: clamp(24px, 2.5vw, 37px);
+  line-height: .98;
+  font-weight: 500;
+  font-style: italic;
+  letter-spacing: -.025em;
+  text-wrap: balance;
+  text-shadow: 0 1px 0 rgba(0,0,0,.22);
+}
+.reading-card-author {
+  position: relative;
+  z-index: 1;
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: rgba(243,234,216,.58);
+}
+.reading-card-front-ornament {
+  position: relative;
+  z-index: 1;
+  margin: auto 0 16px;
+  color: rgba(215,189,123,.72);
+  font-size: 11px;
+  letter-spacing: .2em;
+}
+.reading-card-link {
+  position: relative;
+  z-index: 3;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 2px 2px;
+  border-top: 1px solid rgba(215,189,123,.42);
+  color: var(--gold-light);
+  text-decoration: none;
+  font-family: var(--mono);
+  font-size: 7px;
+  line-height: 1.35;
+  letter-spacing: .10em;
+  text-transform: uppercase;
+}
+.reading-card-link:hover { color: #f0d795; }
+
+.reading-footer {
+  position: relative;
+  z-index: 2;
+  min-height: 51px;
+  margin-top: 22px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(215,189,123,.22);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+.reading-status {
+  color: rgba(243,234,216,.63);
+  font-family: var(--mono);
+  font-size: 8px;
+  line-height: 1.45;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.reading-again {
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid rgba(215,189,123,.48);
+  background: rgba(215,189,123,.05);
+  color: var(--gold-light);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: .10em;
+  text-transform: uppercase;
+}
+.reading-again:hover { background: rgba(215,189,123,.12); }
+.reading-again:disabled { opacity: .45; cursor: wait; }
+.reading-again[hidden] { display: none !important; }
+
+@media (max-width: 760px) {
+  .free-reading { padding-block: 30px 68px; }
+  .reading-intro { grid-template-columns: 1fr; gap: 14px; text-align: center; }
+  .reading-intro > p { margin-inline: auto; font-size: 16px; }
+  .reading-table { padding: 24px 10px 16px; }
+  .reading-table-ornament { margin-bottom: 14px; letter-spacing: .42em; }
+  .reading-deck { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .reading-card-front { padding: 19px 11px 14px; }
+  .reading-card-title { font-size: clamp(16px, 5.2vw, 24px); }
+  .reading-card-author, .reading-card-front-kicker, .reading-card-link { font-size: 5.5px; }
+  .reading-card-sigil b { width: 42px; height: 42px; font-size: 15px; box-shadow: 0 0 0 5px rgba(215,189,123,.04); }
+  .reading-card-number { font-size: 6px; }
+  .reading-card-back-label { font-size: 5.5px; }
+  .reading-card-front-ornament { margin-bottom: 8px; font-size: 8px; }
+  .reading-card-link { padding-top: 8px; }
+  .reading-footer { align-items: flex-start; flex-direction: column; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}
+
+
+/* LEITURA EM PÁGINA PRÓPRIA · v3 */
+.reading-page-main {
+  min-height: calc(100vh - 170px);
+  padding-block: 58px 76px;
+}
+.reading-page .free-reading { padding-block: 0; }
+.reading-page-intro { margin-bottom: 30px; }
+.reading-page-intro h1 {
+  margin: 0;
+  font-size: clamp(46px, 6vw, 76px);
+  font-weight: 500;
+  line-height: .9;
+  letter-spacing: -.04em;
+}
+.reading-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  transition: color .18s ease, transform .18s ease;
+}
+.reading-back-link:hover { color: var(--wine); transform: translateX(-2px); }
+.reading-page .reading-table { min-height: 430px; }
+.reading-page .reading-deck:empty {
+  min-height: 330px;
+}
+.reading-page .reading-deck:empty::before {
+  content: "✦";
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  margin: auto;
+  border: 1px solid rgba(215,189,123,.34);
+  border-radius: 50%;
+  color: rgba(215,189,123,.68);
+  font-size: 17px;
+  animation: readingShuffle 1.25s ease-in-out infinite alternate;
+}
+@keyframes readingShuffle {
+  from { opacity: .35; transform: rotate(-18deg) scale(.92); }
+  to { opacity: 1; transform: rotate(18deg) scale(1.04); }
+}
+@media (max-width: 760px) {
+  .reading-page-main { padding-block: 34px 54px; }
+  .reading-page-intro h1 { font-size: clamp(40px, 12vw, 58px); }
+  .reading-page .reading-table { min-height: 360px; }
+  .reading-page .reading-deck:empty { min-height: 270px; }
+  .reading-back-link span:last-child { display: none; }
+}
+
+
+/* LEITURA · MESA FULLSCREEN · v4 */
+.reading-page {
+  min-height: 100vh;
+  color: var(--paper);
+  background:
+    radial-gradient(circle at 50% 38%, rgba(215,189,123,.105), transparent 26rem),
+    radial-gradient(circle at 18% 76%, rgba(215,189,123,.045), transparent 18rem),
+    linear-gradient(135deg, #21463d 0%, #123a32 52%, #0d2f29 100%);
+}
+
+.reading-page .grain {
+  opacity: .5;
+}
+
+.reading-page .site-header {
+  position: relative;
+  z-index: 10;
+  background: transparent;
+}
+
+.reading-page .brand {
+  color: var(--paper);
+}
+
+.reading-page .brand em,
+.reading-page .brand-mark {
+  color: var(--gold-light);
+}
+
+.reading-page .reading-back-link {
+  color: rgba(243,234,216,.72);
+}
+
+.reading-page .reading-back-link:hover {
+  color: var(--gold-light);
+}
+
+/* A mesa passa a ocupar o viewport, em vez de aparecer como um quadro. */
+.reading-page-main.shell {
+  width: 100%;
+  max-width: none;
+  min-height: calc(100vh - 76px);
+  padding: 34px clamp(24px, 5vw, 78px) 48px;
+}
+
+.reading-page .free-reading {
+  width: 100%;
+  min-height: calc(100vh - 158px);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.reading-page .reading-intro {
+  width: min(1180px, 100%);
+  margin: 0 auto 22px;
+}
+
+.reading-page .reading-intro .eyebrow {
+  color: rgba(215,189,123,.78);
+}
+
+.reading-page .reading-page-intro h1 {
+  color: var(--paper);
+  text-shadow: 0 1px 0 rgba(0,0,0,.18);
+}
+
+.reading-page .reading-intro > p {
+  color: rgba(243,234,216,.72);
+}
+
+/* A página inteira já é a mesa. */
+.reading-page .reading-table {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  overflow: visible;
+  padding: 20px 0 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.reading-page .reading-table::before {
+  width: min(58vw, 740px);
+  height: min(58vw, 740px);
+  top: 48%;
+  border-color: rgba(215,189,123,.11);
+}
+
+.reading-page .reading-table::after {
+  width: min(72vw, 920px);
+  height: min(72vw, 920px);
+  top: 48%;
+  border-color: rgba(215,189,123,.08);
+}
+
+.reading-page .reading-table-ornament {
+  margin-bottom: 24px;
+  color: rgba(215,189,123,.66);
+}
+
+/* Um pouco maiores que os 220px anteriores. */
+.reading-page .reading-deck {
+  grid-template-columns: repeat(3, minmax(0, 248px));
+  gap: clamp(26px, 5.2vw, 72px);
+}
+
+.reading-page .reading-card {
+  max-width: 248px;
+  justify-self: center;
+}
+
+.reading-page .reading-footer {
+  width: min(980px, 100%);
+  margin: 30px auto 0;
+  border-top-color: rgba(215,189,123,.18);
+}
+
+.reading-page .reading-status {
+  color: rgba(243,234,216,.64);
+}
+
+.reading-page .site-footer {
+  display: none;
+}
+
+/* Loading sem desenhar cartas falsas. */
+.reading-page .reading-deck:empty {
+  min-height: 372px;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .reading-page .reading-deck {
+    grid-template-columns: repeat(3, minmax(0, 210px));
+    gap: 18px;
+  }
+
+  .reading-page .reading-card {
+    max-width: 210px;
+  }
+}
+
+@media (max-width: 760px) {
+  .reading-page-main.shell {
+    min-height: calc(100vh - 64px);
+    padding: 24px 14px 30px;
+  }
+
+  .reading-page .free-reading {
+    min-height: calc(100vh - 112px);
+  }
+
+  .reading-page .reading-intro {
+    margin-bottom: 8px;
+  }
+
+  .reading-page .reading-table {
+    padding-top: 14px;
+    justify-content: flex-start;
+  }
+
+  .reading-page .reading-deck {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 9px;
+    width: 100%;
+  }
+
+  .reading-page .reading-card {
+    max-width: 180px;
+  }
+
+  .reading-page .reading-deck:empty {
+    min-height: 275px;
+  }
+
+  .reading-page .reading-table::before {
+    width: 94vw;
+    height: 94vw;
+  }
+
+  .reading-page .reading-table::after {
+    width: 118vw;
+    height: 118vw;
+  }
+
+  .reading-page .reading-footer {
+    margin-top: 22px;
+  }
+}
+
+
+/* LEITURA · CARTAS GRANDES + CONTRASTE · v5 */
+
+.reading-page .reading-deck {
+  grid-template-columns: repeat(3, minmax(0, 292px));
+  gap: clamp(30px, 5.6vw, 82px);
+}
+
+.reading-page .reading-card {
+  max-width: 292px;
+}
+
+.reading-page .reading-card-face {
+  box-shadow:
+    0 28px 58px rgba(0,0,0,.34),
+    0 4px 12px rgba(0,0,0,.18);
+}
+
+.reading-page .reading-card-front {
+  padding: 32px 27px 25px;
+  background:
+    radial-gradient(circle at 50% 28%, rgba(235,206,139,.14), transparent 10rem),
+    linear-gradient(155deg, #5c2032 0%, #35121d 72%, #291018 100%);
+}
+
+.reading-page .reading-card-front-kicker {
+  font-size: 8px;
+  color: rgba(239,213,153,.82);
+}
+
+.reading-page .reading-card-title {
+  font-size: clamp(29px, 2.8vw, 43px);
+  color: #f1d99b;
+  text-shadow:
+    0 1px 0 rgba(0,0,0,.42),
+    0 0 16px rgba(215,189,123,.08);
+}
+
+.reading-page .reading-card-author {
+  font-size: 8px;
+  color: rgba(250,241,221,.76);
+}
+
+.reading-page .reading-card-link {
+  min-height: 44px;
+  padding: 11px 13px;
+  border: 1px solid rgba(246,219,157,.72);
+  border-radius: 3px;
+  background: rgba(239,216,162,.96);
+  color: #35121d;
+  font-size: 9px;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: .085em;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.25),
+    0 5px 14px rgba(0,0,0,.16);
+  transition:
+    background .18s ease,
+    color .18s ease,
+    transform .18s ease,
+    box-shadow .18s ease;
+}
+
+.reading-page .reading-card-link:hover {
+  background: #f6dda4;
+  color: #250b12;
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.32),
+    0 8px 18px rgba(0,0,0,.22);
+}
+
+.reading-page .reading-card-link:focus-visible {
+  outline: 2px solid #fff0c5;
+  outline-offset: 3px;
+}
+
+.reading-page .reading-card-front-ornament {
+  margin-bottom: 18px;
+  color: rgba(236,208,143,.85);
+}
+
+@media (max-width: 1100px) {
+  .reading-page .reading-deck {
+    grid-template-columns: repeat(3, minmax(0, 250px));
+    gap: 24px;
+  }
+
+  .reading-page .reading-card {
+    max-width: 250px;
+  }
+
+  .reading-page .reading-card-title {
+    font-size: clamp(27px, 3.2vw, 39px);
+  }
+}
+
+@media (max-width: 820px) {
+  .reading-page .reading-deck {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 11px;
+  }
+
+  .reading-page .reading-card {
+    max-width: 205px;
+  }
+
+  .reading-page .reading-card-front {
+    padding: 21px 13px 15px;
+  }
+
+  .reading-page .reading-card-title {
+    font-size: clamp(18px, 5.5vw, 28px);
+  }
+
+  .reading-page .reading-card-author,
+  .reading-page .reading-card-front-kicker {
+    font-size: 6.5px;
+  }
+
+  .reading-page .reading-card-link {
+    min-height: 38px;
+    padding: 8px 8px;
+    font-size: 6.5px;
+    letter-spacing: .055em;
+  }
+}
+
+
+/* LEITURA · TITULO REFORCADO + 324PX · v6 */
+
+.reading-page .reading-deck {
+  grid-template-columns: repeat(3, minmax(0, 324px));
+  gap: clamp(32px, 5.8vw, 88px);
+}
+
+.reading-page .reading-card {
+  max-width: 324px;
+}
+
+.reading-page .reading-card-front {
+  padding: 36px 29px 27px;
+  background:
+    radial-gradient(circle at 50% 24%, rgba(242,219,159,.18), transparent 10rem),
+    linear-gradient(155deg, #682538 0%, #3b1421 68%, #2d1018 100%);
+}
+
+.reading-page .reading-card-front-ornament {
+  margin-bottom: 20px;
+  color: rgba(245,219,159,.92);
+}
+
+.reading-page .reading-card-front-kicker {
+  font-size: 8.5px;
+  letter-spacing: .26em;
+  color: rgba(245,223,172,.90);
+}
+
+.reading-page .reading-card-title {
+  margin: 10px 0 12px;
+  font-size: clamp(34px, 3.2vw, 50px);
+  line-height: 1.04;
+  letter-spacing: .015em;
+  color: #f6dfaa;
+  text-shadow:
+    0 1px 0 rgba(0,0,0,.46),
+    0 2px 8px rgba(0,0,0,.20),
+    0 0 18px rgba(232,200,121,.12);
+  text-wrap: balance;
+}
+
+.reading-page .reading-card-author {
+  font-size: 8.5px;
+  color: rgba(252,245,229,.84);
+}
+
+.reading-page .reading-card-link {
+  min-height: 46px;
+  padding: 12px 14px;
+  font-size: 9.2px;
+  letter-spacing: .09em;
+  background: linear-gradient(180deg, rgba(246,224,171,.98) 0%, rgba(236,207,142,.98) 100%);
+  border-color: rgba(249,227,176,.92);
+  color: #301019;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.28),
+    0 7px 16px rgba(0,0,0,.17);
+}
+
+.reading-page .reading-card-link:hover {
+  background: linear-gradient(180deg, #fae5b7 0%, #f3d792 100%);
+  color: #230a12;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.34),
+    0 10px 20px rgba(0,0,0,.22);
+}
+
+@media (max-width: 1180px) {
+  .reading-page .reading-deck {
+    grid-template-columns: repeat(3, minmax(0, 276px));
+    gap: 24px;
+  }
+
+  .reading-page .reading-card {
+    max-width: 276px;
+  }
+
+  .reading-page .reading-card-title {
+    font-size: clamp(30px, 3vw, 42px);
+  }
+}
+
+@media (max-width: 820px) {
+  .reading-page .reading-deck {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .reading-page .reading-card {
+    max-width: 214px;
+  }
+
+  .reading-page .reading-card-front {
+    padding: 22px 14px 16px;
+  }
+
+  .reading-page .reading-card-title {
+    margin: 8px 0 10px;
+    font-size: clamp(19px, 5.8vw, 30px);
+    line-height: 1.05;
+  }
+
+  .reading-page .reading-card-author,
+  .reading-page .reading-card-front-kicker {
+    font-size: 6.8px;
+  }
+
+  .reading-page .reading-card-link {
+    min-height: 38px;
+    padding: 8px 8px;
+    font-size: 6.8px;
+    letter-spacing: .055em;
+  }
+}
+
+
+/* LEITURA · BOOKPLATE DOMINIO PUBLICO · v7 */
+
+/*
+ * Em vez de um botão genérico, o acesso ao Domínio Público passa a parecer
+ * uma pequena ficha de acervo/bookplate presa ao rodapé da carta.
+ */
+.reading-page .reading-card-link {
+  position: relative;
+  width: 100%;
+  min-height: 76px;
+  margin-top: 18px;
+  padding:
+    30px
+    58px
+    13px
+    18px;
+
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+
+  overflow: hidden;
+  isolation: isolate;
+
+  border:
+    2px
+    solid
+    #e6bd68;
+  border-radius: 4px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #fff2cf 0%,
+      #f3dca6 56%,
+      #e8c985 100%
+    );
+
+  color: #2d0c16;
+
+  font-family:
+    Georgia,
+    "Times New Roman",
+    serif;
+  font-size: 17px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: .035em;
+  text-transform: none;
+  text-decoration: none;
+
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.58),
+    inset 0 -12px 28px rgba(101,58,16,.08),
+    0 8px 18px rgba(0,0,0,.22);
+
+  transition:
+    transform .18s ease,
+    box-shadow .18s ease,
+    background .18s ease,
+    border-color .18s ease;
+}
+
+/* Rótulo editorial, separado do verbo principal. */
+.reading-page .reading-card-link::before {
+  content: "DOMÍNIO PÚBLICO  ·  ACERVO OFICIAL";
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  left: 18px;
+  right: 60px;
+
+  color: #6c352c;
+
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  font-size: 8px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+/* Selo/saída externa. */
+.reading-page .reading-card-link::after {
+  content: "↗";
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+
+  display: grid;
+  place-items: center;
+
+  transform: translateY(-50%);
+
+  border:
+    1px
+    solid
+    rgba(247,222,164,.88);
+  border-radius: 50%;
+
+  background: #3a1020;
+  color: #f6dfa9;
+
+  font-family:
+    Georgia,
+    "Times New Roman",
+    serif;
+  font-size: 18px;
+  line-height: 1;
+
+  box-shadow:
+    0 3px 8px rgba(40,7,16,.24),
+    inset 0 0 0 1px rgba(255,255,255,.06);
+}
+
+/* Filete ornamental de ficha antiga. */
+.reading-page .reading-card-link > * {
+  position: relative;
+  z-index: 2;
+}
+
+.reading-page .reading-card-link:hover {
+  transform: translateY(-2px);
+  border-color: #f2d38f;
+
+  background:
+    linear-gradient(
+      180deg,
+      #fff7df 0%,
+      #f7e1ad 56%,
+      #edce8b 100%
+    );
+
+  color: #240811;
+
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.7),
+    inset 0 -12px 28px rgba(101,58,16,.07),
+    0 13px 24px rgba(0,0,0,.28);
+}
+
+.reading-page .reading-card-link:hover::after {
+  background: #53172c;
+  color: #ffe8b4;
+}
+
+.reading-page .reading-card-link:focus-visible {
+  outline: 3px solid #fff0c4;
+  outline-offset: 4px;
+}
+
+/*
+ * Um pequeno vinco/gravura de papel no canto inferior esquerdo deixa o bloco
+ * menos parecido com um botão de aplicação comum e mais com parte da carta.
+ */
+.reading-page .reading-card-link {
+  background-image:
+    linear-gradient(
+      115deg,
+      transparent 0 72%,
+      rgba(111,63,28,.045) 72% 74%,
+      transparent 74% 100%
+    ),
+    linear-gradient(
+      180deg,
+      #fff2cf 0%,
+      #f3dca6 56%,
+      #e8c985 100%
+    );
+}
+
+.reading-page .reading-card-link:hover {
+  background-image:
+    linear-gradient(
+      115deg,
+      transparent 0 72%,
+      rgba(111,63,28,.04) 72% 74%,
+      transparent 74% 100%
+    ),
+    linear-gradient(
+      180deg,
+      #fff7df 0%,
+      #f7e1ad 56%,
+      #edce8b 100%
+    );
+}
+
+/* O rodapé da carta ganha respiro para o bookplate. */
+.reading-page .reading-card-front {
+  padding-bottom: 28px;
+}
+
+@media (max-width: 1180px) {
+  .reading-page .reading-card-link {
+    min-height: 70px;
+    padding:
+      28px
+      52px
+      12px
+      15px;
+    font-size: 15px;
+  }
+
+  .reading-page .reading-card-link::before {
+    top: 11px;
+    left: 15px;
+    right: 54px;
+    font-size: 7px;
+    letter-spacing: .13em;
+  }
+
+  .reading-page .reading-card-link::after {
+    right: 12px;
+    width: 31px;
+    height: 31px;
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 820px) {
+  .reading-page .reading-card-link {
+    min-height: 58px;
+    margin-top: 11px;
+    padding:
+      23px
+      36px
+      9px
+      9px;
+    border-width: 1px;
+    font-size: 11px;
+    line-height: 1.05;
+    letter-spacing: .01em;
+  }
+
+  .reading-page .reading-card-link::before {
+    top: 8px;
+    left: 9px;
+    right: 36px;
+    font-size: 5.2px;
+    letter-spacing: .085em;
+  }
+
+  .reading-page .reading-card-link::after {
+    right: 7px;
+    width: 25px;
+    height: 25px;
+    font-size: 13px;
+  }
 }
