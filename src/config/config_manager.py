@@ -45,6 +45,7 @@ class StorageConfig(BaseModel):
     raw_bucket: str = "acartomante-raw"
     bronze_bucket: str = "acartomante-bronze"
     silver_bucket: str = "acartomante-silver"
+    enrichment_bucket: str = "acartomante-enrichment"
     embedding_indexes_bucket: str = "acartomante-indexes"
     benchmarks_bucket: str = "acartomante-benchmarks"
 
@@ -292,6 +293,40 @@ class GenerationConfig(BaseModel):
 
 
 
+class EnrichmentSemanticConfig(BaseModel):
+    min_capitulos: int = Field(default=2, ge=2)
+    min_mediana_chars: int = Field(default=200, ge=0)
+
+
+class EnrichmentConfig(BaseModel):
+    pipeline_version: int = Field(default=1, ge=1)
+    model: str = Field(default="qwen3.5:4b", min_length=1)
+    prompt_version: str = Field(default="summary_events_v1", min_length=1)
+    schema_version: str = Field(default="summary_events_v1", min_length=1)
+    strategy: Literal["hybrid"] = "hybrid"
+    unit_chars: int = Field(default=18000, gt=0)
+    char_overlap: int = Field(default=800, ge=0)
+    final_context_chars: int = Field(default=24000, gt=0)
+    temperature: float = Field(default=0.0, ge=0, le=2)
+    top_p: float = Field(default=0.9, gt=0, le=1)
+    max_tokens: int = Field(default=1024, gt=0)
+    num_ctx: int = Field(default=8192, gt=0)
+    num_batch: int = Field(default=256, gt=0)
+    max_parallel: int = Field(default=2, gt=0)
+    timeout_seconds: float = Field(default=300, gt=0)
+    keep_alive: str = "10m"
+    reasoning: bool = False
+    semantic: EnrichmentSemanticConfig = Field(default_factory=EnrichmentSemanticConfig)
+
+    @model_validator(mode="after")
+    def validate_char_overlap(self):
+        if self.char_overlap >= self.unit_chars:
+            raise ValueError(
+                "enrichment.char_overlap deve ser menor que enrichment.unit_chars."
+            )
+        return self
+
+
 class ApiConfig(BaseModel):
     host: str = "0.0.0.0"
     port: int = Field(
@@ -325,6 +360,7 @@ class AppConfig(BaseModel):
         default_factory=RetrievalBenchmarkConfig
     )
     generation: GenerationConfig = Field(default_factory=GenerationConfig)
+    enrichment: EnrichmentConfig = Field(default_factory=EnrichmentConfig)
 
     @property
     def retrieval(self) -> RetrievalIndexConfig:

@@ -4,7 +4,7 @@ storage:
   silver_bucket: acartomante-silver
   embedding_indexes_bucket: acartomante-indexes
   benchmarks_bucket: acartomante-benchmarks
-  
+  enrichment_bucket: acartomante-enrichment
 bronze:
   coletanea:
     similaridade_threshold: 0.1
@@ -102,3 +102,24 @@ api:
   port: 8000
 chat:
   history_turns: 3
+enrichment:
+  pipeline_version: 1
+  model: qwen3.5:4b
+  prompt_version: summary_events_v1
+  schema_version: summary_events_v1
+  strategy: hybrid
+  unit_chars: 18000
+  char_overlap: 800
+  final_context_chars: 24000
+  temperature: 0.0
+  top_p: 0.9
+  max_tokens: 1024
+  num_ctx: 8192
+  num_batch: 256
+  max_parallel: 2
+  timeout_seconds: 300
+  keep_alive: 10m
+  reasoning: false
+  semantic:
+    min_capitulos: 2
+    min_mediana_chars: 200
