@@ -23,6 +23,7 @@ import pandas as pd
 from pydantic import BaseModel, Field
 
 from benchmark.matrix import BENCHMARK_PREFIX, OLLAMA_MODELS
+from benchmark.prepare import make_qdrant_manager
 from src.config.config_manager import ConfigManager
 from src.generation.context_builder import build_context
 from src.generation.provider import OllamaGenerationProvider
@@ -33,6 +34,7 @@ MCQ_PROMPT_VERSION = "mcq_v1"
 OPTION_KEYS = ("A", "B", "C", "D", "E")
 VALID_OPTION_CLASSES = {"correct", "ambiguous", "wrong"}
 DEFAULT_MAX_CONSECUTIVE_ERRORS = 5
+ENRICHMENT_INDEX_CURRENT_KEY = "enrichment/current.json"
 
 MCQ_SYSTEM_PROMPT = """
 Você participa de um benchmark de compreensão da obra de Machado de Assis.
@@ -79,31 +81,18 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Executa a etapa MCQ sobre as 10 configurações de retrieval "
-            "congeladas no DEV, em DEV ou holdout, reutilizando os contextos."
+            "selecionadas no DEV, reutilizando os contextos congelados."
         )
     )
     parser.add_argument(
         "--retrieval-run-id",
         required=True,
-        help="Run de retrieval cujos resultados/contextos serão usados.",
-    )
-    parser.add_argument(
-        "--selection-run-id",
-        default=None,
-        help=(
-            "Run DEV que contém retrieval/final_selection_10.json. "
-            "Se omitido, usa --retrieval-run-id."
-        ),
-    )
-    parser.add_argument(
-        "--unlock-holdout",
-        action="store_true",
-        help="Confirma explicitamente a execução MCQ sobre holdout.",
+        help="Run DEV de retrieval que contém final_selection_10.json.",
     )
     parser.add_argument(
         "--run-id",
         default=None,
-        help="ID do run MCQ. Se omitido, cria mcq_<split>_<timestamp>.",
+        help="ID do run MCQ. Se omitido, cria mcq_dev_<timestamp>.",
     )
     parser.add_argument(
         "--resume",
@@ -124,7 +113,7 @@ def parse_args() -> argparse.Namespace:
         "--limit-queries",
         type=int,
         default=None,
-        help="Limita o número de query_id do split do retrieval.",
+        help="Limita o número de query_id DEV.",
     )
     parser.add_argument(
         "--limit-configs",
@@ -173,6 +162,40 @@ def parse_args() -> argparse.Namespace:
             "associado ao --retrieval-run-id."
         ),
     )
+    parser.add_argument(
+        "--enrichment",
+        action="store_true",
+        help=(
+            "Adiciona ao contexto os resumos semanticamente recuperados do "
+            "índice de enrichment. O retrieval textual congelado não é alterado."
+        ),
+    )
+    parser.add_argument(
+        "--enrichment-top-k",
+        type=int,
+        default=3,
+        help="Quantidade de resumos recuperados por query/config. Padrão: 3.",
+    )
+    parser.add_argument(
+        "--enrichment-max-chars",
+        type=int,
+        default=6000,
+        help="Orçamento adicional para resumos recuperados. Padrão: 6000 chars.",
+    )
+    parser.add_argument(
+        "--enrichment-default-embedder",
+        default=None,
+        help=(
+            "Embedder do enrichment para configs sem embedder (ex.: BM25). "
+            "Padrão: embedding.selected_model."
+        ),
+    )
+    parser.add_argument(
+        "--enrichment-debug-samples",
+        type=int,
+        default=3,
+        help="Imprime os hits das primeiras N combinações query/config. Padrão: 3.",
+    )
     return parser.parse_args()
 
 
@@ -183,9 +206,10 @@ def sanitize(value: str, *, max_len: int = 180) -> str:
     return value[:max_len]
 
 
-def default_run_id(split: str) -> str:
+def default_run_id(*, enrichment: bool = False) -> str:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    return f"mcq_{sanitize(split, max_len=24)}_{stamp}"
+    prefix = "mcq_enriched_dev" if enrichment else "mcq_dev"
+    return f"{prefix}_{stamp}"
 
 
 def read_json(storage: RustFSManager, bucket: str, key: str) -> dict[str, Any]:
@@ -200,8 +224,11 @@ def find_latest_resumable_run(
     storage: RustFSManager,
     bucket: str,
     retrieval_run_id: str,
+    *,
+    enrichment_enabled: bool,
 ) -> str:
-    prefix = f"{BENCHMARK_PREFIX}/runs/mcq_"
+    run_prefix = "mcq_enriched_dev_" if enrichment_enabled else "mcq_dev_"
+    prefix = f"{BENCHMARK_PREFIX}/runs/{run_prefix}"
     candidates: list[tuple[str, str]] = []
     for key in storage.list_objects(bucket, prefix=prefix):
         if not key.endswith("/manifest.json"):
@@ -211,6 +238,8 @@ def find_latest_resumable_run(
         except Exception:
             continue
         if str(manifest.get("source_retrieval_run_id") or "") != retrieval_run_id:
+            continue
+        if bool(manifest.get("enrichment_enabled", False)) != bool(enrichment_enabled):
             continue
         if str(manifest.get("status") or "") not in {"running", "failed"}:
             continue
@@ -476,6 +505,265 @@ def safe_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
+
+def load_prepared_query_vectors(
+    *,
+    storage: RustFSManager,
+    bucket: str,
+    alias: str,
+) -> tuple[dict[tuple[str, str], np.ndarray], dict[str, Any]]:
+    prefix = f"{BENCHMARK_PREFIX}/prepared/query_embeddings/{alias}"
+    meta_key = f"{prefix}/queries.parquet"
+    vectors_key = f"{prefix}/vectors.npz"
+    manifest_key = f"{prefix}/manifest.json"
+    for key in (meta_key, vectors_key, manifest_key):
+        if not storage.object_exists(bucket, key):
+            raise FileNotFoundError(f"Query embeddings ausentes: s3://{bucket}/{key}")
+
+    manifest = read_json(storage, bucket, manifest_key)
+    metadata = pd.read_parquet(io.BytesIO(storage.download_bytes(bucket, meta_key)))
+    npz = np.load(io.BytesIO(storage.download_bytes(bucket, vectors_key)))
+    vectors = np.asarray(npz["vectors"], dtype=np.float32)
+    if len(metadata) != len(vectors):
+        raise RuntimeError(
+            f"Query embeddings {alias}: metadata={len(metadata)} vectors={len(vectors)}."
+        )
+
+    lookup: dict[tuple[str, str], np.ndarray] = {}
+    for row_index, row in metadata.reset_index(drop=True).iterrows():
+        key = (str(row["query_id"]), str(row["query_variant"]))
+        if key in lookup:
+            raise RuntimeError(f"Query embedding duplicado: {alias} {key}")
+        lookup[key] = vectors[row_index]
+    return lookup, manifest
+
+
+def qdrant_enrichment_search(
+    client: Any,
+    *,
+    collection: str,
+    vector: np.ndarray,
+    limit: int,
+) -> list[dict[str, Any]]:
+    query_vector = np.asarray(vector, dtype=np.float32).tolist()
+    query_points = getattr(client, "query_points", None)
+    if callable(query_points):
+        response = query_points(
+            collection_name=collection,
+            query=query_vector,
+            limit=limit,
+            with_payload=True,
+            with_vectors=False,
+        )
+        points = getattr(response, "points", response)
+    else:
+        search = getattr(client, "search", None)
+        if not callable(search):
+            raise RuntimeError("QdrantClient não possui query_points nem search.")
+        points = search(
+            collection_name=collection,
+            query_vector=query_vector,
+            limit=limit,
+            with_payload=True,
+            with_vectors=False,
+        )
+
+    rows: list[dict[str, Any]] = []
+    for point in points:
+        payload = dict(getattr(point, "payload", None) or {})
+        rows.append(
+            {
+                **payload,
+                "score": safe_float(getattr(point, "score", 0.0)),
+                "qdrant_point_id": str(getattr(point, "id", "")),
+            }
+        )
+    return rows
+
+
+def format_enrichment_context(
+    hits: list[dict[str, Any]],
+    *,
+    max_chars: int,
+) -> tuple[str, list[dict[str, Any]]]:
+    blocks: list[str] = []
+    used: list[dict[str, Any]] = []
+    chars = 0
+
+    for rank, hit in enumerate(hits, start=1):
+        title = str(hit.get("titulo") or "não informada")
+        document_type = str(hit.get("document_type") or "summary")
+        section = str(hit.get("section_label") or "").strip()
+        part_index = hit.get("part_index")
+        part_count = hit.get("part_count")
+        text = str(hit.get("text") or "").strip()
+        events = [str(item).strip() for item in (hit.get("events") or []) if str(item).strip()]
+
+        header = [f"[R{rank}]", f"Obra: {title}"]
+        header.append(
+            "Tipo: resumo da obra" if document_type == "work_summary" else "Tipo: resumo de seção"
+        )
+        if section:
+            header.append(f"Seção: {section}")
+        if part_index is not None and part_count is not None and int(part_count) > 1:
+            header.append(f"Parte: {part_index}/{part_count}")
+
+        body = "\n".join(header) + "\nResumo: " + text
+        if events:
+            body += "\nEventos:\n" + "\n".join(f"- {event}" for event in events)
+        body += "\n\n"
+
+        remaining = max_chars - chars
+        if remaining <= 0:
+            break
+        truncated = False
+        if len(body) > remaining:
+            body = body[:remaining].rstrip() + " …\n"
+            truncated = True
+
+        blocks.append(body)
+        chars += len(body)
+        used.append(
+            {
+                "rank": rank,
+                "enrichment_document_id": hit.get("enrichment_document_id"),
+                "qdrant_point_id": hit.get("qdrant_point_id"),
+                "score": safe_float(hit.get("score")),
+                "document_type": document_type,
+                "titulo": title,
+                "section_label": section or None,
+                "section_index": hit.get("section_index"),
+                "part_index": part_index,
+                "part_count": part_count,
+                "truncated": truncated,
+            }
+        )
+        if truncated:
+            break
+
+    return "".join(blocks).strip(), used
+
+
+def build_enrichment_context_lookup(
+    *,
+    config: Any,
+    storage: RustFSManager,
+    benchmark_bucket: str,
+    questions_df: pd.DataFrame,
+    config_ids: list[str],
+    selection_lookup: dict[str, dict[str, Any]],
+    top_k: int,
+    max_chars: int,
+    default_embedder: str,
+    debug_samples: int,
+) -> tuple[dict[tuple[str, str], dict[str, Any]], dict[str, Any]]:
+    indexes_bucket = config.storage.embedding_indexes_bucket
+    if not storage.object_exists(indexes_bucket, ENRICHMENT_INDEX_CURRENT_KEY):
+        raise FileNotFoundError(
+            "Índices de enrichment ainda não foram publicados: "
+            f"s3://{indexes_bucket}/{ENRICHMENT_INDEX_CURRENT_KEY}"
+        )
+    index_set = read_json(storage, indexes_bucket, ENRICHMENT_INDEX_CURRENT_KEY)
+    indexes = index_set.get("indexes") or {}
+
+    alias_by_config: dict[str, str] = {}
+    for config_id in config_ids:
+        selected = selection_lookup[config_id]
+        raw_alias = selected.get("embedder")
+        alias = str(raw_alias).strip() if raw_alias is not None else ""
+        if not alias or alias.casefold() in {"none", "nan", "null"}:
+            alias = default_embedder
+        if alias not in indexes:
+            raise RuntimeError(
+                f"Índice enrichment não publicado para alias={alias} config={config_id}."
+            )
+        alias_by_config[config_id] = alias
+
+    vector_lookups: dict[str, dict[tuple[str, str], np.ndarray]] = {}
+    for alias in sorted(set(alias_by_config.values())):
+        lookup, query_manifest = load_prepared_query_vectors(
+            storage=storage,
+            bucket=benchmark_bucket,
+            alias=alias,
+        )
+        index_meta = indexes[alias]
+        index_manifest = read_json(storage, indexes_bucket, str(index_meta["manifest_key"]))
+        emb = index_manifest.get("embedding") or {}
+        identity_pairs = {
+            "model": (query_manifest.get("model"), emb.get("model")),
+            "resolved_revision": (
+                query_manifest.get("resolved_revision"), emb.get("resolved_revision")
+            ),
+            "dimension": (query_manifest.get("dimension"), emb.get("dimension")),
+            "query_prompt_name": (
+                query_manifest.get("query_prompt_name"), emb.get("query_prompt_name")
+            ),
+        }
+        mismatches = {
+            key: values for key, values in identity_pairs.items() if values[0] != values[1]
+        }
+        if mismatches:
+            raise RuntimeError(
+                f"Query vectors e enrichment index incompatíveis para {alias}: {mismatches}"
+            )
+        vector_lookups[alias] = lookup
+
+    qdrant = make_qdrant_manager(config)
+    client = getattr(qdrant, "client", qdrant)
+    output: dict[tuple[str, str], dict[str, Any]] = {}
+    printed = 0
+
+    for config_id in config_ids:
+        alias = alias_by_config[config_id]
+        index_meta = indexes[alias]
+        collection = str(index_meta["collection"])
+        vectors = vector_lookups[alias]
+        for row in questions_df.itertuples(index=False):
+            query_id = str(row.query_id)
+            vector_key = (query_id, "rewritten")
+            if vector_key not in vectors:
+                raise RuntimeError(f"Query vector ausente: {alias} {vector_key}")
+            hits = qdrant_enrichment_search(
+                client,
+                collection=collection,
+                vector=vectors[vector_key],
+                limit=top_k,
+            )
+            context, used = format_enrichment_context(hits, max_chars=max_chars)
+            output[(config_id, query_id)] = {
+                "context": context,
+                "context_chars": len(context),
+                "hits": used,
+                "hit_count": len(used),
+                "embedder": alias,
+                "index_id": str(index_meta["index_id"]),
+                "collection": collection,
+            }
+
+            if printed < debug_samples:
+                printed += 1
+                print(
+                    f"[enrichment sample {printed}/{debug_samples}] "
+                    f"config={config_id} query={query_id} alias={alias}"
+                )
+                for hit in used:
+                    print(
+                        "  "
+                        f"#{hit['rank']} score={hit['score']:.4f} "
+                        f"{hit['document_type']} | {hit['titulo']} | "
+                        f"{hit.get('section_label') or '-'}"
+                    )
+
+    return output, {
+        "index_set_key": ENRICHMENT_INDEX_CURRENT_KEY,
+        "source_enrichment_dataset_id": index_set.get("source_enrichment_dataset_id"),
+        "source_enrichment_manifest_sha256": index_set.get(
+            "source_enrichment_manifest_sha256"
+        ),
+        "aliases": alias_by_config,
+        "indexes": {alias: indexes[alias] for alias in sorted(set(alias_by_config.values()))},
+    }
+
 def build_frozen_contexts(
     *,
     results_df: pd.DataFrame,
@@ -484,6 +772,7 @@ def build_frozen_contexts(
     selection_lookup: dict[str, dict[str, Any]],
     max_chars: int,
     source_retrieval_run_id: str,
+    enrichment_lookup: dict[tuple[str, str], dict[str, Any]] | None = None,
 ) -> pd.DataFrame:
     selected_query_ids = set(
         questions_df["query_id"].astype(str).tolist()
@@ -512,7 +801,7 @@ def build_frozen_contexts(
         config_id = str(config_id_raw)
         query_id = str(query_id_raw)
         if query_id not in question_lookup:
-            raise RuntimeError(f"query_id do retrieval não está no split selecionado: {query_id}")
+            raise RuntimeError(f"query_id do retrieval não está no DEV: {query_id}")
 
         group = group.sort_values("rank", kind="stable")
         hits: list[FrozenHit] = []
@@ -543,8 +832,22 @@ def build_frozen_contexts(
                 )
             )
 
-        context, evidences = build_context(hits, max_chars=max_chars)
+        baseline_context, evidences = build_context(hits, max_chars=max_chars)
         used_chunk_ids = [str(item["chunk_id"]) for item in evidences]
+
+        enrichment = (enrichment_lookup or {}).get((config_id, query_id))
+        enrichment_context = str((enrichment or {}).get("context") or "").strip()
+        if enrichment_context:
+            context = (
+                "EVIDÊNCIAS TEXTUAIS ORIGINAIS:\n"
+                + baseline_context
+                + "\n\nCONTEXTO ENRIQUECIDO RECUPERADO:\n"
+                + enrichment_context
+            )
+        else:
+            context = baseline_context
+
+        enrichment_hits = list((enrichment or {}).get("hits") or [])
         context_id = stable_hash(
             {
                 "source_retrieval_run_id": source_retrieval_run_id,
@@ -553,7 +856,12 @@ def build_frozen_contexts(
                 "query_variant": "rewritten",
                 "max_chars": max_chars,
                 "used_chunk_ids": used_chunk_ids,
-                "context": context,
+                "baseline_context": baseline_context,
+                "enrichment_index_id": (enrichment or {}).get("index_id"),
+                "enrichment_hit_ids": [
+                    item.get("enrichment_document_id") for item in enrichment_hits
+                ],
+                "enrichment_context": enrichment_context,
             }
         )[:24]
 
@@ -569,6 +877,16 @@ def build_frozen_contexts(
                 "query_variant": "rewritten",
                 "context": context,
                 "context_chars": len(context),
+                "baseline_context_chars": len(baseline_context),
+                "enrichment_enabled": bool(enrichment_context),
+                "enrichment_context_chars": len(enrichment_context),
+                "enrichment_hit_count": len(enrichment_hits),
+                "enrichment_embedder": (enrichment or {}).get("embedder"),
+                "enrichment_index_id": (enrichment or {}).get("index_id"),
+                "enrichment_collection": (enrichment or {}).get("collection"),
+                "enrichment_hits_json": json.dumps(
+                    enrichment_hits, ensure_ascii=False, default=json_default
+                ),
                 "retrieved_chunk_count": len(retrieved_chunk_ids),
                 "used_evidence_count": len(evidences),
                 "retrieved_chunk_ids_json": json.dumps(
@@ -793,7 +1111,18 @@ def execute_one(
         "generation_error_message": error_message,
         "generation_latency_ms": latency_ms,
         "context_chars": int(context_row.context_chars),
+        "baseline_context_chars": int(
+            getattr(context_row, "baseline_context_chars", context_row.context_chars)
+        ),
         "used_evidence_count": int(context_row.used_evidence_count),
+        "enrichment_enabled": bool(getattr(context_row, "enrichment_enabled", False)),
+        "enrichment_context_chars": int(
+            getattr(context_row, "enrichment_context_chars", 0)
+        ),
+        "enrichment_hit_count": int(getattr(context_row, "enrichment_hit_count", 0)),
+        "enrichment_embedder": getattr(context_row, "enrichment_embedder", None),
+        "enrichment_index_id": getattr(context_row, "enrichment_index_id", None),
+        "enrichment_collection": getattr(context_row, "enrichment_collection", None),
         **usage,
         "created_at_utc": utc_now(),
     }
@@ -897,6 +1226,12 @@ def main() -> None:
         raise SystemExit("--generation-retries deve ser >= 0.")
     if args.ollama_num_batch is not None and args.ollama_num_batch <= 0:
         raise SystemExit("--ollama-num-batch deve ser > 0.")
+    if args.enrichment_top_k <= 0:
+        raise SystemExit("--enrichment-top-k deve ser > 0.")
+    if args.enrichment_max_chars <= 0:
+        raise SystemExit("--enrichment-max-chars deve ser > 0.")
+    if args.enrichment_debug_samples < 0:
+        raise SystemExit("--enrichment-debug-samples deve ser >= 0.")
     if args.resume_latest and args.run_id:
         raise SystemExit("Use --resume-latest ou --run-id, não ambos.")
 
@@ -908,13 +1243,8 @@ def main() -> None:
     retrieval_prefix = f"{BENCHMARK_PREFIX}/runs/{retrieval_run_id}"
     retrieval_manifest_key = f"{retrieval_prefix}/manifest.json"
     retrieval_config_key = f"{retrieval_prefix}/config.json"
+    selection_key = f"{retrieval_prefix}/retrieval/final_selection_10.json"
     results_key = f"{retrieval_prefix}/retrieval/results.parquet"
-
-    selection_run_id = sanitize(args.selection_run_id or retrieval_run_id)
-    selection_prefix = f"{BENCHMARK_PREFIX}/runs/{selection_run_id}"
-    selection_key = (
-        f"{selection_prefix}/retrieval/final_selection_10.json"
-    )
 
     for key in (
         retrieval_manifest_key,
@@ -932,22 +1262,10 @@ def main() -> None:
 
     if retrieval_manifest.get("status") != "success":
         raise RuntimeError("Run de retrieval não está com status=success.")
-
-    target_split = str(retrieval_config.get("split") or "").strip()
-    if target_split not in {"dev", "holdout"}:
-        raise RuntimeError(
-            "MCQ exige retrieval com split dev ou holdout; "
-            f"recebido={target_split!r}."
-        )
-    if target_split == "holdout" and not args.unlock_holdout:
-        raise SystemExit(
-            "Holdout protegido. Use --unlock-holdout somente após congelar "
-            "seleção, modelos, prompt e métricas no DEV."
-        )
-    if str(selection.get("split") or "") != "dev":
-        raise RuntimeError(
-            "final_selection_10.json precisa ser a seleção congelada no DEV."
-        )
+    if str(retrieval_config.get("split")) != "dev":
+        raise RuntimeError("MCQ de seleção deve usar retrieval split=dev.")
+    if str(selection.get("split")) != "dev":
+        raise RuntimeError("final_selection_10.json não pertence ao DEV.")
 
     benchmark_sha = str(retrieval_config.get("benchmark_sha256") or "")
     if str(selection.get("benchmark_sha256") or "") != benchmark_sha:
@@ -962,9 +1280,7 @@ def main() -> None:
     questions = pd.read_csv(
         io.BytesIO(storage.download_bytes(bucket, SPLIT_KEY))
     )
-    questions = questions[
-        questions["split"].astype(str).eq(target_split)
-    ].copy()
+    questions = questions[questions["split"].astype(str).eq("dev")].copy()
     validate_mcq_rows(questions)
     questions = questions.sort_values("query_id", kind="stable").reset_index(drop=True)
     if args.limit_queries is not None:
@@ -972,17 +1288,27 @@ def main() -> None:
     if args.smoke:
         questions = questions.head(2).copy()
     if questions.empty:
-        raise RuntimeError(f"Nenhuma questão {target_split} selecionada.")
+        raise RuntimeError("Nenhuma questão DEV selecionada.")
 
     retrieval_results = read_parquet(storage, bucket, results_key)
-    available_configs = set(
-        retrieval_results["config_id"].astype(str).unique().tolist()
-    )
-    missing_configs = [item for item in config_ids if item not in available_configs]
-    if missing_configs:
-        raise RuntimeError(
-            "Run de retrieval não contém todas as 10 configs congeladas: "
-            + ", ".join(missing_configs)
+
+    enrichment_lookup = None
+    enrichment_metadata: dict[str, Any] | None = None
+    if args.enrichment:
+        default_enrichment_embedder = (
+            args.enrichment_default_embedder or config.embedding.selected_model
+        )
+        enrichment_lookup, enrichment_metadata = build_enrichment_context_lookup(
+            config=config,
+            storage=storage,
+            benchmark_bucket=bucket,
+            questions_df=questions,
+            config_ids=config_ids,
+            selection_lookup=selection_lookup,
+            top_k=args.enrichment_top_k,
+            max_chars=args.enrichment_max_chars,
+            default_embedder=default_enrichment_embedder,
+            debug_samples=args.enrichment_debug_samples,
         )
 
     contexts = build_frozen_contexts(
@@ -992,6 +1318,7 @@ def main() -> None:
         selection_lookup=selection_lookup,
         max_chars=config.generation.max_context_chars,
         source_retrieval_run_id=retrieval_run_id,
+        enrichment_lookup=enrichment_lookup,
     )
 
     model_names = args.models or [item["name"] for item in OLLAMA_MODELS]
@@ -1009,11 +1336,12 @@ def main() -> None:
             storage,
             bucket,
             retrieval_run_id,
+            enrichment_enabled=args.enrichment,
         )
         args.resume = True
         print(f"[resume-latest] run_id={run_id}")
     else:
-        run_id = sanitize(args.run_id or default_run_id(target_split))
+        run_id = sanitize(args.run_id or default_run_id(enrichment=args.enrichment))
 
     print(f"[run] run_id={run_id}")
     run_prefix = f"{BENCHMARK_PREFIX}/runs/{run_id}"
@@ -1055,10 +1383,9 @@ def main() -> None:
         "created_at_utc": utc_now(),
         "source_retrieval_run_id": retrieval_run_id,
         "source_retrieval_results": results_key,
-        "source_selection_run_id": selection_run_id,
         "source_final_selection": selection_key,
         "benchmark_sha256": benchmark_sha,
-        "split": target_split,
+        "split": "dev",
         "query_variant": "rewritten",
         "base_queries": len(questions),
         "retrieval_configs": len(config_ids),
@@ -1082,6 +1409,17 @@ def main() -> None:
             "fields": ["resposta", "opcao_escolhida"],
         },
         "selected_config_ids": config_ids,
+        "enrichment": {
+            "enabled": bool(args.enrichment),
+            "top_k": args.enrichment_top_k if args.enrichment else 0,
+            "max_chars": args.enrichment_max_chars if args.enrichment else 0,
+            "default_embedder": (
+                args.enrichment_default_embedder or config.embedding.selected_model
+            ) if args.enrichment else None,
+            "index_set": enrichment_metadata,
+            "retrieval_uses_canonical_work_filter": False,
+            "baseline_text_context_evicted": False,
+        },
         "selection_method": selection.get("method"),
         "runtime": {
             "python": sys.version,
@@ -1098,7 +1436,8 @@ def main() -> None:
         "updated_at_utc": utc_now(),
         "source_retrieval_run_id": retrieval_run_id,
         "benchmark_sha256": benchmark_sha,
-        "split": target_split,
+        "split": "dev",
+        "enrichment_enabled": bool(args.enrichment),
         "completed_shards": completed_shards,
         "expected_shards": len(model_names) * len(config_ids),
     }
@@ -1255,8 +1594,9 @@ def main() -> None:
         payload = {
             "run_id": run_id,
             "source_retrieval_run_id": retrieval_run_id,
-            "split": target_split,
+            "split": "dev",
             "query_variant": "rewritten",
+            "enrichment_enabled": bool(args.enrichment),
             "retrieval_configs": len(config_ids),
             "models": len(model_names),
             "base_queries": len(questions),
@@ -1292,6 +1632,9 @@ def main() -> None:
         print("\n=== MCQ BENCHMARK OK ===")
         print(f"run_id: {run_id}")
         print(f"source retrieval: {retrieval_run_id}")
+        print(f"enrichment: {'on' if args.enrichment else 'off'}")
+        if args.enrichment:
+            print(f"enrichment top_k: {args.enrichment_top_k}")
         print(f"configs: {len(config_ids)}")
         print(f"models: {len(model_names)}")
         print(f"queries: {len(questions)}")
