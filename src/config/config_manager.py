@@ -236,6 +236,35 @@ class RetrievalStrategiesConfig(BaseModel):
     )
 
 
+class EnrichmentRetrievalConfig(BaseModel):
+    enabled: bool = True
+
+    top_k: int = Field(
+        default=3,
+        gt=0,
+    )
+
+    max_context_chars: int = Field(
+        default=6000,
+        gt=0,
+    )
+
+    max_context_fraction: float = Field(
+        default=0.25,
+        gt=0,
+        le=1,
+    )
+
+    fallback_embedder: str = Field(
+        default="qwen3_embedding_06b",
+        min_length=1,
+    )
+
+    expose_as_evidence: bool = False
+
+    fail_open: bool = True
+
+
 class RetrievalBenchmarkConfig(BaseModel):
     evidence_min_coverage: float = Field(default=0.60, ge=0, le=1)
     warmup_runs: int = Field(default=3, ge=0)
@@ -359,8 +388,23 @@ class AppConfig(BaseModel):
     retrieval_benchmark: RetrievalBenchmarkConfig = Field(
         default_factory=RetrievalBenchmarkConfig
     )
+    enrichment_retrieval: EnrichmentRetrievalConfig = Field(
+        default_factory=EnrichmentRetrievalConfig
+    )
     generation: GenerationConfig = Field(default_factory=GenerationConfig)
     enrichment: EnrichmentConfig = Field(default_factory=EnrichmentConfig)
+
+    @model_validator(mode="after")
+    def validate_enrichment_retrieval(self):
+        alias = self.enrichment_retrieval.fallback_embedder
+
+        if alias not in self.embedding.models:
+            raise ValueError(
+                "enrichment_retrieval.fallback_embedder "
+                "não existe em embedding.models."
+            )
+
+        return self
 
     @property
     def retrieval(self) -> RetrievalIndexConfig:

@@ -123,3 +123,11 @@ enrichment:
   semantic:
     min_capitulos: 2
     min_mediana_chars: 200
+enrichment_retrieval:
+  enabled: true
+  top_k: 3
+  max_context_chars: 6000
+  max_context_fraction: 0.25
+  fallback_embedder: qwen3_embedding_06b
+  expose_as_evidence: false
+  fail_open: true
