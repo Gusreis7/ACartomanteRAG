@@ -151,6 +151,7 @@ def send_message(
                 session_id=session_id,
                 chat_id=chat_id,
                 message=body.message,
+                persona=body.persona,
             )
         )
     except ChatNotFoundError as exc:

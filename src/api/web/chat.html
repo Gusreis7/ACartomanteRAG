@@ -38,6 +38,40 @@
           <p class="chat-kicker">consulta em curso</p>
           <h1 id="conversation-title">Nova conversa</h1>
         </div>
+        <div
+          class="persona-controls"
+          id="persona-controls"
+          aria-label="Modo de opinião"
+        >
+          <span class="persona-controls-label">opinião</span>
+
+          <button
+            class="persona-toggle"
+            type="button"
+            data-persona="cosmo"
+            aria-pressed="false"
+            title="Cosmo: lê que Capitu não traiu Bentinho"
+          >
+            Cosmo
+          </button>
+
+          <button
+            class="persona-toggle"
+            type="button"
+            data-persona="damiao"
+            aria-pressed="false"
+            title="Damião: lê que Capitu traiu Bentinho"
+          >
+            Damião
+          </button>
+
+          <span
+            class="persona-state"
+            id="persona-state"
+            aria-live="polite"
+          >neutro</span>
+        </div>
+
         <a class="header-home" href="/">mesa inicial</a>
       </header>
 

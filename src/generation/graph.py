@@ -26,6 +26,10 @@ from src.generation.context_builder import (
 from src.generation.prompt import (
     SYSTEM_PROMPT,
 )
+from src.generation.personas import (
+    normalize_persona,
+    persona_instruction,
+)
 from src.generation.provider import (
     GenerationProvider,
     OllamaGenerationProvider,
@@ -48,6 +52,8 @@ class RAGState(
     total=False,
 ):
     query: str
+
+    persona: str
 
     messages: Annotated[
         list[BaseMessage],
@@ -178,6 +184,7 @@ class MachadoRAG:
         query: str,
         *,
         thread_id: str | None = None,
+        persona: str = "neutral",
     ) -> dict[str, Any]:
         query = str(
             query
@@ -187,6 +194,10 @@ class MachadoRAG:
             raise ValueError(
                 "Query não pode ser vazia."
             )
+
+        persona = normalize_persona(
+            persona
+        )
 
         invoke_config = None
 
@@ -212,6 +223,7 @@ class MachadoRAG:
             self.graph.invoke(
                 {
                     "query": query,
+                    "persona": persona,
                     "timings_ms": {},
                 },
                 config=(
@@ -714,13 +726,26 @@ class MachadoRAG:
             "prompt de sistema."
         )
 
+        system_prompt = (
+            SYSTEM_PROMPT
+            + "\
+\
+"
+            + persona_instruction(
+                state.get(
+                    "persona",
+                    "neutral",
+                )
+            )
+        )
+
         message = (
             self.generation_provider
             .invoke(
                 [
                     (
                         "system",
-                        SYSTEM_PROMPT,
+                        system_prompt,
                     ),
                     (
                         "human",

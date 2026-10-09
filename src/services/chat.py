@@ -41,6 +41,7 @@ class ChatService:
         session_id: UUID,
         chat_id: UUID,
         message: str,
+        persona: str = "neutral",
     ) -> dict:
         conversation = self.repository.get(
             session_id=session_id,
@@ -64,6 +65,7 @@ class ChatService:
                 session_id=session_id,
                 chat_id=chat_id,
             ),
+            persona=persona,
         )
 
         evidences = [
@@ -98,8 +100,9 @@ class ChatService:
             )
 
         logger.info(
-            "chat_answered chat_id=%s strategy=%s total_ms=%.2f",
+            "chat_answered chat_id=%s persona=%s strategy=%s total_ms=%.2f",
             chat_id,
+            persona,
             result["retrieval_strategy"],
             result["timings_ms"].get("total_ms", 0.0),
         )
