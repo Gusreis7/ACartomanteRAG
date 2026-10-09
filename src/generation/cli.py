@@ -14,6 +14,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("query", help="Pergunta sobre a coletânea.")
     parser.add_argument("--env-file", type=Path, default=None)
     parser.add_argument("--config-file", type=Path, default=None)
+    parser.add_argument(
+        "--persona",
+        choices=("neutral", "cosmo", "damiao"),
+        default="neutral",
+        help="Persona interpretativa do chat.",
+    )
     return parser.parse_args()
 
 
@@ -27,7 +33,10 @@ def main() -> None:
 
     config = ConfigManager.load(**kwargs)
     rag = MachadoRAG(config)
-    result = rag.ask(args.query)
+    result = rag.ask(
+        args.query,
+        persona=args.persona,
+    )
 
     print()
     print("=" * 80)

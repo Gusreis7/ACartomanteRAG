@@ -22,6 +22,11 @@ class ConversationResponse(BaseModel):
 
 class MessageRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
+    persona: Literal[
+        "neutral",
+        "cosmo",
+        "damiao",
+    ] = "neutral"
 
 
 class EvidenceResponse(BaseModel):

@@ -13,8 +13,40 @@ const evidenceTable = document.querySelector("#evidence-table");
 const evidenceSpread = document.querySelector("#evidence-spread");
 const evidenceTableCount = document.querySelector("#evidence-table-count");
 const evidenceTableClose = document.querySelector("#evidence-table-close");
+const personaButtons = [...document.querySelectorAll("[data-persona]")];
+const personaState = document.querySelector("#persona-state");
 
 let sending = false;
+let activePersona = "neutral";
+
+const PERSONA_LABELS = {
+  neutral: "neutro",
+  cosmo: "cosmo",
+  damiao: "damião",
+};
+
+function setPersona(nextPersona) {
+  const requested = nextPersona || "neutral";
+  activePersona = activePersona === requested ? "neutral" : requested;
+
+  personaButtons.forEach((button) => {
+    const active = button.dataset.persona === activePersona;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+
+  if (personaState) {
+    personaState.textContent = PERSONA_LABELS[activePersona] || "neutro";
+  }
+
+  if (activePersona === "cosmo") {
+    showToast("Cosmo entra na mesa: Capitu não traiu.");
+  } else if (activePersona === "damiao") {
+    showToast("Damião entra na mesa: Capitu traiu.");
+  } else {
+    showToast("Modo neutro restaurado.");
+  }
+}
 
 function showToast(message) {
   toast.textContent = message;
@@ -203,6 +235,7 @@ function setSending(value) {
   sending = value;
   sendButton.disabled = value;
   input.disabled = value;
+  personaButtons.forEach((button) => { button.disabled = value; });
 }
 
 function resizeInput() {
@@ -275,6 +308,8 @@ async function sendMessage(message) {
   const clean = message.trim();
   if (!clean || sending) return;
 
+  const requestPersona = activePersona;
+
   addMessage("user", clean);
   input.value = "";
   resizeInput();
@@ -285,7 +320,7 @@ async function sendMessage(message) {
   try {
     const payload = await jsonFetch(`/api/v1/conversations/${chatId}/messages`, {
       method: "POST",
-      body: JSON.stringify({ message: clean }),
+      body: JSON.stringify({ message: clean, persona: requestPersona }),
     });
 
     pending.remove();
@@ -335,6 +370,10 @@ document.querySelector("#new-chat")?.addEventListener("click", async () => {
 
 document.querySelector("#sidebar-toggle")?.addEventListener("click", () => {
   sidebar.classList.toggle("is-open");
+});
+
+personaButtons.forEach((button) => {
+  button.addEventListener("click", () => setPersona(button.dataset.persona));
 });
 
 evidenceTableClose?.addEventListener("click", () => evidenceTable.close());

@@ -1661,3 +1661,103 @@ a { color: inherit; }
     font-size: 13px;
   }
 }
+
+/* Persona opinion toggles */
+.persona-controls {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid rgba(72,55,34,.22);
+  background: rgba(247,239,220,.42);
+}
+
+.chat-header .header-home {
+  margin-left: 6px;
+}
+
+.persona-controls-label,
+.persona-state {
+  font-family: var(--mono);
+  font-size: 7px;
+  line-height: 1;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.persona-controls-label {
+  padding-inline: 5px 3px;
+  color: rgba(52,49,38,.55);
+}
+
+.persona-state {
+  min-width: 42px;
+  padding-inline: 4px;
+  text-align: center;
+  color: var(--wine);
+}
+
+.persona-toggle {
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  transition:
+    background .16s ease,
+    border-color .16s ease,
+    color .16s ease,
+    transform .16s ease;
+}
+
+.persona-toggle:hover {
+  border-color: rgba(90,30,45,.28);
+  color: var(--wine);
+  transform: translateY(-1px);
+}
+
+.persona-toggle.is-active {
+  border-color: rgba(90,30,45,.55);
+  background: var(--wine);
+  color: var(--paper-light);
+  box-shadow: 0 5px 16px rgba(90,30,45,.14);
+}
+
+.persona-toggle:disabled {
+  opacity: .5;
+  cursor: wait;
+  transform: none;
+}
+
+@media (max-width: 900px) {
+  .persona-controls-label,
+  .persona-state {
+    display: none;
+  }
+
+  .persona-toggle {
+    padding-inline: 7px;
+  }
+}
+
+@media (max-width: 620px) {
+  .persona-controls {
+    gap: 2px;
+  }
+
+  .persona-toggle {
+    font-size: 7px;
+    padding-inline: 6px;
+  }
+
+  .header-home {
+    display: none;
+  }
+}
+
