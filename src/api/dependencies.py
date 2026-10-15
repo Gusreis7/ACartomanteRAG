@@ -27,7 +27,7 @@ def get_session_id(request: Request, response: Response) -> UUID:
         value=str(session_id),
         httponly=True,
         samesite="lax",
-        secure=False,
+        secure=request.app.state.secure_cookies,
         max_age=60 * 60 * 24 * 30,
     )
     return session_id

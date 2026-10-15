@@ -33,9 +33,10 @@ class WorkRecommendationService:
     processo. Ele não guarda estado de usuário.
     """
 
-    def __init__(self, *, storage, bucket: str) -> None:
+    def __init__(self, *, storage, bucket: str, current_key: str = BRONZE_CURRENT_KEY) -> None:
         self.storage = storage
         self.bucket = bucket
+        self.current_key = current_key
         self._catalog: list[dict[str, str | None]] | None = None
         self._catalog_source: str | None = None
         self._catalog_lock = Lock()
@@ -46,6 +47,7 @@ class WorkRecommendationService:
         return cls(
             storage=rag.retrieval.rustfs,
             bucket=config.storage.bronze_bucket,
+            current_key=config.storage.bronze_current_key,
         )
 
     @staticmethod
@@ -86,7 +88,7 @@ class WorkRecommendationService:
         """Resolve o manifest da Bronze atual pelo ponteiro current.json."""
         if not self.storage.object_exists(
             self.bucket,
-            BRONZE_CURRENT_KEY,
+            self.current_key,
         ):
             raise RecommendationUnavailableError(
                 "A camada Bronze não possui current.json."
@@ -95,7 +97,7 @@ class WorkRecommendationService:
         try:
             current_payload = self.storage.download_bytes(
                 self.bucket,
-                BRONZE_CURRENT_KEY,
+                self.current_key,
             )
             current = json.loads(
                 current_payload.decode("utf-8")
@@ -250,7 +252,7 @@ class WorkRecommendationService:
                         "recommendation_catalog_load_failed "
                         "bucket=%s current=%s",
                         self.bucket,
-                        BRONZE_CURRENT_KEY,
+                        self.current_key,
                     )
                     raise RecommendationUnavailableError(
                         "Não foi possível carregar o catálogo de obras."

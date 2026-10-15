@@ -1,0 +1,13 @@
+extends: config.yaml
+generation:
+  provider: ollama
+  model: qwen3.5:4b
+  base_url: http://ollama:11434
+  max_parallel: 1
+  acquire_timeout_seconds: 30
+  timeout_seconds: 600
+enrichment:
+  provider: ollama
+  model: qwen3.5:4b
+  max_parallel: 1
+  timeout_seconds: 900

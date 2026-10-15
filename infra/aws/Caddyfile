@@ -1,0 +1,25 @@
+{
+	admin off
+	email {$ACME_EMAIL}
+	auto_https disable_redirects
+}
+https://{$APP_DOMAIN} {
+	tls {
+		issuer acme {
+			disable_http_challenge
+		}
+	}
+	encode gzip
+	request_body {
+		max_size 64KB
+	}
+	header Strict-Transport-Security "max-age=31536000"
+	@operational path /health /ready
+	respond @operational 404
+	reverse_proxy api:8000 {
+		transport http {
+			dial_timeout 5s
+			response_header_timeout 140s
+		}
+	}
+}

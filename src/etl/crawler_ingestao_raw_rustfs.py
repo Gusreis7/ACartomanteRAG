@@ -496,6 +496,7 @@ def processar_obra(
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--strict", action="store_true", help="Produção: falha se alguma página ou download tiver erro.")
 
     parser.add_argument(
         "--pagina-inicial",
@@ -584,6 +585,7 @@ def main():
     #
     urls_vistas = set()
     obras = []
+    page_errors = 0
 
     for pagina in range(
         args.pagina_inicial,
@@ -604,9 +606,11 @@ def main():
                 obras.append(obra)
 
         except requests.RequestException as exc:
+            page_errors += 1
             print(f"[ERRO HTTP] " f"Página {pagina}: {exc}")
 
         except Exception as exc:
+            page_errors += 1
             print(f"[ERRO] " f"Página {pagina}: {exc}")
 
         time.sleep(args.delay)
@@ -661,6 +665,8 @@ def main():
     )
 
     df_resultado = pd.DataFrame(registros)
+    if args.strict and (page_errors or not obras or (not df_resultado.empty and df_resultado["status_ingestao"].eq("erro").any())):
+        raise RuntimeError("Crawler incompleto. Manifest parcial salvo para retomada; próxima etapa não executada.")
 
     print("\n" + "=" * 80)
     print("RESULTADO")

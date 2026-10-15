@@ -43,6 +43,9 @@ class EmbeddingIndex:
         self,
         silver_dataset_id: str,
         model_alias: str | None = None,
+        *,
+        resume: bool = False,
+        publish_default: bool = True,
     ) -> dict[str, Any]:
         alias = (
             model_alias
@@ -147,10 +150,21 @@ class EmbeddingIndex:
             )
         )
 
-        if (
-            collection_exists
-            or manifest_exists
-        ):
+        building_key = f"{index_id}/building.json"
+        if resume and manifest_exists:
+            previous = json.loads(self.rustfs.download_bytes(indexes_bucket, manifest_key))
+            if previous.get("status") != "success" or previous.get("index_hash") != index_hash:
+                raise ValueError("Manifest existente diverge da assinatura do índice.")
+            if collection_exists:
+                count = self.qdrant.count(collection_name=collection_name, exact=True)
+                if count == previous["validation"]["silver_chunks"]:
+                    return previous
+                # Reenvia IDs determinísticos de um índice pertencente à assinatura.
+        elif resume and collection_exists and self.rustfs.object_exists(indexes_bucket, building_key):
+            marker = json.loads(self.rustfs.download_bytes(indexes_bucket, building_key))
+            if marker.get("index_hash") != index_hash:
+                raise ValueError("Collection parcial não pertence a esta execução.")
+        elif collection_exists or manifest_exists:
             raise FileExistsError(
                 "Embedding index já existe "
                 "ou está em estado inconsistente. "
@@ -191,17 +205,19 @@ class EmbeddingIndex:
             ),
         )
 
-        self.qdrant.create_collection(
-            collection_name=(
-                collection_name
-            ),
-            vector_size=info.dimension,
-            distance=(
-                self.config.embedding
-                .index
-                .distance
-            ),
-        )
+        self.rustfs.upload_bytes(indexes_bucket, building_key, json.dumps({"index_hash": index_hash}).encode(), "application/json")
+        if not collection_exists:
+            self.qdrant.create_collection(
+                collection_name=(
+                    collection_name
+                ),
+                vector_size=info.dimension,
+                distance=(
+                    self.config.embedding
+                    .index
+                    .distance
+                ),
+            )
 
         configured_batch_size = (
             self.config.embedding
@@ -462,7 +478,7 @@ class EmbeddingIndex:
             rustfs=self.rustfs,
         )
 
-        bootstrapped = (
+        bootstrapped = publish_default and (
             release_manager
             .bootstrap_if_missing(
                 index_id=index_id,

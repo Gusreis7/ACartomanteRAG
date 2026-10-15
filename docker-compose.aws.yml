@@ -1,0 +1,91 @@
+name: acartomanterag
+x-logging: &logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+services:
+  redis:
+    image: redis/redis-stack-server:7.4.0-v8
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    environment:
+      REDIS_ARGS: "${REDIS_ARGS_OVERRIDE:---appendonly yes --appendfsync everysec --aclfile /data/users.acl --maxmemory 1gb --maxmemory-policy noeviction}"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Configuração SSM ausente}
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - /srv/acartomante/data/redis:/data
+    networks: [redis_private]
+    healthcheck:
+      test: [CMD-SHELL, 'REDISCLI_AUTH="$${REDIS_PASSWORD}" redis-cli ping | grep -qx PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: *logging
+  api:
+    image: ${API_IMAGE:?Imagem ECR com digest obrigatório}
+    restart: unless-stopped
+    init: true
+    user: "10001:10001"
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    pids_limit: 512
+    env_file:
+      - ${RUNTIME_ENV_FILE:-/etc/acartomante/runtime.env}
+    environment:
+      CONFIG_FILE: /app/config/config.aws.yaml
+      ENV_FILE: /app/config/absent.env
+      DATA_RELEASE_KEY: ${DATA_RELEASE_KEY:-production/current.json}
+      API_ALLOWED_HOSTS: "${APP_DOMAIN:?Defina APP_DOMAIN},localhost,127.0.0.1"
+      SESSION_COOKIE_SECURE: "true"
+      HF_HOME: /home/app/.cache/huggingface
+      TOKENIZERS_PARALLELISM: "false"
+      OMP_NUM_THREADS: "2"
+    volumes:
+      - /srv/acartomante/data/cache:/home/app/.cache
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=512m,mode=1777
+    networks: [redis_private, proxy_private, api_egress]
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=15).close()"]
+      interval: 30s
+      timeout: 20s
+      retries: 10
+      start_period: 240s
+    logging: *logging
+  caddy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Defina APP_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?Defina ACME_EMAIL}
+    ports:
+      - "${EC2_BIND_IP:?Informe o IP privado específico da EC2}:443:443/tcp"
+    volumes:
+      - ./infra/aws/Caddyfile:/etc/caddy/Caddyfile:ro
+      - /srv/acartomante/data/caddy:/data
+      - /srv/acartomante/data/caddy-config:/config
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=32m
+    networks: [proxy_private, proxy_egress]
+    depends_on:
+      api:
+        condition: service_healthy
+    logging: *logging
+networks:
+  redis_private:
+    internal: true
+  proxy_private:
+    internal: true
+  api_egress: {}
+  proxy_egress: {}

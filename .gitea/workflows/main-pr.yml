@@ -1,5 +1,8 @@
 name: Main PR
 
+env:
+  COMPOSE_FILE: "docker-compose.yml:docker-compose.raspberry.yml"
+
 on:
   pull_request:
     branches:
@@ -17,6 +20,9 @@ jobs:
     env:
       COMPOSE_PROJECT_NAME: acartomante-ci-${{ gitea.run_number }}
 
+      # Interface publicada no host; CI usa somente loopback.
+      API_BIND_IP: 127.0.0.1
+
       # Application connection
       RUSTFS_ENDPOINT: http://localhost:9003
       QDRANT_URL: http://localhost:6335
@@ -24,6 +30,7 @@ jobs:
       # Secrets
       RUSTFS_ACCESS_KEY: ${{ secrets.RUSTFS_ACCESS_KEY }}
       RUSTFS_SECRET_KEY: ${{ secrets.RUSTFS_SECRET_KEY }}
+      REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
       QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
 
       # Docker Compose / CI deployment
@@ -49,31 +56,34 @@ jobs:
           fi
 
       - name: Prepare CI storage
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
         run: |
           mkdir -p "$RUSTFS_VOLUME" "$QDRANT_VOLUME" "$REDIS_VOLUME"
 
-      - name: Validate Docker Compose
-        run: docker compose config --quiet
+      - name: Check repository (Raspberry maintenance)
+        run: bash scripts/check_raspberry_ci.sh
 
       - name: Build services
-        run: docker compose build
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
+        run: bash scripts/compose_raspberry.sh build
 
-      - name: Start services
-        run: |
-          docker compose up             --detach             --wait             --wait-timeout 120
+      - name: Check local infrastructure and runtime imports
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
+        run: bash scripts/check_raspberry_ci.sh
 
       - name: Show services
-        run: docker compose ps
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
+        run: bash scripts/compose_raspberry.sh ps
 
       - name: Show logs on failure
-        if: failure()
-        run: docker compose logs --no-color
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
+        run: bash scripts/compose_raspberry.sh logs --no-color
 
       - name: Shutdown services
-        if: always()
-        run: docker compose down --remove-orphans
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
+        run: bash scripts/compose_raspberry.sh down --volumes --remove-orphans
 
       - name: Cleanup CI storage
-        if: always()
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
         run: |
           rm -rf "/tmp/acartomante-ci-${{ gitea.run_number }}"

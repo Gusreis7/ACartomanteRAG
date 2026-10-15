@@ -38,6 +38,7 @@ Categorias:
 from __future__ import annotations
 
 import argparse
+import os
 import hashlib
 import json
 import re
@@ -817,6 +818,8 @@ def utc_now() -> str:
 
 
 def build_bronze_artifact_id() -> str:
+    if os.getenv("BRONZE_ARTIFACT_ID"):
+        return os.environ["BRONZE_ARTIFACT_ID"]
     stamp = datetime.now(
         timezone.utc
     ).strftime("%Y%m%dT%H%M%SZ")
@@ -1047,6 +1050,10 @@ def main() -> None:
 
     raw_bucket = config.storage.raw_bucket
     bronze_bucket = config.storage.bronze_bucket
+    global BRONZE_CURRENT_KEY
+    BRONZE_CURRENT_KEY = config.storage.bronze_current_key
+    global DEFAULT_RAW_MANIFEST_KEY
+    DEFAULT_RAW_MANIFEST_KEY = config.storage.raw_manifest_key
 
     coletanea_config = config.bronze.coletanea
     carta_config = config.bronze.carta
@@ -1416,6 +1423,8 @@ def main() -> None:
 
     # Só troca o ponteiro quando o artifact
     # inteiro foi persistido com sucesso.
+    if erros:
+        raise RuntimeError(f"Bronze com {erros} erro(s); current.json foi preservado.")
     salvar_json_rustfs(
         storage=storage,
         bucket=bronze_bucket,

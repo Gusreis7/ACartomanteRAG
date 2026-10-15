@@ -13,8 +13,22 @@ const evidenceTable = document.querySelector("#evidence-table");
 const evidenceSpread = document.querySelector("#evidence-spread");
 const evidenceTableCount = document.querySelector("#evidence-table-count");
 const evidenceTableClose = document.querySelector("#evidence-table-close");
+const personaButtons = [...document.querySelectorAll("[data-persona]")];
 
 let sending = false;
+let activePersona = "neutral";
+
+function setPersona(nextPersona) {
+  activePersona = ["neutral", "cosmo", "damiao"].includes(nextPersona)
+    ? nextPersona
+    : "neutral";
+
+  personaButtons.forEach((button) => {
+    const selected = button.dataset.persona === activePersona;
+    button.classList.toggle("is-active", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  });
+}
 
 function showToast(message) {
   toast.textContent = message;
@@ -203,6 +217,7 @@ function setSending(value) {
   sending = value;
   sendButton.disabled = value;
   input.disabled = value;
+  personaButtons.forEach((button) => { button.disabled = value; });
 }
 
 function resizeInput() {
@@ -275,6 +290,8 @@ async function sendMessage(message) {
   const clean = message.trim();
   if (!clean || sending) return;
 
+  const requestPersona = activePersona;
+
   addMessage("user", clean);
   input.value = "";
   resizeInput();
@@ -285,7 +302,7 @@ async function sendMessage(message) {
   try {
     const payload = await jsonFetch(`/api/v1/conversations/${chatId}/messages`, {
       method: "POST",
-      body: JSON.stringify({ message: clean }),
+      body: JSON.stringify({ message: clean, persona: requestPersona }),
     });
 
     pending.remove();
@@ -335,6 +352,10 @@ document.querySelector("#new-chat")?.addEventListener("click", async () => {
 
 document.querySelector("#sidebar-toggle")?.addEventListener("click", () => {
   sidebar.classList.toggle("is-open");
+});
+
+personaButtons.forEach((button) => {
+  button.addEventListener("click", () => setPersona(button.dataset.persona));
 });
 
 evidenceTableClose?.addEventListener("click", () => evidenceTable.close());

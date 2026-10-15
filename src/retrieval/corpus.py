@@ -11,7 +11,9 @@ def load_resolved_silver_chunks(config, rustfs, resolved_index) -> pd.DataFrame:
     """Carrega a Silver exata registrada no manifest do índice resolvido."""
     source = resolved_index.manifest.get("source") or {}
     silver_dataset_id = resolved_index.silver_dataset_id
-    silver_bucket = source.get("silver_bucket") or config.storage.silver_bucket
+    # O manifest registra a origem histórica; o ambiente resolve a localização
+    # atual após a migração RustFS -> S3, preservando os bytes do corpus.
+    silver_bucket = config.storage.silver_bucket
     chunks_key = source.get("chunks_key") or (
         f"datasets/{silver_dataset_id}/chunks.parquet"
     )
