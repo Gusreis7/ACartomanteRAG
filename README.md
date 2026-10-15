@@ -64,7 +64,8 @@ A graça de um projeto desses é aprender, quebrar as coisas, consertar, subir e
 | Documento | Conteúdo |
 |---|---|
 | [Arquitetura e fluxo](docs/RUNTIME_ARCHITECTURE.md) | Pipeline, módulos, estado, chat, evidências e UI. |
-| [Execução e publicação](docs/INFRA_LOCAL_AND_DEPLOYMENT.md) | Ambiente local, rede, AWS, migração de dados e CI/CD. |
+| [Execução e publicação](docs/INFRA_LOCAL_AND_DEPLOYMENT.md) | Ambiente local, rede, AWS, ETL na nuvem e CI/CD. |
+| [AWS: bootstrap e automação](docs/AWS_AUTOMATION.md) | O que configurar, primeira infraestrutura, ETL integral na nuvem e publicação pelo GitHub. |
 | [Resultados e decisões](docs/RESULTS_AND_LEARNINGS.md) | Benchmarks, configuração promovida e limites dos resultados. |
 
 No ambiente local, mantenho o `config/.env` existente, usando `config/.env.example` como referência. Preservo os volumes e as credenciais e defino `API_BIND_IP` com o IP LAN do notebook.
@@ -76,4 +77,4 @@ docker compose --env-file config/.env -f docker-compose.local.yml up -d --build
 
 A aplicação fica em `http://<IP_LAN>:8000`. Na AWS, uso `docker-compose.aws.yml`, Terraform, S3, Qdrant Cloud e Bedrock. O GitHub Actions executa as validações na `develop` e o deploy após o merge na `main`. O Gitea permanece no homelab, sem participar do deploy AWS.
 
-A preparação da infraestrutura, a migração dos artefatos, a geração única do enrichment e a proteção da branch estão no guia de [execução e publicação](docs/INFRA_LOCAL_AND_DEPLOYMENT.md). Aplicar o patch não cria recursos nem executa deploy.
+A preparação da infraestrutura, o ETL integral na nuvem, o reaproveitamento do enrichment e o CI/CD estão no guia de [bootstrap e automação AWS](docs/AWS_AUTOMATION.md). Aplicar o patch não cria recursos nem executa deploy.

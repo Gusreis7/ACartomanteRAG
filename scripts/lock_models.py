@@ -1,4 +1,5 @@
 """Fixa revisões de tokenizer, Colibri e reranker antes de empacotar o release."""
+
 import json
 from pathlib import Path
 import re
@@ -27,7 +28,9 @@ def main():
         if re.fullmatch(r"[0-9a-f]{40}", revision):
             continue
         model = source["model"]
-        with urlopen(f"https://huggingface.co/api/models/{model}/revision/{revision}", timeout=30) as response:
+        with urlopen(
+            f"https://huggingface.co/api/models/{model}/revision/{revision}", timeout=30
+        ) as response:
             sha = json.load(response)["sha"]
         if not re.fullmatch(r"[0-9a-f]{40}", sha):
             raise ValueError(f"Revisão não imutável para {model}")

@@ -45,9 +45,18 @@ jobs:
         run: |
           docker build --target runtime -t acartomante:ci .
           docker run --rm --network none -e AWS_EC2_METADATA_DISABLED=true --entrypoint python acartomante:ci -c 'import src.api.main; import src.generation.provider; import src.retrieval.enrichment'
-  deploy:
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+  infrastructure:
+    if: github.ref == 'refs/heads/main' && vars.AWS_INFRA_ROLE_ARN != '' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: validate
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/infrastructure.yml
+    with:
+      operation: apply
+  deploy:
+    if: always() && needs.validate.result == 'success' && (needs.infrastructure.result == 'success' || needs.infrastructure.result == 'skipped') && github.ref == 'refs/heads/main' && vars.AWS_APP_DEPLOY_ENABLED == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: [validate, infrastructure]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     concurrency:
@@ -60,8 +69,6 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION }}
       ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
       OPS_BUCKET: ${{ vars.OPS_BUCKET }}
-      INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
-      DEPLOY_DOCUMENT: ${{ vars.SSM_DEPLOY_DOCUMENT }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
@@ -71,6 +78,8 @@ jobs:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
           role-session-name: github-${{ github.run_id }}
+      - name: Read current deployment context
+        run: aws s3 cp "s3://$OPS_BUCKET/config/deployment.json" "$RUNNER_TEMP/deployment.local.json" --only-show-errors
       - name: Build and push immutable image
         id: image
         shell: bash
@@ -86,17 +95,15 @@ jobs:
             digest=$(aws ecr describe-images --repository-name "$repository" --image-ids imageTag="git-$GITHUB_SHA" --query 'imageDetails[0].imageDigest' --output text)
           fi
           echo "image=$ECR_REPOSITORY@$digest" >> "$GITHUB_OUTPUT"
-      - name: Build production job dependencies and source bundle
+      - name: Package application release
         run: |
-          docker build -f infra/glue/Dockerfile.wheels --output type=local,dest=dist/glue .
-          python3 scripts/package_release.py --sha "$GITHUB_SHA"
-      - name: Publish release and Glue bundle (does not run ETL)
+          python3 scripts/package_release.py --sha "$GITHUB_SHA" --only app
+      - name: Publish application release
         run: |
           aws s3 cp dist/bundle.tar.gz "s3://$OPS_BUCKET/releases/$GITHUB_SHA/bundle.tar.gz" --only-show-errors
-          aws s3 cp dist/glue/ "s3://$OPS_BUCKET/glue/$GITHUB_SHA/" --recursive --only-show-errors
       - name: Install AWS operation client
         run: python3 -m pip install -c requirements-runtime.lock boto3
       - name: Deploy through restricted SSM document
         env:
           API_IMAGE: ${{ steps.image.outputs.image }}
-        run: python3 scripts/cloud.py deploy --instance "$INSTANCE_ID" --document "$DEPLOY_DOCUMENT" --release "$GITHUB_SHA" --image "$API_IMAGE"
+        run: python3 scripts/cloud.py --outputs "$RUNNER_TEMP/deployment.local.json" deploy --release "$GITHUB_SHA" --image "$API_IMAGE"

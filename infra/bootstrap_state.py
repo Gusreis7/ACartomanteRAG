@@ -11,6 +11,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--bucket", required=True)
     p.add_argument("--region", default="us-east-1")
+    p.add_argument("--key", default="acartomanterag/production.tfstate")
     p.add_argument("--output", type=Path, default=Path("infra/aws/backend.hcl"))
     args = p.parse_args()
     sts = boto3.client("sts", region_name=args.region)
@@ -37,7 +38,7 @@ def main():
         "Condition": {"Bool": {"aws:SecureTransport": "false"}},
     }]}))
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(f'bucket = "{args.bucket}"\nkey = "acartomanterag/production.tfstate"\nregion = "{args.region}"\nencrypt = true\nuse_lockfile = true\n')
+    args.output.write_text(f'bucket = {json.dumps(args.bucket)}\nkey = {json.dumps(args.key)}\nregion = {json.dumps(args.region)}\nencrypt = true\nuse_lockfile = true\n')
     print(f"Backend preparado: {args.output}")
 
 

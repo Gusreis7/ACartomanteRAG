@@ -34,7 +34,7 @@ variable "hosted_zone_id" {
 }
 variable "instance_type" {
   type    = string
-  default = "t3.large"
+  default = "m7i-flex.large"
 }
 variable "ami_id" {
   type        = string
@@ -57,5 +57,5 @@ variable "budget_email" { type = string }
 variable "glue_bundle_prefix" {
   type        = string
   default     = "glue/bootstrap"
-  description = "Versão publicada pelo CI. O job também aceita uma revisão específica por argumento."
+  description = "Fallback do job. O workflow ETL seleciona script, fontes e wheels da mesma revisão em cada execução."
 }

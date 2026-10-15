@@ -18,5 +18,4 @@ provider "qdrant-cloud" {
   account_id = var.account_id
   api_key    = var.cloud_api_key
 }
-# cluster.generated.tf é gerado do cluster real pelo script de importação.
-# Não escolho um pacote pago ou uma configuração fictícia para o free tier.
+
