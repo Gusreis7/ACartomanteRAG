@@ -113,7 +113,7 @@ resource "aws_security_group" "app" {
   name   = "${var.project}-https"
   vpc_id = aws_vpc.app.id
   ingress {
-    description = "Único serviço público"
+    description = "Unico servico publico"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"

@@ -14,3 +14,6 @@ output "etl_settings_parameter" { value = local.settings_etl }
 output "glue_job" { value = aws_glue_job.etl.name }
 output "github_oidc_subject" { value = "repository_id:${var.github_repository_id}:ref:refs/heads/main" }
 output "region" { value = var.region }
+output "github_infra_role_arn" { value = aws_iam_role.github_infra.arn }
+output "github_etl_role_arn" { value = aws_iam_role.github_etl.arn }
+output "ssm_data_reload_document" { value = aws_ssm_document.reload_data.name }

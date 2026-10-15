@@ -159,7 +159,7 @@ def execute(args):
             if layer not in args.steps and not storage.object_exists(layer_bucket, pointer):
                 source_pointer = active.get(f"{layer}_pointer", "current.json")
                 if not storage.object_exists(layer_bucket, source_pointer):
-                    raise ValueError(f"{layer}: execute a etapa ou migre o artefato existente primeiro.")
+                    raise ValueError(f"{layer}: execute a etapa na nuvem antes de tentar reutilizar seus artefatos.")
                 write_json(storage, layer_bucket, pointer, read_json(storage, layer_bucket, source_pointer))
         if "enrichment" not in args.steps and active.get("enrichment_dataset_pointer"):
             pointer = os.environ["ENRICHMENT_DATASET_POINTER"]

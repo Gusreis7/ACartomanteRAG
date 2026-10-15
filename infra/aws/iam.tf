@@ -67,7 +67,7 @@ resource "aws_ssm_document" "deploy" {
     },
     mainSteps = [{ action = "aws:runShellScript", name = "deploy", inputs = {
       timeoutSeconds = "1800",
-      runCommand     = ["python3 /opt/acartomante/manage.py deploy --release-key \"$SSM_ReleaseKey\" --image \"$SSM_Image\""]
+      runCommand     = ["cloud-init status --wait >/dev/null && python3 /opt/acartomante/manage.py deploy --release-key \"$SSM_ReleaseKey\" --image \"$SSM_Image\""]
     } }]
   })
 }
@@ -77,8 +77,9 @@ resource "aws_iam_role_policy" "github_deploy" {
     { Effect = "Allow", Action = ["ecr:GetAuthorizationToken"], Resource = ["*"] },
     { Effect = "Allow", Action = ["ecr:DescribeImages", "ecr:BatchGetImage", "ecr:BatchCheckLayerAvailability", "ecr:PutImage", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload"], Resource = [aws_ecr_repository.api.arn] },
     { Effect = "Allow", Action = ["s3:PutObject", "s3:GetObject"], Resource = [
-      "${aws_s3_bucket.data["ops"].arn}/releases/*", "${aws_s3_bucket.data["ops"].arn}/glue/*"
+      "${aws_s3_bucket.data["ops"].arn}/releases/*"
     ] },
+    { Effect = "Allow", Action = ["s3:GetObject"], Resource = ["${aws_s3_bucket.data["ops"].arn}/config/deployment.json"] },
     { Effect = "Allow", Action = ["ssm:SendCommand"], Resource = [
       aws_ssm_document.deploy.arn, "arn:aws:ec2:${var.region}:${data.aws_caller_identity.current.account_id}:instance/${aws_instance.app.id}"
     ] },

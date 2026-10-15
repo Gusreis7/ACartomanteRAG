@@ -4,5 +4,6 @@ github_repository_id = "ID_NUMERICO_DO_REPOSITORIO"
 # ami_id = "ami-..." # Fixar após o primeiro plan.
 # hosted_zone_id = "Z..." # Se já usa Route 53 para o domínio.
 # oidc_provider_arn = "arn:aws:iam::CONTA:oidc-provider/token.actions.githubusercontent.com"
-# Publicação do bundle Glue pelo CI não executa o job.
-glue_bundle_prefix = "glue/REVISAO_GIT_DE_40_CARACTERES"
+# O fluxo automatizado usa production.tfvars.json; consulte docs/AWS_AUTOMATION.md.
+# Fallback do job; o workflow ETL fixa script/fontes/wheels por execução.
+glue_bundle_prefix = "glue/bootstrap"

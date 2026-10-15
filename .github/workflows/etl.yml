@@ -1,0 +1,102 @@
+name: AWS ETL
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Smoke verifica o ambiente; run executa o pipeline completo na nuvem
+        type: choice
+        options: [smoke, run]
+        default: smoke
+      run_id:
+        description: Identificador estável do processamento, por exemplo corpus-v1
+        required: true
+        type: string
+        default: smoke-v1
+      revision:
+        description: SHA completo já na main; vazio usa a revisão desta execução
+        required: false
+        type: string
+      promote:
+        description: Após validar, selecionar os dados para produção e recarregar a API existente
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  etl:
+    if: github.ref == 'refs/heads/main' && vars.AWS_ETL_ROLE_ARN != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    concurrency:
+      group: aws-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      OPS_BUCKET: ${{ vars.OPS_BUCKET }}
+      REQUESTED_REVISION: ${{ inputs.revision }}
+      RUN_ID: ${{ inputs.run_id }}
+      OPERATION: ${{ inputs.operation }}
+      PROMOTE: ${{ inputs.promote }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate and select revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$OPERATION" in smoke|run) ;; *) exit 1 ;; esac
+          [[ "$RUN_ID" =~ ^[A-Za-z0-9_-]{1,100}$ ]] || { echo 'run_id inválido'; exit 1; }
+          [[ "$OPERATION" != smoke || "$PROMOTE" != true ]] || { echo 'Smoke não promove dados'; exit 1; }
+          revision="${REQUESTED_REVISION:-$GITHUB_SHA}"
+          [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || { echo 'Use um SHA completo'; exit 1; }
+          git merge-base --is-ancestor "$revision" "$GITHUB_SHA"
+          echo "ETL_REVISION=$revision" >> "$GITHUB_ENV"
+          echo "Revisão ETL: $revision; run_id: $RUN_ID; operação: $OPERATION; promoção: $PROMOTE"
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Install controller dependencies
+        run: python -m pip install -c requirements-runtime.lock boto3
+      - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
+        with:
+          role-to-assume: ${{ vars.AWS_ETL_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: etl-${{ github.run_id }}
+          role-duration-seconds: 10800
+      - name: Read current deployment context
+        run: aws s3 cp "s3://$OPS_BUCKET/config/deployment.json" "$RUNNER_TEMP/deployment.local.json" --only-show-errors
+      - name: Prepare immutable Glue bundle if missing
+        shell: bash
+        run: |
+          set -euo pipefail
+          result=0
+          python scripts/cloud.py --outputs "$RUNNER_TEMP/deployment.local.json" check-glue --revision "$ETL_REVISION" || result=$?
+          if [ "$result" -eq 3 ]; then
+            mkdir -p "$RUNNER_TEMP/etl-source" "$RUNNER_TEMP/etl-bundle/glue"
+            git archive "$ETL_REVISION" | tar -x -C "$RUNNER_TEMP/etl-source"
+            docker build -f "$RUNNER_TEMP/etl-source/infra/glue/Dockerfile.wheels" \
+              --output "type=local,dest=$RUNNER_TEMP/etl-bundle/glue" "$RUNNER_TEMP/etl-source"
+            python scripts/package_release.py --source-root "$RUNNER_TEMP/etl-source" \
+              --sha "$ETL_REVISION" --only glue --output "$RUNNER_TEMP/etl-bundle"
+            python scripts/cloud.py --outputs "$RUNNER_TEMP/deployment.local.json" upload-glue \
+              --revision "$ETL_REVISION" --directory "$RUNNER_TEMP/etl-bundle/glue"
+          elif [ "$result" -ne 0 ]; then
+            exit "$result"
+          fi
+      - name: Run Glue and wait for validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          options=()
+          [ "$OPERATION" != smoke ] || options+=(--smoke)
+          [ "$PROMOTE" != true ] || options+=(--promote)
+          python scripts/cloud.py --outputs "$RUNNER_TEMP/deployment.local.json" glue \
+            --revision "$ETL_REVISION" --run-id "$RUN_ID" --wait "${options[@]}"
+      - name: Reload application after data promotion
+        if: inputs.operation == 'run' && inputs.promote
+        run: python scripts/cloud.py --outputs "$RUNNER_TEMP/deployment.local.json" reload-data

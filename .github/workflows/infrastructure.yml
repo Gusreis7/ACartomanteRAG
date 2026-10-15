@@ -1,0 +1,66 @@
+name: AWS infrastructure
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Plan consulta; apply executa o plano gerado nesta execução
+        type: choice
+        options: [plan, apply]
+        default: plan
+  workflow_call:
+    inputs:
+      operation:
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  terraform:
+    if: github.ref == 'refs/heads/main' && vars.AWS_INFRA_ROLE_ARN != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    concurrency:
+      group: aws-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      STATE_KEY: ${{ vars.TF_STATE_KEY }}
+      OPERATION: ${{ inputs.operation }}
+      TF_IN_AUTOMATION: 'true'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Validate operation and configuration
+        run: |
+          case "$OPERATION" in plan|apply) ;; *) exit 1 ;; esac
+          test -f infra/aws/production.tfvars.json
+          : "${STATE_BUCKET:?Execute o bootstrap inicial}"
+          : "${STATE_KEY:?Execute o bootstrap inicial}"
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
+        with:
+          terraform_version: 1.11.4
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
+        with:
+          role-to-assume: ${{ vars.AWS_INFRA_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: infra-${{ github.run_id }}
+      - name: Initialize and validate
+        run: |
+          terraform -chdir=infra/aws init -input=false \
+            -backend-config="bucket=$STATE_BUCKET" \
+            -backend-config="key=$STATE_KEY" \
+            -backend-config="region=$AWS_REGION" \
+            -backend-config=encrypt=true -backend-config=use_lockfile=true
+          terraform -chdir=infra/aws fmt -check
+          terraform -chdir=infra/aws validate
+      - name: Plan
+        run: terraform -chdir=infra/aws plan -input=false -lock-timeout=5m -var-file=production.tfvars.json -out="$RUNNER_TEMP/deployment.tfplan"
+      - name: Apply
+        if: inputs.operation == 'apply'
+        run: terraform -chdir=infra/aws apply -input=false "$RUNNER_TEMP/deployment.tfplan"

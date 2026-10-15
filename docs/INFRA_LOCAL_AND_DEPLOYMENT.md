@@ -153,58 +153,37 @@ Quis manter os mesmos módulos de preparação e recuperação, mudando os servi
 
 O domínio escolhido é `https://acartomanterag.gustavodreis.dev.br`, em `us-east-1`. O security group não abre SSH, HTTP, Redis ou uma porta própria da API. Caddy usa o desafio TLS-ALPN-01 na 443, e a API permanece sem porta publicada. `/health` e `/ready` ficam disponíveis internamente, mas o proxy não os expõe.
 
-Usei uma EC2 CPU com Redis e proxy para manter a operação pequena. A contrapartida é uma única máquina para o atendimento: atualização ou substituição pode causar indisponibilidade. Colibri e CrossEncoder continuam em CPU. `t3.large` é um ponto inicial configurável, ainda sujeito à medição de memória, latência e concorrência; não é um dimensionamento validado.
+Usei uma EC2 CPU com Redis e proxy para manter a operação pequena. A contrapartida é uma única máquina para o atendimento: atualização ou substituição pode causar indisponibilidade. Colibri e CrossEncoder continuam em CPU. `m7i-flex.large` (2 vCPUs e 8 GiB de RAM, x86_64) é o ponto inicial configurável, confirmado como elegível ao Free Tier nesta conta em `us-east-1`; o consumo reduz os créditos disponíveis. O dimensionamento ainda depende da medição de memória, latência e concorrência.
 
 Separei IAM de runtime e ETL. O runtime lê os artefatos e usa uma chave Qdrant de leitura; o Glue escreve os dados e usa outra chave. A EC2 e seus containers compartilham a role do host, que também permite pull do ECR, operação SSM e gravação no prefixo de backups. Isso não equivale ao isolamento de roles por container oferecido por ECS.
 
 ## Repositório público e CI/CD
 
-Posso publicar as fontes como portfólio. A proteção vem das permissões e credenciais, e o histórico do Git também precisa passar pela auditoria. `.env`, estados e planos Terraform, credenciais, volumes e dados de sessão ficam fora do Git. Se uma credencial real já tiver sido publicada, ignorar o arquivo depois não a revoga.
+O guia de [bootstrap e automação AWS](AWS_AUTOMATION.md) define o que configurar, onde e quando. O Gitea continua no homelab e espelha o GitHub. O GitHub executa testes, Terraform e publicação em runners hospedados, sem acesso à rede doméstica.
 
-O GitHub Actions é quem executa o CI/CD da AWS. O Gitea do homelab não participa desse deploy. O workflow usa runners hospedados pelo GitHub; PRs públicos não ganham uma conexão com a minha rede doméstica.
+Push na develop e PRs executam scanner de segredos, testes, validação dos Composes e Terraform e build/import da API. Na main, após as validações, o workflow chama o Terraform com uma role própria e aguarda o apply antes do deploy da API. A publicação da aplicação é habilitada pela variável `AWS_APP_DEPLOY_ENABLED`, inicialmente false. O ETL tem outro workflow e outra role; não roda em cada feature.
 
-- Push na `develop` e PRs para `develop`/`main`: scanner de segredos, testes, sintaxe, configuração dos Composes, Terraform e build/import da API.
-- Push ou execução manual na `main`: as mesmas validações; depois, imagem no ECR e bundles no S3; por fim, deploy via documento SSM restrito.
-- A proteção da `main` exige PR, check `validate` atualizado, histórico linear e conversas resolvidas; bloqueia force push e exclusão, inclusive para administradores. Não exijo uma aprovação de outra pessoa nesta configuração de mantenedor único.
-- A role OIDC exige o ID imutável do repositório e `refs/heads/main`. Não guardo chaves AWS permanentes no GitHub. O job de validação não recebe essa role.
-
-A proteção de branch é uma configuração do GitHub, não um efeito de adicionar um YAML. Eu a aplico com `scripts/configure_github.py`, usando `gh` autenticado com permissão administrativa. O script também cria `develop` caso ela não exista e configura as variáveis públicas de deploy a partir dos outputs Terraform. Não altera a visibilidade do repositório.
+As roles OIDC exigem o ID imutável do repositório e `refs/heads/main`. Não há access keys AWS no GitHub. No modo espelhado, o bootstrap preserva proteções GitHub existentes e não acrescenta a exigência de PR que impediria o push do espelho. A revisão da main fica no fluxo do Gitea. Para um GitHub que seja a origem principal, a opção `--protect-main` aplica a proteção de PR e check validate.
 
 ## Primeira preparação, por código
 
-No notebook preciso de AWS CLI com SSO/profile autorizado, Terraform 1.11+, GitHub CLI, Python e Docker/Compose. Os comandos abaixo são de implantação: aplicar o ZIP não os executa. Os arquivos `.tfvars` são escolhas reais de conta e orçamento, preenchidas antes de planejar qualquer gasto.
+Uso o perfil temporário do usuário terraform. A configuração pública fica em `infra/aws/production.tfvars.json` e é versionada. O arquivo privado `config/aws-bootstrap.env` contém o endpoint e as chaves Qdrant de produção e fica fora do Git. A EC2 e o Glue usam suas próprias roles AWS.
+
+O bootstrap tem operações separadas para gerar a política IAM inicial, produzir o plano, aplicar o plano salvo e repetir apenas o cadastro dos segredos/variáveis quando necessário:
 
 ```bash
-aws sso login --profile SEU_PROFILE
-export AWS_PROFILE=SEU_PROFILE
-export AWS_REGION=us-east-1
-python -m pip install boto3
-
-python scripts/configure_github.py --repo SEU_USUARIO/ACartomanteRAG --inspect
-cp infra/aws/terraform.tfvars.example infra/aws/terraform.tfvars
-# Preencher e-mails, ID numérico do repo e revisão do bundle Glue.
-
-python infra/bootstrap_state.py --bucket NOME_GLOBAL_UNICO_PARA_ESTADO
-terraform -chdir=infra/aws init -backend-config=backend.hcl
-terraform -chdir=infra/aws plan -out=deployment.tfplan
-terraform -chdir=infra/aws apply deployment.tfplan
-terraform -chdir=infra/aws output -json > infra/aws/outputs.local.json
-python scripts/cloud.py --outputs infra/aws/outputs.local.json secrets
+export AWS_PROFILE=terraform
+python scripts/bootstrap_aws.py policy > infra/aws/server-terraform-policy.local.json
+# Atualizar ServerTerraformIAM no IAM com o JSON gerado, conforme o guia.
+python scripts/bootstrap_aws.py plan --repo SEU_USUARIO/ACartomanteRAG
+python scripts/bootstrap_aws.py apply --repo SEU_USUARIO/ACartomanteRAG
 ```
 
-O bootstrap cria o bucket de estado com versionamento, criptografia e bloqueio de acesso público. Terraform usa lock de estado no S3. Os segredos de Qdrant e Redis são gravados como SecureString no SSM por entrada protegida no terminal; não são recursos contendo senhas no estado Terraform. Reexecutar `secrets` preserva as senhas Redis já existentes.
+Antes dos comandos, preencher os arquivos e preparar as ferramentas conforme [AWS_AUTOMATION.md](AWS_AUTOMATION.md). O plano é revisável; apply executa o plano salvo, sem gerar outro. Conta, repositório e configuração devem continuar correspondendo ao plano. O bucket de state fica privado, criptografado, versionado e com lock S3.
 
-O Terraform cria a VPC, subnet, regras, EC2, volume EBS separado, Elastic IP, buckets, ECR, roles, documento SSM, job Glue, zona DNS e alerta mensal. Buckets e volume têm proteção contra destruição no código. Após o primeiro plano, posso fixar o `ami_id` resolvido para repetir a imagem do sistema operacional.
+O Terraform cria VPC, subnet, regras, EC2, EBS separado, Elastic IP, buckets, ECR, roles, documentos SSM, job Glue, zona DNS e alerta mensal. Os segredos são importados para SSM SecureString fora dos argumentos Terraform. Senhas Redis já existentes são preservadas. O apply não inicia o ETL.
 
-O cluster Qdrant não é recriado pelo Terraform AWS. Para também gerenciá-lo por código, há `scripts/import_qdrant.py`: ele usa o provider oficial para gerar a configuração do cluster real, preservando seu pacote gratuito. Exige a chave de administração Qdrant Cloud, diferente das chaves do banco. Recusa um plano com atualização, criação ou exclusão e acrescenta `prevent_destroy` ao recurso gerado.
-
-```bash
-python scripts/import_qdrant.py --account-id UUID_DA_CONTA --cluster-id UUID_DO_CLUSTER
-# Conferir infra/qdrant/cluster.generated.tf e o plano; então persistir o import:
-python scripts/import_qdrant.py --account-id UUID_DA_CONTA --cluster-id UUID_DO_CLUSTER --apply-import
-```
-
-Essa importação ainda precisa dos IDs e da chave reais. A configuração gerada e o lock do provider devem ser versionados; seu estado fica em outra chave do mesmo backend privado. Collections e conteúdo continuam sob responsabilidade do ETL Python.
+O cluster Qdrant Cloud existente não é recriado pelo Terraform AWS. Seu endpoint e suas duas chaves são fornecidos no bootstrap; os dados e collections de produção são gerados pelo ETL na nuvem.
 
 ## DNS sem deslocar os outros registros do domínio
 
@@ -214,72 +193,23 @@ Essa delegação inicial ocorre no provedor do domínio e não é executada pelo
 
 ## O ETL que realmente preciso publicar
 
-Não levo a matriz de experimentos para o job de produção. A seleção é `fixed/256/o32 + Colibri`; a recuperação continua Dense + CrossEncoder. Tenho dois caminhos: migrar os artefatos aprovados e reutilizar a collection textual, ou executar crawler → Raw → Bronze → Silver → índice quando precisar reconstruir os dados.
+O processamento é integralmente em nuvem, começando pelo crawler. A seleção continua fixed/256/o32 + Colibri, com recuperação Dense + CrossEncoder. Os objetos são escritos diretamente no S3 e as collections no Qdrant Cloud, sem migração de dados locais.
 
-`scripts/package_release.py` produz um ZIP de fontes sem `.env` e dados. O Dockerfile de wheels usa Python 3.11 em Amazon Linux 2023, compatível com Glue 5.1, e baixa as dependências CPU fixadas. Glue continua sendo um teste de compatibilidade a concluir: o pipeline usa o driver Python, sem transformar essas funções em operações Spark distribuídas. Duas workers são o mínimo configurado para esse tipo de job, mesmo sem paralelismo Spark útil.
+Em GitHub Actions, o workflow AWS ETL oferece smoke e execução completa. Ele publica um bundle da revisão escolhida e inicia o Glue com script, fontes e wheels daquela revisão. Um manifest final identifica a publicação completa; o controlador recusa bundles incompletos ou alterados e não sobrescreve artefatos existentes. A seleção por execução não exige reaplicar Terraform para trocar o código do ETL.
 
-```bash
-# Primeiro versionar as fontes desta entrega no Git, sem .env, dados ou tfvars.
-revision=$(git rev-parse HEAD)
-# Os SHAs dos modelos já estão fixados; lock_models.py só resolve revisões não fixadas.
-python scripts/lock_models.py
-docker build -f infra/glue/Dockerfile.wheels --output type=local,dest=dist/glue .
-python scripts/package_release.py --sha "$revision"
-python scripts/cloud.py --outputs infra/aws/outputs.local.json upload-glue --revision "$revision"
-# glue_bundle_prefix no tfvars deve ser glue/<essa revisão>.
-terraform -chdir=infra/aws plan -out=deployment.tfplan
-terraform -chdir=infra/aws apply deployment.tfplan
+O smoke importa as bibliotecas, verifica S3/Qdrant, consulta o catálogo Bedrock e calcula um embedding Colibri. Não gera resposta LLM nem prova permissão de inferência. A execução do Glue tem custo. Depois dele, o modo run executa crawl, bronze, silver, text-index, enrichment e enrichment-index. O pipeline usa o driver Python do Glue, sem distribuir essas funções em Spark.
 
-python scripts/cloud.py --outputs infra/aws/outputs.local.json glue --revision "$revision" --run-id smoke-v1 --smoke --wait
-```
+Uso um run_id e um SHA estáveis para retomar o processamento ou promover o candidato. Na promoção, o pipeline reutiliza as etapas concluídas e valida os artefatos antes de selecionar production/current.json. O documento SSM de recarga reinicia somente a API existente; antes do primeiro deploy, registra que a publicação da aplicação ainda está pendente.
 
-O smoke importa as bibliotecas, testa S3 e Qdrant, consulta o catálogo Bedrock e calcula um embedding Colibri. Não chama o LLM, mas a execução do Glue tem custo. Uma chamada de inferência real e o benchmark continuam necessários antes da abertura pública.
+O enrichment usa somente Qwen3 32B. Cada resumo concluído é persistido por prompt, configuração e texto. Deploys, reinícios, troca para Scout e benchmarks reutilizam os artefatos compatíveis. Uma interrupção entre a resposta e o checkpoint ainda pode repetir uma chamada. O ETL é acionado explicitamente; uma feature da aplicação não reenriquece o corpus.
 
-Para aproveitar os dados locais, a migração tem plano por padrão. Leva Raw, a Bronze referenciada, a Silver escolhida e o manifest textual; não leva a matriz de embeddings ou os resumos do gerador anterior. Compara bytes existentes e recusa overwrite divergente. O exemplo abaixo roda no profile `tools`, com as credenciais temporárias do meu profile AWS acessíveis pelo mount somente leitura:
-
-```bash
-aws sso login --profile SEU_PROFILE
-docker compose --env-file config/.env -f docker-compose.local.yml run --rm \
-  --user "$(id -u):$(id -g)" \
-  -v "$HOME/.aws:/tmp/.aws:ro" \
-  -v "$PWD/config/.env:/tmp/source.env:ro" \
-  -v "$PWD/infra/aws/outputs.local.json:/tmp/outputs.json:ro" \
-  -e HOME=/tmp -e AWS_PROFILE=SEU_PROFILE -e AWS_CONFIG_FILE=/tmp/.aws/config \
-  -e AWS_SHARED_CREDENTIALS_FILE=/tmp/.aws/credentials \
-  tools python -m src.etl.migrate_storage \
-  --source-env /tmp/source.env --source-endpoint http://rustfs:9000 --outputs /tmp/outputs.json
-# Repetir o comando com --apply após conferir o plano.
-```
-
-O SDK usa o cache SSO em `/tmp/.aws/sso/cache`. Faço `aws sso login` antes, para que o cache temporário montado somente leitura esteja válido. Não salvo essas credenciais no bundle nem na imagem.
-
-Com a migração concluída e a collection textual já no Qdrant Cloud:
-
-```bash
-python scripts/cloud.py --outputs infra/aws/outputs.local.json glue --revision "$revision" \
-  --run-id corpus-v1 --steps text-index,enrichment,enrichment-index \
-  --reuse-index-id idx_colibri-embed-ptbr_2b279b323307 --promote --wait
-```
-
-Se for uma reconstrução completa, omito `--reuse-index-id` e uso `--steps crawl,bronze,silver,text-index,enrichment,enrichment-index`. Sem `--promote`, o resultado continua candidato.
-
-O enrichment usa somente Qwen3 32B. O dataset é determinístico e retomável; cada resumo concluído é persistido imediatamente por prompt, configuração e texto. Deploys, reinícios, troca para Scout e benchmarks reutilizam esses artefatos. Uma interrupção entre receber a resposta e salvar o checkpoint ainda pode repetir aquela chamada; não prometo cobrança exatamente uma vez.
-
-As etapas usam um lock global de ETL e um checkpoint por `run-id`. Crawler incompleto, Bronze com erro ou índices com contagens divergentes impedem a promoção. As collections usam IDs determinísticos nos pontos para retomar upserts sem duplicar registros. Reinício do host não limpa um lock de job interrompido: primeiro confiro o estado do Glue e só depois removo explicitamente `production/etl.lock` no bucket de índices, se não houver execução ativa.
-
-A promoção publica um único manifest `production/current.json` com o índice textual e os ponteiros da Bronze, Silver e enrichment. Os candidatos têm caminhos próprios, então preparar uma versão não troca o catálogo em uso. Cada processo da API lê a seleção uma vez no startup. Assim evito misturar o catálogo de uma execução com o índice de outra.
+As etapas usam lock global e checkpoint por run_id no S3. Crawler incompleto, Bronze com erro ou índices divergentes impedem promoção. Confirmar o estado do Glue antes de remover um lock de execução interrompida. A API lê a seleção publicada no startup; a recarga após promoção evita manter o catálogo anterior em memória.
 
 ## Ativando o deploy e operando depois
 
-Depois do smoke, dos dados promovidos e do DNS delegado, configuro o GitHub:
+Depois do smoke, dos dados promovidos e do DNS delegado, habilito AWS_APP_DEPLOY_ENABLED=true nas variáveis do GitHub e executo CI and AWS deploy na main. O bootstrap já cadastrou OIDC e as demais variáveis. A configuração detalhada está em [AWS_AUTOMATION.md](AWS_AUTOMATION.md).
 
-```bash
-terraform -chdir=infra/aws output -json > infra/aws/outputs.local.json
-python scripts/configure_github.py --repo SEU_USUARIO/ACartomanteRAG \
-  --terraform-output infra/aws/outputs.local.json
-```
-
-O primeiro commit da implantação entra pelo fluxo de branches existente; depois, o caminho normal é trabalhar na `develop`, validar o PR para `main` e fazer o merge. O workflow da `main` publica a imagem por digest e usa SSM para atualizar a máquina. Ele não roda `terraform apply`, crawler ou enrichment automaticamente. Mudanças de infraestrutura continuam usando `plan`/`apply` por CLI; o GitHub tem uma role limitada ao deploy da aplicação, sem administração IAM.
+Nas próximas publicações, sigo as branches habituais. O workflow valida, aplica a infraestrutura por uma role própria e publica a imagem por digest via SSM. Ele lê o contexto de deploy atualizado pelo Terraform no S3, sem depender de IDs EC2 antigos em variáveis GitHub. Crawler e enrichment continuam no workflow AWS ETL separado.
 
 Antes de uma atualização, salvo um RDB consistente do Redis. Se a nova release falhar no readiness ou HTTPS, o aplicador de deploy tenta restabelecer a imagem anterior. O volume EBS e o Elastic IP são independentes da EC2; a substituição do host remonta o volume e reutiliza a última release. Há um timer de backup diário para S3, com retenção de 30 dias.
 
