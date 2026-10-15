@@ -86,10 +86,10 @@ class ChunkTokenizerConfig(BaseModel):
 
 
 class SilverChunkingConfig(BaseModel):
-    strategy: Literal["fixed", "hybrid"] = "hybrid"
+    strategy: Literal["fixed", "hybrid"] = "fixed"
     tokenizer: str
-    chunk_size: int = Field(default=512, gt=0)
-    overlap: int = Field(default=64, ge=0)
+    chunk_size: int = Field(default=256, gt=0)
+    overlap: int = Field(default=32, ge=0)
 
     @model_validator(mode="after")
     def validate_overlap(self):
@@ -273,7 +273,7 @@ class RetrievalBenchmarkConfig(BaseModel):
 
 class GenerationConfig(BaseModel):
     provider: Literal["ollama"] = "ollama"
-    model: str = "llama3:latest"
+    model: str = "qwen3.5:4b"
     base_url: str = "http://localhost:11434"
 
     temperature: float = Field(
@@ -446,6 +446,15 @@ class ConfigManager:
             dict,
         ):
             raise ValueError("config.yaml deve possuir um objeto YAML na raiz.")
+
+        # Host e container enxergam endpoints diferentes. O override não
+        # altera o YAML nem as configurações versionadas dos benchmarks.
+        ollama_base_url = os.getenv("OLLAMA_BASE_URL")
+        if ollama_base_url:
+            yaml_config["generation"] = {
+                **(yaml_config.get("generation") or {}),
+                "base_url": ollama_base_url,
+            }
 
         environment_values = {
             "RUSTFS_ENDPOINT": os.getenv("RUSTFS_ENDPOINT"),

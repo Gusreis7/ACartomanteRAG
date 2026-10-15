@@ -32,6 +32,7 @@ from src.generation.personas import (
 )
 from src.generation.provider import (
     GenerationProvider,
+    GenerationServiceError,
     OllamaGenerationProvider,
 )
 from src.retrieval.enrichment import (
@@ -104,17 +105,19 @@ class MachadoRAG:
             )
         )
 
-        self.enrichment_retrieval = (
-            EnrichmentRetriever(
-                config
-            )
-            if (
-                config
-                .enrichment_retrieval
-                .enabled
-            )
-            else None
-        )
+        self.enrichment_retrieval = None
+        if config.enrichment_retrieval.enabled:
+            try:
+                self.enrichment_retrieval = EnrichmentRetriever(config)
+            except Exception as exc:
+                if not config.enrichment_retrieval.fail_open:
+                    raise
+                # A evidência original continua obrigatória. Resumos
+                # auxiliares indisponíveis não devem impedir o startup.
+                logger.warning(
+                    "enrichment_startup_unavailable error_type=%s",
+                    type(exc).__name__,
+                )
 
         self.generation_provider = (
             generation_provider
@@ -762,6 +765,11 @@ class MachadoRAG:
                 message.content
             )
         )
+
+        if not answer:
+            raise GenerationServiceError(
+                "Modelo de geração retornou resposta vazia."
+            )
 
         timings = dict(
             state.get(

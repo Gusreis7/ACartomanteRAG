@@ -54,7 +54,6 @@ A graça de um projeto desses é aprender, quebrar as coisas, consertar, subir e
 * Plataforma web para chat sobre obras de Machado de Assis;
 * desenvolvimento de um jogo com as informações extraídas, em uma espécie de quiz;
 * comparação entre abordagens RAG:
-
   * diferentes arquiteturas de recuperação;
   * diferentes modelos;
 * pipeline de CI/CD para publicação;

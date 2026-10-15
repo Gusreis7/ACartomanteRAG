@@ -5,6 +5,7 @@ storage:
   embedding_indexes_bucket: acartomante-indexes
   benchmarks_bucket: acartomante-benchmarks
   enrichment_bucket: acartomante-enrichment
+  
 bronze:
   coletanea:
     similaridade_threshold: 0.1
@@ -24,10 +25,10 @@ bronze:
 silver:
   pipeline_version: 1
   chunking:
-    strategy: hybrid
+    strategy: fixed
     tokenizer: roberta_crawl_pt
-    chunk_size: 1024
-    overlap: 128
+    chunk_size: 256
+    overlap: 32
   tokenizers:
     roberta_crawl_pt:
       model: eduagarcia/RoBERTaCrawlPT-base
@@ -40,7 +41,7 @@ silver:
     min_mediana_chars: 200
 embedding:
   pipeline_version: 1
-  selected_model: qwen3_embedding_06b
+  selected_model: colibri
   models:
     colibri:
       backend: sentence_transformers
@@ -55,7 +56,7 @@ embedding:
       backend: sentence_transformers
       model: Qwen/Qwen3-Embedding-0.6B
       revision: main
-      inference_dtype: bfloat16
+      inference_dtype: float32
       pooling: model
       document_prompt_name: document
       query_prompt_name: query
@@ -69,7 +70,7 @@ embedding:
 retrieval_strategy: dense_cross_encoder
 retrieval_index:
   release: default
-  index_id: null
+  index_id: idx_colibri-embed-ptbr_2b279b323307
 retrievals:
   bm25:
     top_k: 10
@@ -84,9 +85,11 @@ retrievals:
 retrieval_benchmark:
   evidence_min_coverage: 0.6
   warmup_runs: 3
+  
 generation:
   provider: ollama
-  model: llama3:latest
+  model: qwen3.5:4b
+  reasoning: false
   base_url: http://localhost:11434
   temperature: 0.1
   top_p: 0.9

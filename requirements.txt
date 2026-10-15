@@ -1,20 +1,10 @@
+-r requirements-runtime.txt
+
+# ETL, exploração e relatórios (não instalados na imagem da API).
 PyMuPDF
-pandas
+requests>=2.32,<3
+beautifulsoup4>=4.12,<5
 spacy
 plotly
 statsmodels
-
-torch>=2.2,<3
-transformers>=5.0,<6
-sentence-transformers>=6.1,<7
-huggingface-hub>=1.0,<2
-
-# RAG orchestration / local generation
-langgraph>=1.2,<2
-langchain-ollama>=1.1,<2
-fastapi>=0.116,<1
-uvicorn[standard]>=0.35,<1
-redis>=6,<8
-langgraph-checkpoint-redis>=0.2,<1
-httpx>=0.28,<1
 pytest>=8,<10
