@@ -309,6 +309,8 @@ Referências de implementação: [GitHub OIDC](https://docs.github.com/en/action
 
 ## Raspberry Pi: Ollama dentro do Docker
 
+**Situação em 15/10/2026: execução e deploy locais suspensos por falta de espaço no Raspberry.** Os workflows do Gitea executam somente checagens estáticas enquanto aguardo a manutenção. O espelhamento para o GitHub e o CI/CD da AWS permanecem independentes. Consulte [impeditivos e critérios de retomada](IMPEDITIVOS.md) antes de usar os comandos de runtime desta seção.
+
 No Raspberry uso o Compose base junto de `docker-compose.raspberry.yml`. O notebook continua usando o Ollama do host com o Compose local anterior. Na AWS a configuração permanece Bedrock.
 
 O overlay do Raspberry aponta API e tools para `http://ollama:11434`, sem publicar a porta 11434 no host. O servidor tem rede privada para seus clientes e uma rede de saída para baixar o modelo. Os pesos ficam no volume nomeado `ollama_models` do projeto Compose. Mantenho o mesmo `COMPOSE_PROJECT_NAME` entre deploys para reutilizar esse volume e o cache da API.
@@ -332,7 +334,7 @@ O wrapper usa `config/.env` quando esse arquivo existe; `LOCAL_ENV_FILE` permite
 
 Para selecionar outro modelo, defino `OLLAMA_MODEL` no ambiente privado e repito o comando de atualização. O mesmo valor é usado no download, chat e enrichment. O padrão permanece `qwen3.5:4b`; trocar para um modelo menor altera o comportamento do baseline.
 
-Os workflows Gitea usam o wrapper e o Compose do Raspberry. O deploy permite uma espera de 3600 segundos na primeira preparação. Os jobs Integration CI/Main PR possuem volumes novos: verificam a infraestrutura local, a saúde do servidor Ollama e os imports da API, sem baixar o modelo a cada execução nem simular que há um corpus publicado. O teste completo do RAG exige os manifests, datasets e collections aprovados nos volumes da instalação. O patch não os cria ou copia durante o startup.
+Durante a manutenção, os jobs Integration CI/Main PR e o job de produção mantêm seus nomes e eventos, mas validam somente a sintaxe Python/shell e as configurações Compose. Os passos de pull, build, inicialização, promoção e limpeza de serviços estão explicitamente desabilitados nos workflows. O sucesso desses checks não valida a infraestrutura nem publica uma release. Após a manutenção, a retomada precisa restaurar as verificações reais de runtime e o deploy, conforme os critérios em [IMPEDITIVOS.md](IMPEDITIVOS.md). O RAG completo exige os manifests, datasets e collections aprovados nos volumes da instalação.
 
 Para diagnóstico:
 

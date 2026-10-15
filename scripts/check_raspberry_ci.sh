@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
-[[ "${COMPOSE_PROJECT_NAME:-}" == acartomante-ci-* ]] || {
-  printf '%s\n' 'Erro: esta checagem exige um projeto temporário acartomante-ci-*.' >&2
-  exit 1
-}
-compose=(bash "$PROJECT_ROOT/scripts/compose_raspberry.sh")
-"${compose[@]}" config --quiet
-"${compose[@]}" build api
-# O CI tem volumes novos, sem os manifests e collections do corpus publicado.
-# Testa os backends e o servidor Ollama; não baixa 4 GB nem inicializa o RAG.
-"${compose[@]}" up --detach --wait --wait-timeout 240 redis qdrant rustfs ollama
-"${compose[@]}" run --rm --no-deps \
-  -e AWS_EC2_METADATA_DISABLED=true --entrypoint python api \
-  -c 'import src.api.main; import src.generation.provider; import src.retrieval.enrichment'
-printf '%s\n' 'Infraestrutura local e imports da API validados; o RAG completo exige o corpus publicado.'
+# Manutenção do Raspberry: somente análise estática, sem importar a aplicação,
+# criar imagens, baixar modelos ou tocar no estado dos serviços existentes.
+python3 - "$PROJECT_ROOT" <<'PY'
+from pathlib import Path
+import ast
+import subprocess
+import sys
+
+root = Path(sys.argv[1])
+for directory in ("src", "scripts", "infra", "tests"):
+    for path in sorted((root / directory).rglob("*.py")):
+        ast.parse(path.read_bytes(), filename=str(path))
+for directory in ("scripts", ".gitea/scripts"):
+    for path in sorted((root / directory).rglob("*.sh")):
+        subprocess.run(["bash", "-n", str(path)], check=True)
+PY
+python3 "$PROJECT_ROOT/scripts/validate_compose.py"
+printf '%s\n' 'Checagens estáticas concluídas; runtime e deploy do Raspberry suspensos. Consulte docs/IMPEDITIVOS.md.'

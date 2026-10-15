@@ -49,13 +49,14 @@ jobs:
 
       - name: Show deployment info
         run: |
-          echo "Deploying commit:"
+          echo "Revisão (deploy local suspenso):"
           git rev-parse HEAD
 
           echo "Branch:"
           echo "${{ gitea.ref }}"
 
       - name: Validate production bind address
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
         shell: bash
         run: |
           case "$API_BIND_IP" in
@@ -66,25 +67,28 @@ jobs:
           esac
 
       - name: Prepare production storage
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
         run: |
           mkdir -p \
             "$RUSTFS_VOLUME" \
             "$QDRANT_VOLUME" \
             "$REDIS_VOLUME"
 
-      - name: Validate Docker Compose
-        run: |
-          bash scripts/compose_raspberry.sh config --quiet
+      - name: Check repository (Raspberry maintenance)
+        run: bash scripts/check_raspberry_ci.sh
 
       - name: Pull images
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
         run: |
           bash scripts/compose_raspberry.sh pull
 
       - name: Build services
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
         run: |
           bash scripts/compose_raspberry.sh build
 
       - name: Deploy production
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
         run: |
           bash scripts/compose_raspberry.sh up \
             --detach \
@@ -93,6 +97,7 @@ jobs:
             --remove-orphans
 
       - name: Prepare release tooling
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
         run: |
           python3 -m venv .venv-release
 
@@ -103,6 +108,7 @@ jobs:
             "boto3>=1.40,<2"
 
       - name: Promote production release
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
         env:
           BRANCH_NAME: main
         run: |
@@ -113,10 +119,11 @@ jobs:
           .gitea/scripts/promote_release.sh
 
       - name: Show production services
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
         run: |
           bash scripts/compose_raspberry.sh ps
 
       - name: Show logs on failure
-        if: failure()
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
         run: |
           bash scripts/compose_raspberry.sh logs --no-color

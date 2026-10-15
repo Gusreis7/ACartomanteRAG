@@ -125,22 +125,20 @@ with open(os.environ['TRACE'], 'a') as f:
         self.assertNotEqual(result.returncode, 0)
         self.assertFalse(Path(self.env["TRACE"]).exists())
 
-    def test_ci_check_refuses_production_project(self):
+    def test_maintenance_check_does_not_touch_production_services(self):
         self.fake_docker()
         result = subprocess.run(["bash", str(ROOT / "scripts/check_raspberry_ci.sh")], env={**self.env, "COMPOSE_PROJECT_NAME": "acartomante-prod"}, capture_output=True)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertFalse(Path(self.env["TRACE"]).exists())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(all(args["args"][-2:] == ["config", "--quiet"] for args in self.trace()))
 
-    def test_ci_only_starts_backends_and_imports_runtime(self):
+    def test_maintenance_check_only_parses_compose_without_secrets(self):
         self.fake_docker()
         result = subprocess.run(["bash", str(ROOT / "scripts/check_raspberry_ci.sh")], env={**self.env, "COMPOSE_PROJECT_NAME": "acartomante-ci-42"}, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         calls = [line["args"] for line in self.trace()]
-        starts = [args for args in calls if "up" in args]
-        self.assertEqual(len(starts), 1)
-        self.assertEqual(starts[0][-4:], ["redis", "qdrant", "rustfs", "ollama"])
-        self.assertNotIn("ollama-model", starts[0])
-        self.assertTrue(any("--no-deps" in args and "--entrypoint" in args for args in calls))
+        self.assertEqual(len(calls), 3)
+        self.assertTrue(all(args[:1] == ["compose"] and args[-2:] == ["config", "--quiet"] for args in calls))
+        self.assertIn(b"deploy do Raspberry suspensos", result.stdout)
 
 
 if __name__ == "__main__":

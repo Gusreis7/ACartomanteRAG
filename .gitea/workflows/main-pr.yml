@@ -56,30 +56,34 @@ jobs:
           fi
 
       - name: Prepare CI storage
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
         run: |
           mkdir -p "$RUSTFS_VOLUME" "$QDRANT_VOLUME" "$REDIS_VOLUME"
 
-      - name: Validate Docker Compose
-        run: bash scripts/compose_raspberry.sh config --quiet
+      - name: Check repository (Raspberry maintenance)
+        run: bash scripts/check_raspberry_ci.sh
 
       - name: Build services
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
         run: bash scripts/compose_raspberry.sh build
 
       - name: Check local infrastructure and runtime imports
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
         run: bash scripts/check_raspberry_ci.sh
 
       - name: Show services
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
         run: bash scripts/compose_raspberry.sh ps
 
       - name: Show logs on failure
-        if: failure()
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
         run: bash scripts/compose_raspberry.sh logs --no-color
 
       - name: Shutdown services
-        if: always()
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
         run: bash scripts/compose_raspberry.sh down --volumes --remove-orphans
 
       - name: Cleanup CI storage
-        if: always()
+        if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md
         run: |
           rm -rf "/tmp/acartomante-ci-${{ gitea.run_number }}"
