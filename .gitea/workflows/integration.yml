@@ -20,6 +20,7 @@ jobs:
       # Secrets
       RUSTFS_ACCESS_KEY: ${{ secrets.RUSTFS_ACCESS_KEY }}
       RUSTFS_SECRET_KEY: ${{ secrets.RUSTFS_SECRET_KEY }}
+      REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
       QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
 
       # Docker Compose / CI deployment
