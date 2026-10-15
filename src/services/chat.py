@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
+from time import time
 from uuid import UUID
 
 from src.generation.provider import (
     GenerationCapacityError,
     GenerationServiceError,
+    GenerationQuotaError,
 )
 from src.storage.redis_chat_repository import (
     RedisChatRepository,
@@ -53,6 +56,8 @@ class ChatService:
                 "Conversa não encontrada."
             )
 
+        self._check_quota(session_id)
+
         turn_id = self.message_repository.append_user_message(
             session_id=session_id,
             chat_id=chat_id,
@@ -85,6 +90,10 @@ class ChatService:
             turn_id=turn_id,
             content=result["answer"],
             evidences=evidences,
+            metadata={
+                "persona": persona, "timings_ms": result["timings_ms"],
+                "index_id": result.get("index_id"), **result.get("generation_usage", {}),
+            },
         )
 
         self.repository.touch(
@@ -112,6 +121,24 @@ class ChatService:
             "answer": result["answer"],
             "evidences": evidences,
         }
+
+    def _check_quota(self, session_id):
+        config = self.rag.config.generation
+        if not config.daily_request_limit and not config.session_requests_per_minute:
+            return
+        day = datetime.now(timezone.utc).strftime("%Y%m%d")
+        allowed = self.repository.redis.eval("""
+            local minute = tonumber(redis.call('GET', KEYS[1]) or '0')
+            local day = tonumber(redis.call('GET', KEYS[2]) or '0')
+            if (tonumber(ARGV[1]) > 0 and minute >= tonumber(ARGV[1])) or
+               (tonumber(ARGV[2]) > 0 and day >= tonumber(ARGV[2])) then return 0 end
+            redis.call('INCR', KEYS[1]); redis.call('EXPIRE', KEYS[1], 120)
+            redis.call('INCR', KEYS[2]); redis.call('EXPIRE', KEYS[2], 172800)
+            return 1
+        """, 2, f"acartomante:limits:session:{session_id}:{int(time() // 60)}", f"acartomante:limits:day:{day}",
+            config.session_requests_per_minute, config.daily_request_limit)
+        if not allowed:
+            raise GenerationQuotaError("Limite de consultas atingido. Tente novamente mais tarde.")
 
     def list_messages(
         self,

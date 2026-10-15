@@ -4,6 +4,7 @@ import gc
 import hashlib
 import io
 import json
+import os
 import re
 import uuid
 from datetime import datetime, timezone
@@ -19,7 +20,7 @@ from src.storage.qdrant_manager import QdrantManager
 from src.storage.rustfs_manager import RustFSManager
 
 
-ENRICHMENT_CURRENT_KEY = "current.json"
+ENRICHMENT_CURRENT_KEY = os.getenv("ENRICHMENT_DATASET_POINTER", "current.json")
 ENRICHMENT_INDEX_CURRENT_KEY = "enrichment/current.json"
 ENRICHMENT_DOCUMENT_SCHEMA_VERSION = "summary_units_v1"
 
@@ -214,7 +215,7 @@ class EnrichmentEmbeddingIndex:
             raise RuntimeError("enrichment_document_id duplicado.")
         return frame.reset_index(drop=True)
 
-    def build(self, *, model_alias: str) -> dict[str, Any]:
+    def build(self, *, model_alias: str, resume: bool = False) -> dict[str, Any]:
         if model_alias not in self.config.embedding.models:
             raise ValueError(
                 f"Embedder '{model_alias}' não existe em embedding.models."
@@ -265,27 +266,34 @@ class EnrichmentEmbeddingIndex:
 
         collection_exists = self.qdrant.collection_exists(collection)
         manifest_exists = self.rustfs.object_exists(indexes_bucket, manifest_key)
-        if collection_exists or manifest_exists:
-            if not (collection_exists and manifest_exists):
-                raise RuntimeError(
-                    "Índice enrichment inconsistente: collection/manifest não coexistem. "
-                    f"index_id={index_id}."
-                )
+        building_key = f"enrichment/{index_id}/building.json"
+        if manifest_exists:
             old = json.loads(
                 self.rustfs.download_bytes(indexes_bucket, manifest_key).decode("utf-8")
             )
             if old.get("status") != "success" or old.get("index_hash") != index_hash:
                 raise RuntimeError(f"Índice enrichment existente inválido: {index_id}")
-            print(f"[reuse] {model_alias} -> {collection}")
-            return old
+            if collection_exists and self.qdrant.count(collection_name=collection, exact=True) == len(documents):
+                print(f"[reuse] {model_alias} -> {collection}")
+                return old
+            if not resume:
+                raise RuntimeError("Collection enrichment incompleta; use retomada explícita.")
+        elif collection_exists:
+            if not resume or not self.rustfs.object_exists(indexes_bucket, building_key):
+                raise RuntimeError("Collection sem manifest nem checkpoint de construção.")
+            marker = json.loads(self.rustfs.download_bytes(indexes_bucket, building_key))
+            if marker.get("index_hash") != index_hash:
+                raise ValueError("Collection parcial de enrichment diverge da assinatura.")
 
         first = embedder.embed_documents([str(documents.iloc[0]["text"])])
         self._validate_vectors(first, 1, info.dimension)
-        self.qdrant.create_collection(
-            collection_name=collection,
-            vector_size=info.dimension,
-            distance=self.config.embedding.index.distance,
-        )
+        self.rustfs.upload_bytes(indexes_bucket, building_key, json.dumps({"index_hash": index_hash}).encode(), "application/json")
+        if not collection_exists:
+            self.qdrant.create_collection(
+                collection_name=collection,
+                vector_size=info.dimension,
+                distance=self.config.embedding.index.distance,
+            )
 
         batch_size = int(self.config.embedding.execution.batch_size)
         total = 0

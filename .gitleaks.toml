@@ -1,0 +1,7 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Parâmetro num_ctx no relato do benchmark; não é credencial."
+regexTarget = "match"
+regexes = ['''tokens,\s*`num_ctx=8192`''']

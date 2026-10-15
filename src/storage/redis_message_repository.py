@@ -50,6 +50,7 @@ class RedisMessageRepository:
         turn_id: UUID,
         content: str,
         evidences: list[dict],
+        metadata: dict | None = None,
     ) -> None:
         self.redis.xadd(
             self._messages_key(
@@ -61,6 +62,7 @@ class RedisMessageRepository:
                 role="assistant",
                 content=content,
                 evidences=evidences,
+                metadata=metadata,
             ),
         )
 
@@ -105,10 +107,12 @@ class RedisMessageRepository:
         role: MessageRole,
         content: str,
         evidences: list[dict],
+        metadata: dict | None = None,
     ) -> dict[str, str]:
         return {
             "turn_id": str(turn_id),
             "role": role,
+            "metadata": json.dumps(metadata or {}, ensure_ascii=False, separators=(",", ":")),
             "content": content,
             "created_at": datetime.now(
                 timezone.utc

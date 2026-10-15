@@ -1,0 +1,39 @@
+extends: config.yaml
+generation:
+  provider: bedrock
+  region: us-east-1
+  model: qwen.qwen3-32b-v1:0
+  max_tokens: 1024
+  max_parallel: 2
+  retry_attempts: 3
+  daily_request_limit: 300
+  session_requests_per_minute: 6
+  model_prices:
+    qwen.qwen3-32b-v1:0:
+      input: 0.15
+      output: 0.6
+    us.meta.llama4-scout-17b-instruct-v1:0:
+      input: 0.17
+      output: 0.66
+enrichment:
+  provider: bedrock
+  region: us-east-1
+  model: qwen.qwen3-32b-v1:0
+  max_parallel: 2
+retrieval_index:
+  index_id: null
+  release: production
+enrichment_retrieval:
+  fallback_embedder: colibri
+  fail_open: false
+silver:
+  tokenizers:
+    roberta_crawl_pt:
+      revision: e15643ed1997d137ec35dba7f40b0b67f358ab2d
+embedding:
+  models:
+    colibri:
+      revision: 95a4d4f3a1c056ac19e0da196d0ab2b4289e3b3b
+retrievals:
+  dense_cross_encoder:
+    revision: 1427fd652930e4ba29e8149678df786c240d8825

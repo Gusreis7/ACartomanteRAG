@@ -10,12 +10,14 @@ from time import perf_counter
 from typing import Annotated, Any, TypedDict
 from urllib import request as urllib_request
 
-from langchain_ollama import ChatOllama
+from langchain_core.runnables import RunnableLambda
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.utils.chunking import build_sections
+from src.generation.provider import create_generation_provider
+from src.storage.rustfs_manager import RustFSManager
 
 MAX_EVENTS_PER_BLOCK = 5
 MAX_EVENTS_FINAL = 15
@@ -150,6 +152,7 @@ class EnrichmentResult:
     summary: dict[str, Any]
     timings_seconds: dict[str, Any]
     reduce_calls: int
+    usage: dict[str, Any]
 
 
 class EnrichmentState(TypedDict, total=False):
@@ -253,6 +256,29 @@ class WorkEnrichmentService:
         self.config = config
         self.enrichment = config.enrichment
 
+        self.provider = None
+        self._checkpoint_prefix = None
+        self.storage = RustFSManager.from_config(config.environment.rustfs)
+        if self.enrichment.provider == "bedrock":
+            generation = config.generation.model_copy(update={
+                **{key: getattr(self.enrichment, key) for key in (
+                    "provider", "region", "model", "temperature", "top_p", "max_tokens", "timeout_seconds", "max_parallel", "reasoning"
+                )},
+            })
+            self.provider = create_generation_provider(generation)
+            self.unit_llm = RunnableLambda(lambda messages: self.provider.invoke_structured(messages, UnitSummary))
+            self.final_llm = RunnableLambda(lambda messages: self.provider.invoke_structured(messages, FinalNarrativeSummary))
+        else:
+            self._configure_ollama()
+
+        self._map_started = 0.0
+        self._map_elapsed = 0.0
+        self._reduce_calls = 0
+        self.graph = self._build_graph()
+
+    def _configure_ollama(self):
+        from langchain_ollama import ChatOllama
+        config = self.config
         llm = ChatOllama(
             model=self.enrichment.model,
             base_url=config.generation.base_url,
@@ -277,10 +303,17 @@ class WorkEnrichmentService:
             method="json_schema",
         ).with_retry(stop_after_attempt=2)
 
-        self._map_started = 0.0
-        self._map_elapsed = 0.0
-        self._reduce_calls = 0
-        self.graph = self._build_graph()
+    def _cached_summary(self, llm, messages, schema):
+        if not self._checkpoint_prefix:
+            return llm.invoke(messages)
+        digest = hashlib.sha256(json.dumps(messages, ensure_ascii=False).encode()).hexdigest()
+        key = f"{self._checkpoint_prefix}/{schema.__name__}/{digest}.json"
+        bucket = self.config.storage.enrichment_bucket
+        if self.storage.object_exists(bucket, key):
+            return schema.model_validate_json(self.storage.download_bytes(bucket, key))
+        summary = llm.invoke(messages)
+        self.storage.upload_bytes(bucket, key, summary.model_dump_json().encode(), "application/json")
+        return summary
 
     def _build_graph(self):
         graph = StateGraph(EnrichmentState)
@@ -377,7 +410,7 @@ class WorkEnrichmentService:
         unit = state["unit"]
         started = perf_counter()
 
-        summary = self.unit_llm.invoke([
+        summary = self._cached_summary(self.unit_llm, [
             ("system", UNIT_SYSTEM_PROMPT),
             ("human", UNIT_PROMPT_TEMPLATE.format(
                 title=source.title,
@@ -389,7 +422,7 @@ class WorkEnrichmentService:
                 part_count=unit.part_count,
                 text=unit.text,
             )),
-        ])
+        ], UnitSummary)
 
         elapsed = perf_counter() - started
         if not isinstance(summary, UnitSummary):
@@ -452,7 +485,7 @@ class WorkEnrichmentService:
         author: str,
         items: list[dict[str, Any]],
     ) -> FinalNarrativeSummary:
-        response = self.final_llm.invoke([
+        response = self._cached_summary(self.final_llm, [
             ("system", FINAL_SYSTEM_PROMPT),
             ("human", FINAL_PROMPT_TEMPLATE.format(
                 title=title,
@@ -460,7 +493,7 @@ class WorkEnrichmentService:
                 max_events=MAX_EVENTS_FINAL,
                 material=self._serialize_items(items),
             )),
-        ])
+        ], FinalNarrativeSummary)
         self._reduce_calls += 1
         if not isinstance(response, FinalNarrativeSummary):
             response = FinalNarrativeSummary.model_validate(response)
@@ -520,7 +553,9 @@ class WorkEnrichmentService:
         final = self._hierarchical_final(state["source"], state["ordered_results"])
         return {"final_summary": final, "reduce_calls": self._reduce_calls}
 
-    def enrich(self, source: WorkSource) -> EnrichmentResult:
+    def enrich(self, source: WorkSource, *, checkpoint_prefix: str | None = None) -> EnrichmentResult:
+        self._checkpoint_prefix = checkpoint_prefix
+        before_usage = self.provider.usage_snapshot() if self.provider else {}
         self._reduce_calls = 0
         started = perf_counter()
         result = self.graph.invoke(
@@ -544,6 +579,10 @@ class WorkEnrichmentService:
             "eventos": item.summary.eventos,
         } for item in ordered]
 
+        usage = {key: value - before_usage.get(key, 0) for key, value in (self.provider.usage_snapshot() if self.provider else {}).items()}
+        prices = self.config.generation.model_prices.get(self.enrichment.model, {})
+        if usage:
+            usage["estimated_cost_usd"] = (usage.get("input_tokens", 0) * prices.get("input", 0) + usage.get("output_tokens", 0) * prices.get("output", 0)) / 1_000_000
         return EnrichmentResult(
             plan=result["plan"],
             blocks=blocks,
@@ -561,9 +600,12 @@ class WorkEnrichmentService:
                 } for item in ordered],
             },
             reduce_calls=result.get("reduce_calls", self._reduce_calls),
+            usage=usage,
         )
 
     def unload_model(self) -> None:
+        if self.enrichment.provider == "bedrock":
+            return
         endpoint = str(self.config.generation.base_url).rstrip("/") + "/api/generate"
         payload = json.dumps({
             "model": self.enrichment.model,

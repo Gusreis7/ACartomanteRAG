@@ -1,0 +1,83 @@
+import importlib.util
+import io
+import json
+from pathlib import Path
+import tarfile
+from unittest.mock import Mock, patch
+
+from moto import mock_aws
+import boto3
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def module(name, path):
+    spec=importlib.util.spec_from_file_location(name,ROOT/path)
+    loaded=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(loaded)
+    return loaded
+
+
+@pytest.mark.parametrize("member_type", [tarfile.SYMTYPE, tarfile.LNKTYPE, tarfile.DIRTYPE])
+def test_host_deploy_refuses_non_file_members(tmp_path, member_type):
+    manager=module("host_manager","infra/aws/manage.py")
+    path=tmp_path/"malicious.tar.gz"
+    names=["docker-compose.aws.yml","infra/aws/Caddyfile","infra/aws/manage.py","release.json"]
+    with tarfile.open(path,"w:gz") as archive:
+        for name in names:
+            info=tarfile.TarInfo(name)
+            if name == names[0]:
+                info.type=member_type
+                info.linkname="/etc/passwd"
+                archive.addfile(info)
+            else:
+                data=b"{}";info.size=len(data);archive.addfile(info,io.BytesIO(data))
+    with pytest.raises(ValueError,match="Tipo"):
+        manager.validate_archive(path,tmp_path/"extract")
+    assert not (tmp_path/"extract").exists()
+
+
+def test_host_deploy_requires_expected_files_before_extraction(tmp_path):
+    manager=module("host_manager","infra/aws/manage.py")
+    path=tmp_path/"bad.tar.gz"
+    with tarfile.open(path,"w:gz") as archive:
+        info=tarfile.TarInfo("../../outside");info.size=1;archive.addfile(info,io.BytesIO(b"x"))
+    with pytest.raises(ValueError,match="esperados"):
+        manager.validate_archive(path,tmp_path/"extract")
+
+
+@mock_aws
+def test_host_env_uses_ssm_and_separate_readonly_inspector(tmp_path, monkeypatch):
+    manager=module("host_manager","infra/aws/manage.py")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID","testing")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY","testing")
+    monkeypatch.setenv("AWS_DEFAULT_REGION","us-east-1")
+    manager.ROOT=tmp_path/"data"
+    manager.CONFIG=tmp_path/"config"
+    manager.ENV=manager.CONFIG/"runtime.env"
+    manager.CONFIG.mkdir()
+    (manager.CONFIG/"host.json").write_text(json.dumps({"AWS_REGION":"us-east-1","SETTINGS_PARAMETER":"/app","ECR_REPOSITORY":"example.org/app","OPS_BUCKET":"ops"}))
+    ssm=boto3.client("ssm",region_name="us-east-1")
+    ssm.put_parameter(Name="/app",Type="SecureString",Value=json.dumps({"QDRANT_URL":"https://cluster.example.org","QDRANT_API_KEY":"testing","REDIS_PASSWORD":"a"*64,"REDIS_INSPECT_PASSWORD":"b"*64}))
+    manager.render_environment("example.org/app@sha256:"+"a"*64)
+    assert manager.ENV.stat().st_mode & 0o777 == 0o600
+    acl=(manager.ROOT/"data/redis/users.acl").read_text()
+    assert "user inspector on #" in acl
+    assert "a"*64 not in acl
+    assert "-@dangerous" in acl
+    assert "AWS_ACCESS_KEY_ID" not in manager.ENV.read_text()
+
+
+def test_github_script_refuses_wrong_terraform_repo_for_variables(tmp_path, monkeypatch):
+    setup=module("github_setup","scripts/configure_github.py")
+    # get metadata, branch main and matching develop ref.
+    fake=Mock(side_effect=[{"id":42}, None, {"object":{"sha":"a"*40}}, [{"ref":"refs/heads/develop"}], None, None, None])
+    monkeypatch.setattr(setup,"gh",fake)
+    data=tmp_path/"outputs.json"
+    data.write_text(json.dumps({"github_oidc_subject":{"value":"wrong"}}))
+    monkeypatch.setattr("sys.argv",["configure_github.py","--repo","owner/repo","--terraform-output",str(data)])
+    with patch("subprocess.run") as subprocess_call:
+        with pytest.raises(ValueError,match="outro repositório"):
+            setup.main()
+        subprocess_call.assert_not_called()

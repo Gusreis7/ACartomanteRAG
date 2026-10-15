@@ -1,0 +1,10 @@
+# Wheels CPython 3.11/glibc 2.34, compatíveis com Glue 5.1.
+FROM public.ecr.aws/amazonlinux/amazonlinux:2023 AS wheels
+RUN dnf install -y python3.11 python3.11-pip zip && dnf clean all
+WORKDIR /build
+COPY requirements-glue.lock .
+RUN python3.11 -m pip download --only-binary=:all: --extra-index-url https://download.pytorch.org/whl/cpu \
+    --dest /wheels -r requirements-glue.lock \
+    && cd /wheels && zip -q /build/dependencies.gluewheels.zip *.whl
+FROM scratch
+COPY --from=wheels /build/dependencies.gluewheels.zip /

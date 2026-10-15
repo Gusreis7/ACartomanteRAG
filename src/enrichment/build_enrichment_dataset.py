@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import io
 import json
+import os
 import re
 import unicodedata
 from datetime import datetime, timezone
@@ -28,7 +29,7 @@ from src.storage.rustfs_manager import RustFSManager
 
 
 BRONZE_CURRENT_KEY = "current.json"
-ENRICHMENT_CURRENT_KEY = "current.json"
+ENRICHMENT_CURRENT_KEY = os.getenv("ENRICHMENT_DATASET_POINTER", "current.json")
 ENRICHMENT_DATASETS_PREFIX = "datasets"
 
 
@@ -235,6 +236,8 @@ def build_signature(
         "source_bronze_artifact_id": bronze_artifact_id,
         "source_bronze_manifest_sha256": bronze_manifest_sha256,
         "model": enrichment.model,
+        "provider": enrichment.provider,
+        "region": enrichment.region if enrichment.provider == "bedrock" else None,
         "model_digest": model_digest,
         "prompt_version": enrichment.prompt_version,
         "prompt_sha256": prompt_hash,
@@ -482,6 +485,8 @@ def main() -> None:
     storage = RustFSManager.from_config(config.environment.rustfs)
     bronze_bucket = config.storage.bronze_bucket
     enrichment_bucket = config.storage.enrichment_bucket
+    global BRONZE_CURRENT_KEY
+    BRONZE_CURRENT_KEY = config.storage.bronze_current_key
     storage.create_bucket(enrichment_bucket)
 
     bronze_current, bronze_manifest, bronze_manifest_sha256 = load_bronze_state(
@@ -490,9 +495,11 @@ def main() -> None:
     )
     bronze_artifact_id = str(bronze_current["bronze_artifact_id"])
 
-    model_digest = resolve_ollama_model_digest(
-        base_url=config.generation.base_url,
-        model=config.enrichment.model,
+    model_digest = (
+        f"bedrock:{config.enrichment.region}:{config.enrichment.model}"
+        if config.enrichment.provider == "bedrock" else resolve_ollama_model_digest(
+            base_url=config.generation.base_url, model=config.enrichment.model,
+        )
     )
     prompt_hash = prompt_sha256()
     schema_hash = structured_output_schema_sha256()
@@ -640,11 +647,15 @@ def main() -> None:
                         bronze_object_key=bronze_object_key,
                         text=text,
                     )
-                    result = service.enrich(source)
+                    generator_signature = hashlib.sha256(json.dumps({
+                        "enrichment": config.enrichment.model_dump(exclude={"max_parallel", "timeout_seconds", "keep_alive", "num_batch"}), "prompt": prompt_hash, "schema": schema_hash,
+                    }, sort_keys=True).encode()).hexdigest()
+                    result = service.enrich(source, checkpoint_prefix=f"checkpoints/{generator_signature}/{source_text_sha}")
 
                     work_payload = {
                         "enrichment_dataset_id": dataset_id,
                         "config_hash": config_hash,
+                        "usage": result.usage,
                         "created_at_utc": utc_now(),
                         "source": {
                             "bronze_artifact_id": bronze_artifact_id,

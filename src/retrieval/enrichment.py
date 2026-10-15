@@ -136,7 +136,7 @@ class EnrichmentRetriever:
     ) -> dict[str, Any]:
         if not self.rustfs.object_exists(
             self.indexes_bucket,
-            ENRICHMENT_INDEX_CURRENT_KEY,
+            self.runtime_config.index_pointer_key,
         ):
             raise FileNotFoundError(
                 "Índices de enrichment não publicados: "
@@ -148,7 +148,7 @@ class EnrichmentRetriever:
         payload = json.loads(
             self.rustfs.download_bytes(
                 self.indexes_bucket,
-                ENRICHMENT_INDEX_CURRENT_KEY,
+                self.runtime_config.index_pointer_key,
             ).decode(
                 "utf-8"
             )

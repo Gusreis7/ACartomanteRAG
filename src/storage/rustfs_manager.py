@@ -17,21 +17,23 @@ class RustFSConfigProtocol(Protocol):
 class RustFSManager:
     def __init__(
         self,
-        endpoint: str,
-        access_key: str,
-        secret_key: str,
+        endpoint: str | None = None,
+        access_key: str | None = None,
+        secret_key: str | None = None,
         region: str = "us-east-1",
     ) -> None:
+        self.region = region
+        kwargs = {}
+        if endpoint:
+            kwargs = {"endpoint_url": endpoint, "aws_access_key_id": access_key, "aws_secret_access_key": secret_key}
         self.client = boto3.client(
             "s3",
-            endpoint_url=endpoint,
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key,
+            **kwargs,
             region_name=region,
             config=Config(
                 signature_version="s3v4",
                 s3={
-                    "addressing_style": "path",
+                    "addressing_style": "path" if endpoint else "auto",
                 },
             ),
         )
@@ -56,7 +58,7 @@ class RustFSManager:
             endpoint=config.endpoint,
             access_key=config.access_key,
             secret_key=config.secret_key,
-            region=region,
+            region=getattr(config, "region", region),
         )
 
     def create_bucket(
@@ -66,9 +68,10 @@ class RustFSManager:
         if self.bucket_exists(bucket):
             return
 
-        self.client.create_bucket(
-            Bucket=bucket,
-        )
+        kwargs = {"Bucket": bucket}
+        if self.region != "us-east-1":
+            kwargs["CreateBucketConfiguration"] = {"LocationConstraint": self.region}
+        self.client.create_bucket(**kwargs)
 
     def bucket_exists(
         self,

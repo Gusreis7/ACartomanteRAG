@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--env-file", type=Path, default=None)
     parser.add_argument("--config-file", type=Path, default=None)
+    parser.add_argument("--resume", action="store_true")
     return parser.parse_args()
 
 
@@ -60,7 +62,7 @@ def main() -> None:
     for alias in aliases:
         print(f"\n=== ENRICHMENT EMBEDDER: {alias} ===")
         try:
-            manifest = indexer.build(model_alias=alias)
+            manifest = indexer.build(model_alias=alias, resume=args.resume)
             indexes[alias] = {
                 "index_id": manifest["index_id"],
                 "collection": manifest["qdrant"]["collection"],
@@ -84,7 +86,7 @@ def main() -> None:
     }
     rustfs.upload_bytes(
         indexes_bucket,
-        ENRICHMENT_INDEX_CURRENT_KEY,
+        os.getenv("ENRICHMENT_INDEX_POINTER", ENRICHMENT_INDEX_CURRENT_KEY),
         json.dumps(current, ensure_ascii=False, indent=2).encode("utf-8"),
         content_type="application/json",
     )

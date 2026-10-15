@@ -136,6 +136,8 @@ def main() -> None:
 
     bronze_bucket = config.storage.bronze_bucket
     silver_bucket = config.storage.silver_bucket
+    global BRONZE_CURRENT_KEY
+    BRONZE_CURRENT_KEY = config.storage.bronze_current_key
 
     if not storage.bucket_exists(bronze_bucket):
         raise RuntimeError("Bucket Bronze não encontrado: " f"{bronze_bucket}")
@@ -453,6 +455,11 @@ def main() -> None:
         key=manifest_key,
         df=manifest,
     )
+
+    storage.upload_bytes(silver_bucket, config.storage.silver_current_key, json.dumps({
+        "silver_dataset_id": dataset_id, "manifest_key": manifest_key,
+        "chunks_key": chunks_key, "source_bronze_artifact_id": bronze_artifact_id,
+    }).encode(), "application/json")
 
     print()
     print("[OK] Camada Silver criada.")

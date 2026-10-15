@@ -33,7 +33,7 @@ from src.generation.personas import (
 from src.generation.provider import (
     GenerationProvider,
     GenerationServiceError,
-    OllamaGenerationProvider,
+    create_generation_provider,
 )
 from src.retrieval.enrichment import (
     EnrichmentRetriever,
@@ -79,6 +79,7 @@ class RAGState(
     ]
 
     answer: str
+    generation_usage: dict[str, Any]
 
     timings_ms: dict[
         str,
@@ -121,7 +122,7 @@ class MachadoRAG:
 
         self.generation_provider = (
             generation_provider
-            or OllamaGenerationProvider(
+            or create_generation_provider(
                 config.generation
             )
         )
@@ -241,6 +242,7 @@ class MachadoRAG:
 
         return {
             "query": query,
+            "generation_usage": result.get("generation_usage", {}),
             "answer": (
                 result["answer"]
             ),
@@ -801,6 +803,12 @@ class MachadoRAG:
         )
 
         return {
+            "generation_usage": {
+                "provider": self.config.generation.provider,
+                "model": self.config.generation.model,
+                **(getattr(message, "usage_metadata", None) or {}),
+                **{key: value for key, value in (getattr(message, "response_metadata", {}) or {}).items() if key in {"estimated_cost_usd", "region", "retry_attempts"}},
+            },
             "answer": (
                 answer
             ),

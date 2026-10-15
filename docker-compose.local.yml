@@ -1,0 +1,3 @@
+# Alias explícito para o Compose LAN existente; preserva volumes e credenciais.
+include:
+  - path: docker-compose.yml

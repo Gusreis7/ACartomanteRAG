@@ -18,6 +18,7 @@ from src.api.schemas import (
     ReadyResponse,
 )
 from src.storage.qdrant_manager import check_qdrant_collection_ready
+from src.generation.provider import GenerationQuotaError
 from src.services.chat import (
     ChatNotFoundError,
     GenerationCapacityError,
@@ -157,6 +158,8 @@ def send_message(
         )
     except ChatNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except GenerationQuotaError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
     except (GenerationCapacityError, GenerationServiceError) as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except RedisError as exc:

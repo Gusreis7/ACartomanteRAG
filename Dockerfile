@@ -8,10 +8,9 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# CPU para embeddings/reranker; a GPU continua com o Ollama já instalado.
-COPY requirements-runtime.txt ./
-RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu 'torch>=2.2,<3' \
-    && pip install --no-cache-dir -r requirements-runtime.txt \
+# CPU para embeddings/reranker; geração via Ollama local ou Bedrock.
+COPY requirements-runtime.lock ./
+RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu -r requirements-runtime.lock \
     && pip check \
     && groupadd --gid 10001 app \
     && useradd --uid 10001 --gid app --create-home app \
@@ -19,7 +18,7 @@ RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu 
     && chown -R app:app /home/app/.cache /app/reports
 
 COPY --chown=app:app src ./src
-COPY --chown=app:app config/config.yaml ./config/config.yaml
+COPY --chown=app:app config/config.yaml config/config.aws.yaml ./config/
 
 USER 10001:10001
 EXPOSE 8000
@@ -30,8 +29,8 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--wo
 # Imagem opcional para os jobs existentes. Não faz parte do serviço HTTP.
 FROM runtime AS tools
 USER root
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt \
+COPY requirements.txt requirements-runtime.txt ./
+RUN pip install --no-cache-dir -c requirements-runtime.lock -r requirements.txt \
     && pip check \
     && chown app:app /app
 COPY --chown=app:app benchmark ./benchmark

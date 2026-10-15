@@ -95,4 +95,15 @@ A leitura de cartas tem outro funcionamento: sorteia três obras do catálogo Br
 
 Na interface, mantive a estética de cartomancia e ajustei o espaço útil, o tamanho dos textos e a composição das cartas conforme a largura disponível. A responsividade dimensiona os elementos sem aplicar zoom à página; na home em duas colunas, a carta central acompanha a linha de apresentação do texto. No chat, o estado vazio respeita `[hidden]` quando já há mensagens.
 
-Tudo é acessado pela mesma origem: `/`, `/reading`, `/chat/{chat_id}`, os recursos `/api/v1/conversations`, `/api/v1/conversations/{chat_id}/messages` e `/api/v1/recommendations/works`, além de `/health` e `/ready`. Essa sessão anônima permite separar conversas, mas ainda não representa uma conta com login. Nesta etapa, a aplicação foi organizada para a LAN escolhida; a publicação na AWS fica para o próximo trabalho.
+Tudo é acessado pela mesma origem: `/`, `/reading`, `/chat/{chat_id}`, os recursos `/api/v1/conversations`, `/api/v1/conversations/{chat_id}/messages` e `/api/v1/recommendations/works`, além de `/health` e `/ready`. Essa sessão anônima permite separar conversas, mas ainda não representa uma conta com login. A execução local mantém esse contrato. Na AWS, Caddy publica a mesma origem em HTTPS e os endpoints operacionais ficam internos; a sessão continua anônima.
+
+
+## A adaptação cloud que preservei no mesmo desenho
+
+Na AWS, mantive a cadeia de recuperação e substituí as integrações: S3 direto por IAM no lugar do servidor RustFS e `BedrockGenerationProvider` no lugar do Ollama. O provider usa Converse, traduz mensagens e registra tokens. O Qwen3 32B fica como padrão; o perfil US do Llama 4 Scout é uma alternativa configurável para o chat. Os resumos continuam exclusivamente com Qwen, independentemente do gerador escolhido para uma conversa.
+
+Não assumi que o modelo aceitaria o mesmo structured output nativo do Ollama. No Bedrock envio o schema no prompt, valido o JSON com Pydantic e limito a duas tentativas de saída estruturada; o SDK também tem retries limitados. O Qwen recebe o soft switch `/no_think`, e respostas vazias ou truncadas não entram como resumos válidos. Isso ainda precisa ser avaliado com chamadas reais: o teste unitário verifica o contrato, não a qualidade do modelo.
+
+A release de dados referencia Bronze, Silver, índice textual e índice auxiliar em um manifest único. A API lê esse manifest uma vez ao iniciar, enquanto os jobs trabalham em candidatos isolados. O catálogo de leitura usa a Bronze da mesma release. Gerar resumos, construir índices e promover dados são operações explícitas; reiniciar a API não faz nenhuma delas.
+
+No Redis, acrescentei metadados de geração aos streams de mensagens. Eles permitem inspecionar persona, modelo, índice, tokens e tempos sem alterar o contrato visual do chat. A inspeção administrativa usa RedisInsight com ACL de leitura e túnel SSM. O detalhamento da publicação e seus limites está em [execução e rede](INFRA_LOCAL_AND_DEPLOYMENT.md).

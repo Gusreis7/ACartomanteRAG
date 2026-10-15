@@ -54,3 +54,24 @@ Thumbs.db
 
 # Parquet/artefatos locais temporários
 *.parquet.tmp
+
+# Configuração privada e infraestrutura AWS
+.env.*
+!.env.example
+config/*.env
+config/*.local.yaml
+!config/*.env.example
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+backend.hcl
+.terraform/
+# Versionar .terraform.lock.hcl após terraform init.
+*.pem
+*.key
+credentials*
+*.local.json
+infra/qdrant/import.tf

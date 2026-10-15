@@ -9,7 +9,7 @@ from redis import Redis
 
 from src.config.config_manager import ConfigManager
 from src.generation.graph import MachadoRAG
-from src.generation.provider import OllamaGenerationProvider
+from src.generation.provider import create_generation_provider
 from src.services.chat import ChatService
 from src.services.conversations import ConversationService
 from src.storage.redis_chat_repository import RedisChatRepository
@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
         with RedisSaver.from_conn_string(redis_url) as checkpointer:
             checkpointer.setup()
 
-            generation_provider = OllamaGenerationProvider(
+            generation_provider = create_generation_provider(
                 config.generation
             )
 
