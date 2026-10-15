@@ -17,6 +17,9 @@ jobs:
     env:
       COMPOSE_PROJECT_NAME: acartomante-ci-${{ gitea.run_number }}
 
+      # Interface publicada no host; CI usa somente loopback.
+      API_BIND_IP: 127.0.0.1
+
       # Application connection
       RUSTFS_ENDPOINT: http://localhost:9003
       QDRANT_URL: http://localhost:6335
