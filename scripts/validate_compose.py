@@ -1,4 +1,4 @@
-"""Valida os dois Composes com valores fictícios; não sobe containers."""
+"""Valida os Composes local, Raspberry e AWS; não sobe containers."""
 import os
 from pathlib import Path
 import subprocess
@@ -22,6 +22,12 @@ def main():
         env = {**os.environ, **values}
         for name in ("docker-compose.local.yml", "docker-compose.aws.yml"):
             subprocess.run(["docker", "compose", "--env-file", temp.name, "-f", str(ROOT / name), "config", "--quiet"], env=env, check=True)
+        subprocess.run([
+            "docker", "compose", "--env-file", temp.name, "--profile", "tools",
+            "-f", str(ROOT / "docker-compose.yml"),
+            "-f", str(ROOT / "docker-compose.raspberry.yml"),
+            "config", "--quiet",
+        ], env=env, check=True)
     print("Composes válidos")
 
 

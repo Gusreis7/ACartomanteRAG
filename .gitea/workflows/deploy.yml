@@ -1,5 +1,8 @@
 name: Deploy Production
 
+env:
+  COMPOSE_FILE: "docker-compose.yml:docker-compose.raspberry.yml"
+
 on:
   push:
     branches:
@@ -71,22 +74,22 @@ jobs:
 
       - name: Validate Docker Compose
         run: |
-          docker compose config --quiet
+          bash scripts/compose_raspberry.sh config --quiet
 
       - name: Pull images
         run: |
-          docker compose pull
+          bash scripts/compose_raspberry.sh pull
 
       - name: Build services
         run: |
-          docker compose build
+          bash scripts/compose_raspberry.sh build
 
       - name: Deploy production
         run: |
-          docker compose up \
+          bash scripts/compose_raspberry.sh up \
             --detach \
             --wait \
-            --wait-timeout 120 \
+            --wait-timeout 3600 \
             --remove-orphans
 
       - name: Prepare release tooling
@@ -111,9 +114,9 @@ jobs:
 
       - name: Show production services
         run: |
-          docker compose ps
+          bash scripts/compose_raspberry.sh ps
 
       - name: Show logs on failure
         if: failure()
         run: |
-          docker compose logs --no-color
+          bash scripts/compose_raspberry.sh logs --no-color

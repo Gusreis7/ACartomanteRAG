@@ -306,3 +306,40 @@ Esta entrega prepara as etapas de aplicação, infraestrutura e dados. A compara
 As verificações locais cobrem os contratos de configuração, a serialização Converse, limites, retomada de resumos, migração e empacotamento. A configuração dos Composes e do Caddy é validável sem subir servidores. Build Docker, execução Glue, import Qdrant e chamadas AWS dependem do ambiente real. O CI inclui as verificações de build e Terraform antes de permitir deploy.
 
 Referências de implementação: [GitHub OIDC](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws), [claims imutáveis](https://docs.github.com/en/actions/reference/security/oidc), [Qwen no Bedrock](https://docs.aws.amazon.com/bedrock/latest/userguide/model-card-qwen-qwen3-32b.html), [soft switch de reasoning do Qwen](https://huggingface.co/Qwen/Qwen3-32B), [dependências Glue](https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-python-libraries.html), [backend S3](https://developer.hashicorp.com/terraform/language/backend/s3) e [provider Qdrant](https://registry.terraform.io/providers/qdrant/qdrant-cloud/latest/docs/resources/accounts_cluster).
+
+## Raspberry Pi: Ollama dentro do Docker
+
+No Raspberry uso o Compose base junto de `docker-compose.raspberry.yml`. O notebook continua usando o Ollama do host com o Compose local anterior. Na AWS a configuração permanece Bedrock.
+
+O overlay do Raspberry aponta API e tools para `http://ollama:11434`, sem publicar a porta 11434 no host. O servidor tem rede privada para seus clientes e uma rede de saída para baixar o modelo. Os pesos ficam no volume nomeado `ollama_models` do projeto Compose. Mantenho o mesmo `COMPOSE_PROJECT_NAME` entre deploys para reutilizar esse volume e o cache da API.
+
+O serviço `ollama-model` verifica `qwen3.5:4b` e faz pull somente quando ele ainda não existe. A API depende da conclusão com sucesso desse preparo. Falha de download mantém a API bloqueada e deixa um diagnóstico curto. O primeiro download tem aproximadamente 4 GB; espaço ocupado em disco não representa a RAM total necessária ao modelo e ao restante do RAG.
+
+Uso a imagem oficial `ollama/ollama:0.40.4`, cujo manifest oferece Linux ARM64 e AMD64. Não adiciono devices de GPU ao container do Raspberry. Limito Ollama a um modelo carregado e uma geração simultânea; o overlay de configuração também deixa uma chamada simultânea na API e amplia o timeout para CPU. Esses limites não constituem dimensionamento validado no hardware real.
+
+Na raiz do checkout, mantendo o `config/.env` privado e seus volumes:
+
+```bash
+# Se opero o projeto usado pelo workflow de produção:
+export COMPOSE_PROJECT_NAME=acartomante-prod
+bash scripts/compose_raspberry.sh config --quiet
+bash scripts/compose_raspberry.sh up --detach --build --wait --wait-timeout 3600 --remove-orphans
+bash scripts/compose_raspberry.sh ps
+bash scripts/compose_raspberry.sh exec -T ollama ollama list
+```
+
+O wrapper usa `config/.env` quando esse arquivo existe; `LOCAL_ENV_FILE` permite selecionar outro arquivo privado. No runner sem esse arquivo, as variáveis continuam vindo do job. O bind LAN continua obrigatório em produção. Somente projetos temporários `acartomante-ci-*` recebem loopback como fallback para validar a configuração.
+
+Para selecionar outro modelo, defino `OLLAMA_MODEL` no ambiente privado e repito o comando de atualização. O mesmo valor é usado no download, chat e enrichment. O padrão permanece `qwen3.5:4b`; trocar para um modelo menor altera o comportamento do baseline.
+
+Os workflows Gitea usam o wrapper e o Compose do Raspberry. O deploy permite uma espera de 3600 segundos na primeira preparação. Os jobs Integration CI/Main PR possuem volumes novos: verificam a infraestrutura local, a saúde do servidor Ollama e os imports da API, sem baixar o modelo a cada execução nem simular que há um corpus publicado. O teste completo do RAG exige os manifests, datasets e collections aprovados nos volumes da instalação. O patch não os cria ou copia durante o startup.
+
+Para diagnóstico:
+
+```bash
+bash scripts/compose_raspberry.sh logs --tail 80 ollama ollama-model api
+```
+
+Não uso `down --volumes` na instalação persistente. Essa limpeza fica restrita aos projetos temporários dos workflows CI.
+
+Referências: [Docker oficial do Ollama](https://docs.ollama.com/docker), [Qwen3.5 4B](https://ollama.com/library/qwen3.5:4b), [release Ollama 0.40.4](https://github.com/ollama/ollama/releases/tag/v0.40.4) e [ordem de inicialização Compose](https://docs.docker.com/compose/how-tos/startup-order/).

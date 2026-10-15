@@ -1,5 +1,8 @@
 name: Integration CI
 
+env:
+  COMPOSE_FILE: "docker-compose.yml:docker-compose.raspberry.yml"
+
 on:
   push:
     branches:
@@ -45,25 +48,24 @@ jobs:
           mkdir -p "$RUSTFS_VOLUME" "$QDRANT_VOLUME" "$REDIS_VOLUME"
 
       - name: Validate Docker Compose
-        run: docker compose config --quiet
+        run: bash scripts/compose_raspberry.sh config --quiet
 
       - name: Pull images
-        run: docker compose pull
+        run: bash scripts/compose_raspberry.sh pull
 
-      - name: Start services
-        run: |
-          docker compose up             --detach             --wait             --wait-timeout 120
+      - name: Check local infrastructure and runtime imports
+        run: bash scripts/check_raspberry_ci.sh
 
       - name: Show services
-        run: docker compose ps
+        run: bash scripts/compose_raspberry.sh ps
 
       - name: Show logs on failure
         if: failure()
-        run: docker compose logs --no-color
+        run: bash scripts/compose_raspberry.sh logs --no-color
 
       - name: Shutdown services
         if: always()
-        run: docker compose down --remove-orphans
+        run: bash scripts/compose_raspberry.sh down --volumes --remove-orphans
 
       - name: Cleanup CI storage
         if: always()
