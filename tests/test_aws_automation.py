@@ -163,6 +163,55 @@ def test_glue_arguments_pin_all_assets_without_changing_job(cloud):
     assert args["--promote"] == "true"
 
 
+@pytest.mark.parametrize("smoke", [False, True])
+@pytest.mark.parametrize("reuse_options", [[], ["--reuse-index-id", ""], ["--reuse-index-id", "corpus-v1"]])
+def test_glue_start_omits_empty_optional_value_and_accepts_glue_argv(cloud, monkeypatch, smoke, reuse_options):
+    revision = "d" * 40
+    clients = {name: Mock() for name in ("ssm", "s3", "glue")}
+    clients["glue"].start_job_run.return_value = {"JobRunId": "jr-test"}
+    monkeypatch.setattr(cloud.boto3, "client", lambda name, **kwargs: clients[name])
+    monkeypatch.setattr(cloud, "outputs", lambda path: {"ops_bucket": "ops", "glue_job": "etl-job"})
+    monkeypatch.setattr(cloud, "bundle_manifest", lambda *args: {"revision": revision})
+    monkeypatch.setattr("sys.argv", [
+        "cloud.py", "glue", "--revision", revision, "--run-id", "smoke-v1",
+        *reuse_options, *(["--smoke"] if smoke else []),
+    ])
+    cloud.main()
+
+    clients["glue"].start_job_run.assert_called_once()
+    request = clients["glue"].start_job_run.call_args.kwargs
+    assert request["JobName"] == "etl-job"
+    arguments = request["Arguments"]
+    expected_reuse = reuse_options[-1] if reuse_options else ""
+    if expected_reuse:
+        assert arguments["--reuse-index-id"] == expected_reuse
+    else:
+        assert "--reuse-index-id" not in arguments
+    assert arguments["--smoke"] == str(smoke).lower()
+
+    # Glue omitiu o valor vazio no argv observado no CloudWatch.
+    # Verifica o parser real do job com o mesmo formato de transporte.
+    job = module("glue_optional_argument", "infra/glue/job.py")
+    parameters = {
+        "--assets-bucket": "ops", "--settings-parameter": "/project/etl",
+        "--JOB_NAME": "etl-job", "--JOB_RUN_ID": "jr-test", **arguments,
+    }
+    argv = ["job.py"]
+    for name, value in parameters.items():
+        argv.append(name)
+        if value:
+            argv.append(value)
+    monkeypatch.setattr("sys.argv", argv)
+
+    class ParsedArguments(Exception):
+        pass
+
+    clients["ssm"].get_parameter.side_effect = ParsedArguments
+    with pytest.raises(ParsedArguments):
+        job.main()
+    clients["ssm"].get_parameter.assert_called_once_with(Name="/project/etl", WithDecryption=True)
+
+
 @pytest.mark.parametrize("kwargs", [
     {"revision": "main"}, {"run_id": "../../bad"}, {"steps": "silver,crawl"},
     {"steps": "crawl,crawl"}, {"steps": ""}, {"smoke": True, "promote": True},

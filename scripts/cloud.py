@@ -423,7 +423,8 @@ def main():
         if not bundle_manifest(s3, out["ops_bucket"], args.revision):
             raise ValueError("Publique o bundle Glue completo antes de iniciar o job.")
         client = boto3.client("glue", region_name=region)
-        arguments["--reuse-index-id"] = args.reuse_index_id
+        if args.reuse_index_id:
+            arguments["--reuse-index-id"] = args.reuse_index_id
         run_id = client.start_job_run(JobName=out["glue_job"], Arguments=arguments)[
             "JobRunId"
         ]
