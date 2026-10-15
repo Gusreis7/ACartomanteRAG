@@ -156,7 +156,6 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./config/config.yaml:/app/config/config.yaml:ro
       - api_cache:/home/app/.cache
     tmpfs:
       - /tmp:rw,nosuid,nodev,size=512m,mode=1777
