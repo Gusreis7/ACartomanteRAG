@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#171711">
   <title>Cartomante RAG</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=free-reading-7">
+  <link rel="stylesheet" href="/assets/styles.css?v=home-card-align-10">
 </head>
 <body class="home-page">
   <div class="grain" aria-hidden="true"></div>
@@ -15,9 +15,12 @@
       <span class="brand-mark" aria-hidden="true">✦</span>
       <span>Cartomante <em>RAG</em></span>
     </a>
-    <div class="header-status" title="Interface do motor de consulta literária">
-      <span class="status-dot"></span>
-      <span>oráculo conectado</span>
+    <div class="home-header-actions">
+      <button class="header-help" type="button" data-help-open aria-haspopup="dialog">Ajuda</button>
+      <div class="header-status" title="Interface do motor de consulta literária">
+        <span class="status-dot"></span>
+        <span>oráculo conectado</span>
+      </div>
     </div>
   </header>
 
@@ -138,6 +141,7 @@
   </footer>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/assets/help.js?v=ui-minimal-1" defer></script>
   <script src="/assets/home.js?v=free-reading-3" defer></script>
 </body>
 </html>

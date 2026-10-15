@@ -50,7 +50,7 @@ class OllamaGenerationProvider(GenerationProvider):
         self,
         config,
         *,
-        reasoning: bool | str | None = None,
+        reasoning: bool | str | None = False,
         num_batch: int | None = None,
     ) -> None:
         self.config = config

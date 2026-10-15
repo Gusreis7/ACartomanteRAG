@@ -14,38 +14,20 @@ const evidenceSpread = document.querySelector("#evidence-spread");
 const evidenceTableCount = document.querySelector("#evidence-table-count");
 const evidenceTableClose = document.querySelector("#evidence-table-close");
 const personaButtons = [...document.querySelectorAll("[data-persona]")];
-const personaState = document.querySelector("#persona-state");
 
 let sending = false;
 let activePersona = "neutral";
 
-const PERSONA_LABELS = {
-  neutral: "neutro",
-  cosmo: "cosmo",
-  damiao: "damião",
-};
-
 function setPersona(nextPersona) {
-  const requested = nextPersona || "neutral";
-  activePersona = activePersona === requested ? "neutral" : requested;
+  activePersona = ["neutral", "cosmo", "damiao"].includes(nextPersona)
+    ? nextPersona
+    : "neutral";
 
   personaButtons.forEach((button) => {
-    const active = button.dataset.persona === activePersona;
-    button.classList.toggle("is-active", active);
-    button.setAttribute("aria-pressed", String(active));
+    const selected = button.dataset.persona === activePersona;
+    button.classList.toggle("is-active", selected);
+    button.setAttribute("aria-pressed", String(selected));
   });
-
-  if (personaState) {
-    personaState.textContent = PERSONA_LABELS[activePersona] || "neutro";
-  }
-
-  if (activePersona === "cosmo") {
-    showToast("Cosmo entra na mesa: Capitu não traiu.");
-  } else if (activePersona === "damiao") {
-    showToast("Damião entra na mesa: Capitu traiu.");
-  } else {
-    showToast("Modo neutro restaurado.");
-  }
 }
 
 function showToast(message) {

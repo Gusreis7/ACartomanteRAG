@@ -48,7 +48,8 @@ def ready(request: Request) -> ReadyResponse:
     try:
         rag = request.app.state.rag
         bucket = rag.config.storage.embedding_indexes_bucket
-        rag.retrieval.rustfs.bucket_exists(bucket)
+        if not rag.retrieval.rustfs.bucket_exists(bucket):
+            raise RuntimeError("Bucket de índices indisponível.")
         checks["rustfs"] = "ok"
     except Exception:
         checks["rustfs"] = "error"

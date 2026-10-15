@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#171711">
   <title>Consulta · Cartomante RAG</title>
-  <link rel="stylesheet" href="/assets/styles.css">
+  <link rel="stylesheet" href="/assets/styles.css?v=home-chat-large-9">
 </head>
 <body class="chat-page">
   <div class="grain" aria-hidden="true"></div>
@@ -38,41 +38,19 @@
           <p class="chat-kicker">consulta em curso</p>
           <h1 id="conversation-title">Nova conversa</h1>
         </div>
-        <div
-          class="persona-controls"
-          id="persona-controls"
-          aria-label="Modo de opinião"
-        >
-          <span class="persona-controls-label">opinião</span>
-
-          <button
-            class="persona-toggle"
-            type="button"
-            data-persona="cosmo"
-            aria-pressed="false"
-            title="Cosmo: lê que Capitu não traiu Bentinho"
-          >
-            Cosmo
-          </button>
-
-          <button
-            class="persona-toggle"
-            type="button"
-            data-persona="damiao"
-            aria-pressed="false"
-            title="Damião: lê que Capitu traiu Bentinho"
-          >
-            Damião
-          </button>
-
-          <span
-            class="persona-state"
-            id="persona-state"
-            aria-live="polite"
-          >neutro</span>
-        </div>
-
-        <a class="header-home" href="/">mesa inicial</a>
+        <nav class="chat-header-actions" aria-label="Navegação e interpretação">
+          <div class="persona-controls" id="persona-controls" role="group" aria-label="Santo que guia a Cartomante">
+            <span class="persona-guide-label">Santo que guia a Cartomante:</span>
+            <button class="persona-toggle" type="button" data-persona="cosmo" aria-pressed="false" title="Cosmo · santo-guia · opinião induzida">Cosmo</button>
+            <button class="persona-toggle" type="button" data-persona="damiao" aria-pressed="false" title="Damião · santo-guia · opinião induzida">Damião</button>
+            <span class="chat-header-separator" aria-hidden="true">|</span>
+            <button class="persona-toggle is-active" type="button" data-persona="neutral" aria-pressed="true" title="Leitura neutra">Neutro</button>
+          </div>
+          <span class="chat-header-separator" aria-hidden="true">|</span>
+          <button class="header-help" type="button" data-help-open aria-haspopup="dialog">Ajuda</button>
+          <span class="chat-header-separator" aria-hidden="true">|</span>
+          <a class="header-home" href="/">Mesa Inicial</a>
+        </nav>
       </header>
 
       <section class="message-scroll" id="message-scroll" aria-live="polite">
@@ -144,6 +122,7 @@
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="/assets/chat.js" defer></script>
+  <script src="/assets/help.js?v=ui-minimal-1" defer></script>
+  <script src="/assets/chat.js?v=ui-minimal-1" defer></script>
 </body>
 </html>

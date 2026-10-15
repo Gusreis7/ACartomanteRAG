@@ -1,93 +1,200 @@
+x-runtime-environment: &runtime-environment
+  RUSTFS_ENDPOINT: http://rustfs:9000
+  RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:?Defina RUSTFS_ACCESS_KEY em config/.env}
+  RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?Defina RUSTFS_SECRET_KEY em config/.env}
+  QDRANT_URL: http://qdrant:6333
+  QDRANT_API_KEY: ${QDRANT_API_KEY:?Defina QDRANT_API_KEY em config/.env}
+  REDIS_URL: redis://:${REDIS_PASSWORD:?Defina REDIS_PASSWORD hexadecimal em config/.env}@redis:6379/0
+  OLLAMA_BASE_URL: ${OLLAMA_BASE_URL_DOCKER:-http://host.docker.internal:11434}
+  HF_HOME: /home/app/.cache/huggingface
+  TOKENIZERS_PARALLELISM: "false"
+  OMP_NUM_THREADS: ${API_CPU_THREADS:-4}
+
 services:
   redis:
     image: redis/redis-stack-server:7.4.0-v8
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
-      REDIS_ARGS: "--appendonly yes --appendfsync everysec"
-    ports:
-      - "127.0.0.1:${REDIS_PORT}:6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Defina REDIS_PASSWORD hexadecimal em config/.env}
+      REDIS_ARGS: "--appendonly yes --appendfsync everysec --requirepass ${REDIS_PASSWORD:?Defina REDIS_PASSWORD}"
     volumes:
-      - ${REDIS_VOLUME}:/data
+      - ${REDIS_VOLUME:?Mantenha o caminho do volume Redis existente}:/data
+    networks:
+      - redis_private
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", 'REDISCLI_AUTH="$${REDIS_PASSWORD}" redis-cli ping | grep -qx PONG']
       interval: 5s
       timeout: 3s
       retries: 10
       start_period: 3s
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   qdrant:
     image: qdrant/qdrant:v1.19.1
-
+    restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-
-    ports:
-      - "127.0.0.1:${QDRANT_HTTP_PORT}:6333"
-
     environment:
-      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY}
-
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:?Defina QDRANT_API_KEY}
     volumes:
-      - ${QDRANT_VOLUME}:/qdrant/storage
-
-    restart: unless-stopped
-
+      - ${QDRANT_VOLUME:?Mantenha o caminho do volume Qdrant existente}:/qdrant/storage
+    networks:
+      - qdrant_private
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   volume-permission-helper:
     image: alpine:3.22
     user: root
-
+    network_mode: none
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
     volumes:
-      - ${RUSTFS_VOLUME}:/data
-
-    command:
-      [
-        "sh",
-        "-c",
-        "mkdir -p /data && chown -R 10001:10001 /data"
-      ]
-
+      - ${RUSTFS_VOLUME:?Mantenha o caminho do volume RustFS existente}:/data
+    command: ["sh", "-ec", "mkdir -p /data && chown -R 10001:10001 /data"]
     restart: "no"
-
 
   rustfs:
     image: rustfs/rustfs:1.0.0
-
+    restart: unless-stopped
     depends_on:
       volume-permission-helper:
         condition: service_completed_successfully
-
     security_opt:
       - no-new-privileges:true
-
-    ports:
-      - "${RUSTFS_API_PORT}:9000"
-      - "${RUSTFS_CONSOLE_PORT}:9001"
-
+    cap_drop:
+      - ALL
     environment:
       RUSTFS_VOLUMES: /data
       RUSTFS_ADDRESS: 0.0.0.0:9000
-      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
-      RUSTFS_CONSOLE_ENABLE: "true"
-      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY}
-      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY}
-      RUSTFS_OBS_LOGGER_LEVEL: info
-
+      RUSTFS_CONSOLE_ENABLE: "false"
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:?Defina RUSTFS_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?Defina RUSTFS_SECRET_KEY}
+      RUSTFS_OBS_LOGGER_LEVEL: warn
     volumes:
-      - ${RUSTFS_VOLUME}:/data
-
+      - ${RUSTFS_VOLUME:?Mantenha o caminho do volume RustFS existente}:/data
+    networks:
+      - rustfs_private
     healthcheck:
-      test:
-        [
-          "CMD",
-          "sh",
-          "-ec",
-          "curl -fsS http://127.0.0.1:9000/health && curl -fsS http://127.0.0.1:9001/rustfs/console/health"
-        ]
+      test: ["CMD", "sh", "-ec", "curl -fsS http://127.0.0.1:9000/health"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 20s
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # Jobs de ETL/benchmark continuam disponíveis, sem executar no startup da API.
+  tools:
+    profiles: ["tools"]
+    build:
+      context: .
+      target: tools
+    environment: *runtime-environment
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./config/config.yaml:/app/config/config.yaml:ro
+      - api_cache:/home/app/.cache
+    networks:
+      - redis_private
+      - qdrant_private
+      - rustfs_private
+      - api_egress
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      redis:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    command: ["python", "-m", "src.generation.cli", "Quem é Capitu?"]
+
+  api:
+    build:
+      context: .
+      target: runtime
     restart: unless-stopped
+    init: true
+    user: "10001:10001"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 512
+    environment:
+      <<: *runtime-environment
+      API_BIND_IP: ${API_BIND_IP:?Informe o IP específico da LAN em config/.env}
+      API_ALLOWED_HOSTS: "localhost,127.0.0.1,${API_BIND_IP:?Informe API_BIND_IP},${API_EXTRA_HOSTS:-}"
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+    ports:
+      - "${API_BIND_IP:?Informe o IP específico da LAN}:${API_PORT:-8000}:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./config/config.yaml:/app/config/config.yaml:ro
+      - api_cache:/home/app/.cache
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=512m,mode=1777
+    networks:
+      - redis_private
+      - qdrant_private
+      - rustfs_private
+      - api_egress
+    depends_on:
+      redis:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    healthcheck:
+      # Liveness leve. /ready é uma checagem explícita das dependências.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 180s
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+networks:
+  redis_private:
+    internal: true
+  qdrant_private:
+    internal: true
+  rustfs_private:
+    internal: true
+  # Saída necessária para Ollama no host e download dos modelos Hugging Face.
+  api_egress:
+    driver: bridge
+
+volumes:
+  api_cache:

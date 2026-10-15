@@ -1,0 +1,17 @@
+# Somente fontes e configuração sem segredos entram no contexto de build.
+**
+!Dockerfile
+!requirements-runtime.txt
+!requirements.txt
+!benchmark/
+!benchmark/**
+!AED/
+!AED/*.csv
+!src/
+!src/**
+!config/
+!config/config.yaml
+**/__pycache__/**
+**/*.pyc
+**/.env
+**/.env.*
