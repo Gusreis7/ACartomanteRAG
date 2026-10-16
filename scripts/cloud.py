@@ -304,21 +304,30 @@ def send_when_ready(client, **request):
             time.sleep(10)
 
 
-def wait_job(client, job, run_id):
+def wait_job(client, job, run_id, wait_seconds=None):
+    started = time.monotonic()
+    next_report = started
     previous = None
     while True:
         run = client.get_job_run(JobName=job, RunId=run_id)["JobRun"]
         status = run["JobRunState"]
-        if status != previous:
-            print(f"Glue: {status}")
+        now = time.monotonic()
+        elapsed = int(now - started)
+        if status != previous or now >= next_report:
+            print(f"Glue: {status}; execução: {run_id}; acompanhamento: {elapsed}s", flush=True)
             previous = status
+            next_report = now + 300
         if status == "SUCCEEDED":
-            return
+            return True
         if status in {"FAILED", "ERROR", "TIMEOUT", "STOPPED", "EXPIRED"}:
             raise RuntimeError(
                 f'Glue {status}: {run.get("ErrorMessage", "Consulte CloudWatch")[:500]}'
             )
-        time.sleep(15)
+        if wait_seconds is not None and now - started >= wait_seconds:
+            print("Janela de acompanhamento encerrada; o Glue continua ativo. Nenhum job foi iniciado ou cancelado.", flush=True)
+            return False
+        remaining = wait_seconds - (now - started) if wait_seconds is not None else 15
+        time.sleep(min(15, remaining))
 
 
 def main():
@@ -346,6 +355,11 @@ def main():
     g.add_argument("--promote", action="store_true")
     g.add_argument("--smoke", action="store_true")
     g.add_argument("--wait", action="store_true")
+    g.add_argument("--run-id-file", type=Path, help="Arquivo novo para salvar o identificador jr_ criado pelo Glue")
+    g.add_argument("--expected-timeout-minutes", type=int, help="Confere o timeout provisionado antes de iniciar o Glue")
+    monitor = commands.add_parser("wait-glue", help="Acompanha um jr_ existente; retorna 3 se a janela terminar com o job ativo")
+    monitor.add_argument("--job-run-id", required=True)
+    monitor.add_argument("--wait-seconds", type=int, default=8100)
     u = commands.add_parser("upload-glue")
     u.add_argument("--revision", required=True)
     u.add_argument("--directory", type=Path, default=Path("dist/glue"))
@@ -362,6 +376,14 @@ def main():
     r = commands.add_parser("data-rollback")
     r.add_argument("--run-id", required=True)
     args = p.parse_args()
+    if args.command == "glue" and args.expected_timeout_minutes is not None:
+        if not 1 <= args.expected_timeout_minutes < 10080:
+            p.error("--expected-timeout-minutes deve estar entre 1 e 10079")
+    if args.command == "wait-glue":
+        if not re.fullmatch(r"jr_[A-Za-z0-9_-]{1,200}", args.job_run_id):
+            p.error("--job-run-id deve ser o identificador jr_ da execução Glue")
+        if not 1 <= args.wait_seconds <= 8100:
+            p.error("--wait-seconds deve estar entre 1 e 8100 (135 minutos)")
     if args.command == "secrets" and args.check:
         if not args.env_file:
             p.error("--check exige --env-file")
@@ -426,6 +448,8 @@ def main():
             raise SystemExit(3)
         print("Bundle Glue íntegro e pronto.")
     elif args.command == "glue":
+        if args.run_id_file and (args.run_id_file.exists() or not args.run_id_file.parent.is_dir()):
+            p.error("--run-id-file exige um arquivo novo em um diretório existente")
         arguments = glue_arguments(
             args.revision,
             out["ops_bucket"],
@@ -442,14 +466,27 @@ def main():
         if not bundle_manifest(s3, out["ops_bucket"], args.revision):
             raise ValueError("Publique o bundle Glue completo antes de iniciar o job.")
         client = boto3.client("glue", region_name=region)
+        if args.expected_timeout_minutes is not None:
+            actual_timeout = client.get_job(JobName=out["glue_job"])["Job"].get("Timeout")
+            if actual_timeout != args.expected_timeout_minutes:
+                raise ValueError(
+                    f"Timeout Glue atual: {actual_timeout} min; esperado: {args.expected_timeout_minutes} min. "
+                    "Gere, revise e aplique um novo plano Terraform antes de iniciar o ETL."
+                )
         if args.reuse_index_id:
             arguments["--reuse-index-id"] = args.reuse_index_id
         run_id = client.start_job_run(JobName=out["glue_job"], Arguments=arguments)[
             "JobRunId"
         ]
-        print(f"Glue iniciado: {run_id}")
+        print(f"Glue iniciado: {run_id}", flush=True)
+        if args.run_id_file:
+            args.run_id_file.write_text(run_id + "\n", encoding="utf-8")
         if args.wait:
             wait_job(client, out["glue_job"], run_id)
+    elif args.command == "wait-glue":
+        client = boto3.client("glue", region_name=region)
+        if not wait_job(client, out["glue_job"], args.job_run_id, args.wait_seconds):
+            raise SystemExit(3)
     elif args.command == "redis-tunnel":
         subprocess.run(
             [

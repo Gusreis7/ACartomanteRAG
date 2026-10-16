@@ -92,6 +92,28 @@ Siga [AWS_RAW_CRAWL.md](AWS_RAW_CRAWL.md) para coletar o Raw e executar `run-fro
 
 A promoção seleciona `production/current.json` e solicita a recarga da API. Antes do primeiro deploy, a recarga registra que a aplicação ainda não foi publicada. Cancelar o workflow não encerra necessariamente o Glue: confira o job antes de repetir.
 
+### Execuções longas em CPU
+
+O plano FREE foi mantido. O Glue tem limite de dez horas com os mesmos dois workers `G.1X`, sem repetição automática. O workflow inicia um único `jr_` e o acompanha em cinco janelas de até 135 minutos. Cada job renova o OIDC; os seguintes conferem o mesmo Glue, inclusive se ele já terminou. O resultado final exige `SUCCEEDED`. A concorrência `aws-production` cobre o workflow inteiro.
+
+Para ativar o novo prazo, publique o patch no Gitea e confira o espelho da `main`. Execute **AWS infrastructure → plan**, revise o novo plano e depois **apply**; o ajuste esperado é `aws_glue_job.etl.timeout`, de 120 para 600. Outros desvios exigem revisão. Não reutilize um plano salvo antes da alteração. O novo workflow confere o prazo provisionado antes de iniciar outro ETL.
+
+Uma execução já iniciada deve ser acompanhada pelo seu próprio `StartedOn` e `Timeout`; não conte com o patch para estendê-la. Para retomar `corpus-raw-v1`, selecione novamente `run-from-raw`, Raw `machado-v1` e a revisão ETL original `de3ac95e91500f26dcdf43212526fb52f33a2916`. Mantenha a promoção desmarcada até conferir o resultado. O controlador atualizado pode acompanhar o bundle antigo sem alterar a assinatura dos dados.
+
+O checkpoint fica no bucket de índices, em `production/runs/corpus-raw-v1.json`. `completed` registra etapas concluídas; `current_step` identifica a etapa atual. O horário muda nas transições, sem representar um sinal periódico de atividade. Os logs detalhados ficam em `/aws-glue/jobs/output` e `/aws-glue/jobs/error`, filtrados pelo `jr_`.
+
+Se uma interrupção forçada deixar `production/etl.lock`, confirme no Glue que não existe execução em `STARTING`, `RUNNING`, `WAITING` ou `STOPPING`. Confira também que o conteúdo do lock corresponde ao `run_id` interrompido. Só então remova esse objeto específico no bucket de índices. Preserve manifest, candidatos, PDFs e collections. O índice parcial é recalculado na retomada; etapas completas e os checkpoints do enrichment são reaproveitados com a mesma revisão.
+
+O encerramento de uma janela de acompanhamento não para o Glue. Também não há encerramento automático do job AWS ao cancelar o workflow. Retomar o acompanhamento de um `jr_` existente não exige iniciar outro ETL:
+
+```bash
+export AWS_PROFILE=terraform
+export AWS_REGION=us-east-1
+python -u scripts/cloud.py wait-glue --job-run-id jr_ID_DA_EXECUCAO --wait-seconds 8100
+```
+
+Esse comando usa os outputs do Terraform local; `--outputs` aceita o contexto JSON existente. Retorno 0 indica sucesso do Glue; 3 indica que ele ainda estava ativo no fim da janela. Falhas e timeout são propagados. As estimativas e a decisão financeira estão em [IMPEDITIVOS.md](IMPEDITIVOS.md).
+
 ## 5. Configurar DNS e publicar a API
 
 Consulte os servidores da zona:
