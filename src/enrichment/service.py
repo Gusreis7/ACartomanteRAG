@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import operator
 import re
 import unicodedata
@@ -16,11 +17,12 @@ from langgraph.types import Send
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.utils.chunking import build_sections
-from src.generation.provider import create_generation_provider
+from src.generation.provider import create_generation_provider, GenerationResponseError
 from src.storage.rustfs_manager import RustFSManager
 
 MAX_EVENTS_PER_BLOCK = 5
 MAX_EVENTS_FINAL = 15
+logger = logging.getLogger("acartomante.enrichment")
 
 UNIT_SYSTEM_PROMPT = (
     "Resuma fatos narrativos com concisão e fidelidade. "
@@ -303,17 +305,42 @@ class WorkEnrichmentService:
             method="json_schema",
         ).with_retry(stop_after_attempt=2)
 
-    def _cached_summary(self, llm, messages, schema):
-        if not self._checkpoint_prefix:
-            return llm.invoke(messages)
+    def _cached_summary(self, llm, messages, schema, *, context=None):
         digest = hashlib.sha256(json.dumps(messages, ensure_ascii=False).encode()).hexdigest()
         key = f"{self._checkpoint_prefix}/{schema.__name__}/{digest}.json"
         bucket = self.config.storage.enrichment_bucket
-        if self.storage.object_exists(bucket, key):
+        if self._checkpoint_prefix and self.storage.object_exists(bucket, key):
             return schema.model_validate_json(self.storage.download_bytes(bucket, key))
-        summary = llm.invoke(messages)
-        self.storage.upload_bytes(bucket, key, summary.model_dump_json().encode(), "application/json")
+        try:
+            summary = llm.invoke(messages)
+        except GenerationResponseError as exc:
+            exc.diagnostics["enrichment_context"] = context or {}
+            self._save_rejected_response(exc, schema, digest)
+            logger.warning("enrichment_response_error %s", json.dumps(exc.diagnostics, ensure_ascii=False))
+            raise
+        if self._checkpoint_prefix:
+            self.storage.upload_bytes(bucket, key, summary.model_dump_json().encode(), "application/json")
         return summary
+
+    def _save_rejected_response(self, error, schema, message_hash):
+        if not self._checkpoint_prefix or error.response_text is None:
+            return
+        identity = json.dumps([error.diagnostics.get("request_id"), error.diagnostics.get("response_sha256")])
+        suffix = hashlib.sha256(identity.encode()).hexdigest()[:16]
+        key = f"{self._checkpoint_prefix}/diagnostics/{schema.__name__}/{message_hash}-{suffix}.json"
+        bucket = self.config.storage.enrichment_bucket
+        payload = {
+            "diagnostics": dict(error.diagnostics), "message_sha256": message_hash,
+            "expected_schema": schema.model_json_schema(),
+            "response_text": error.response_text[:65536],
+            "response_capture_truncated": len(error.response_text) > 65536,
+        }
+        try:
+            self.storage.upload_bytes(bucket, key, json.dumps(payload, ensure_ascii=False).encode(), "application/json")
+        except Exception as exc:
+            error.diagnostics["response_capture_error"] = type(exc).__name__
+        else:
+            error.diagnostics.update(response_error_bucket=bucket, response_error_key=key)
 
     def _build_graph(self):
         graph = StateGraph(EnrichmentState)
@@ -422,7 +449,11 @@ class WorkEnrichmentService:
                 part_count=unit.part_count,
                 text=unit.text,
             )),
-        ], UnitSummary)
+        ], UnitSummary, context={
+            "phase": "unit", "title": source.title, "source_document_id": source.source_document_id,
+            "unit_id": unit.unit_id, "section_label": unit.section_label,
+            "start_char": unit.start_char, "end_char": unit.end_char,
+        })
 
         elapsed = perf_counter() - started
         if not isinstance(summary, UnitSummary):
@@ -484,6 +515,7 @@ class WorkEnrichmentService:
         title: str,
         author: str,
         items: list[dict[str, Any]],
+        phase: str = "final",
     ) -> FinalNarrativeSummary:
         response = self._cached_summary(self.final_llm, [
             ("system", FINAL_SYSTEM_PROMPT),
@@ -493,7 +525,7 @@ class WorkEnrichmentService:
                 max_events=MAX_EVENTS_FINAL,
                 material=self._serialize_items(items),
             )),
-        ], FinalNarrativeSummary)
+        ], FinalNarrativeSummary, context={"phase": phase, "title": title, "items": len(items)})
         self._reduce_calls += 1
         if not isinstance(response, FinalNarrativeSummary):
             response = FinalNarrativeSummary.model_validate(response)
@@ -530,6 +562,7 @@ class WorkEnrichmentService:
                     title=source.title,
                     author=source.author,
                     items=pack,
+                    phase="reduce",
                 )
                 reduced_items.append({
                     "unidade": f"reduce_{index:03d}",
