@@ -65,6 +65,8 @@ Abra **GitHub → Actions → AWS ETL → Run workflow → main**:
 
 O Glue verifica o Raw e executa Bronze, Silver, índice textual, enrichment e índice auxiliar. O modo `run` inclui o crawler na nuvem e pode reencontrar o 403; o fluxo adotado é `run-from-raw`.
 
+O processamento permanece em CPU no plano FREE. Após aplicar a atualização Terraform, o prazo do Glue é de dez horas; o GitHub acompanha o mesmo job em janelas com renovação de OIDC. O procedimento para ativar esse limite e retomar a revisão existente está em [AWS_AUTOMATION.md](AWS_AUTOMATION.md#execuções-longas-em-cpu).
+
 ## 4. Retomar e promover
 
 - **Downloads pendentes:** use `--retry` com o mesmo bucket e `raw_id`. Só as obras pendentes são revisitadas. O manifest registra status, erro, contador de tentativas desta versão e data da última tentativa.

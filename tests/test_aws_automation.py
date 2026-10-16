@@ -369,8 +369,157 @@ def test_workflow_contract_orders_infra_before_api_and_separates_etl():
     assert "AWS_APP_DEPLOY_ENABLED" in ci["jobs"]["deploy"]["if"]
     assert set(etl["on"]) == {"workflow_dispatch"}
     assert "workflow_call" in infrastructure["on"]
-    for job in (ci["jobs"]["deploy"], infrastructure["jobs"]["terraform"], etl["jobs"]["etl"]):
+    for job in (ci["jobs"]["deploy"], infrastructure["jobs"]["terraform"]):
         assert job["concurrency"] == {"group": "aws-production", "cancel-in-progress": "false"}
+    assert etl["concurrency"] == {"group": "aws-production", "cancel-in-progress": "false"}
+    assert all("concurrency" not in job for job in etl["jobs"].values())
     app_runs = "\n".join(step.get("run", "") for step in ci["jobs"]["deploy"]["steps"])
     assert "Dockerfile.wheels" not in app_runs and " cloud.py glue" not in app_runs
     assert "config/deployment.json" in app_runs
+
+
+@pytest.mark.parametrize("terminal", ["FAILED", "ERROR", "TIMEOUT", "STOPPED", "EXPIRED"])
+def test_glue_monitor_propagates_terminal_failures(cloud, terminal):
+    client = Mock()
+    client.get_job_run.return_value = {"JobRun": {"JobRunState": terminal, "ErrorMessage": "diagnóstico"}}
+    with pytest.raises(RuntimeError, match=f"Glue {terminal}: diagnóstico"):
+        cloud.wait_job(client, "etl-job", "jr_existing", wait_seconds=1)
+    client.start_job_run.assert_not_called()
+    client.batch_stop_job_run.assert_not_called()
+
+
+def test_glue_monitor_window_keeps_running_job_and_reports_heartbeat(cloud, monkeypatch, capsys):
+    clock = SimpleNamespace(now=0.0)
+    monkeypatch.setattr(cloud.time, "monotonic", lambda: clock.now)
+    monkeypatch.setattr(cloud.time, "sleep", lambda seconds: setattr(clock, "now", clock.now + seconds))
+    client = Mock()
+    client.get_job_run.return_value = {"JobRun": {"JobRunState": "RUNNING"}}
+    assert cloud.wait_job(client, "etl-job", "jr_existing", wait_seconds=305) is False
+    assert clock.now == 305
+    log = capsys.readouterr().out
+    assert log.count("Glue: RUNNING") == 2
+    assert "continua ativo" in log
+    client.start_job_run.assert_not_called()
+    client.batch_stop_job_run.assert_not_called()
+    assert all(call.kwargs == {"JobName": "etl-job", "RunId": "jr_existing"} for call in client.get_job_run.call_args_list)
+
+
+def test_glue_monitor_recognizes_success_at_window_boundary(cloud, monkeypatch):
+    clock = SimpleNamespace(now=0.0)
+    monkeypatch.setattr(cloud.time, "monotonic", lambda: clock.now)
+    monkeypatch.setattr(cloud.time, "sleep", lambda seconds: setattr(clock, "now", clock.now + seconds))
+    client = Mock()
+    client.get_job_run.side_effect = [
+        {"JobRun": {"JobRunState": "RUNNING"}},
+        {"JobRun": {"JobRunState": "SUCCEEDED"}},
+    ]
+    assert cloud.wait_job(client, "etl-job", "jr_existing", wait_seconds=1) is True
+    assert clock.now == 1
+    client.start_job_run.assert_not_called()
+
+
+@pytest.mark.parametrize("status, expected_exit", [("SUCCEEDED", None), ("RUNNING", 3)])
+def test_wait_glue_cli_only_observes_existing_execution(cloud, monkeypatch, status, expected_exit):
+    clients = {name: Mock() for name in ("ssm", "s3", "glue")}
+    clients["glue"].get_job_run.return_value = {"JobRun": {"JobRunState": status}}
+    clock = SimpleNamespace(now=0.0)
+    monkeypatch.setattr(cloud.time, "monotonic", lambda: clock.now)
+    monkeypatch.setattr(cloud.time, "sleep", lambda seconds: setattr(clock, "now", clock.now + seconds))
+    monkeypatch.setattr(cloud.boto3, "client", lambda name, **kwargs: clients[name])
+    monkeypatch.setattr(cloud, "outputs", lambda path: {"glue_job": "etl-job"})
+    monkeypatch.setattr("sys.argv", ["cloud.py", "wait-glue", "--job-run-id", "jr_existing", "--wait-seconds", "1"])
+    if expected_exit:
+        with pytest.raises(SystemExit) as error:
+            cloud.main()
+        assert error.value.code == expected_exit
+    else:
+        cloud.main()
+    clients["glue"].start_job_run.assert_not_called()
+    clients["glue"].batch_stop_job_run.assert_not_called()
+    assert not clients["s3"].mock_calls
+    assert not clients["ssm"].mock_calls
+
+
+@pytest.mark.parametrize("arguments", [
+    ["--job-run-id", "corpus-raw-v1"],
+    ["--job-run-id", "jr_existing", "--wait-seconds", "0"],
+    ["--job-run-id", "jr_existing", "--wait-seconds", "8101"],
+])
+def test_wait_glue_rejects_invalid_identity_and_window_before_aws(cloud, monkeypatch, arguments):
+    client = Mock(side_effect=AssertionError("não deve consultar AWS"))
+    monkeypatch.setattr(cloud.boto3, "client", client)
+    monkeypatch.setattr("sys.argv", ["cloud.py", "wait-glue", *arguments])
+    with pytest.raises(SystemExit) as error:
+        cloud.main()
+    assert error.value.code == 2
+    client.assert_not_called()
+
+
+@pytest.mark.parametrize("already_exists", [False, True])
+def test_glue_start_exports_only_created_run_id_and_preserves_existing_file(tmp_path, cloud, monkeypatch, already_exists):
+    clients = {name: Mock() for name in ("ssm", "s3", "glue")}
+    clients["glue"].start_job_run.return_value = {"JobRunId": "jr_created"}
+    monkeypatch.setattr(cloud.boto3, "client", lambda name, **kwargs: clients[name])
+    monkeypatch.setattr(cloud, "outputs", lambda path: {"ops_bucket": "ops", "glue_job": "etl-job"})
+    monkeypatch.setattr(cloud, "bundle_manifest", lambda *args: {"revision": "d" * 40})
+    path = tmp_path / "glue-run-id"
+    if already_exists:
+        path.write_text("jr_previous\n")
+    monkeypatch.setattr("sys.argv", ["cloud.py", "glue", "--revision", "d" * 40, "--run-id", "corpus-v1", "--run-id-file", str(path)])
+    if already_exists:
+        with pytest.raises(SystemExit) as error:
+            cloud.main()
+        assert error.value.code == 2
+        clients["glue"].start_job_run.assert_not_called()
+        assert path.read_text() == "jr_previous\n"
+    else:
+        cloud.main()
+        clients["glue"].start_job_run.assert_called_once()
+        assert path.read_text() == "jr_created\n"
+        assert "Timeout" not in clients["glue"].start_job_run.call_args.kwargs
+
+
+def test_etl_workflow_keeps_one_glue_run_and_requires_success_after_all_windows():
+    workflow = yaml.load((ROOT / ".github/workflows/etl.yml").read_text(), Loader=yaml.BaseLoader)
+    jobs = workflow["jobs"]
+    commands = lambda name: "\n".join(step.get("run", "") for step in jobs[name]["steps"])
+    assert "--run-id-file" in commands("etl") and "--wait " not in commands("etl")
+    assert "--expected-timeout-minutes 600" in commands("etl")
+    assert jobs["etl"]["outputs"]["glue_run_id"] == "${{ steps.start.outputs.glue_run_id }}"
+    monitor = jobs["monitor"]
+    assert monitor["needs"] == "etl"
+    assert monitor["strategy"]["max-parallel"] == "1"
+    assert len(monitor["strategy"]["matrix"]["window"]) * 135 > 600
+    assert "wait-glue" in commands("monitor") and '"$result" -ne 3' in commands("monitor")
+    assert jobs["finish"]["needs"] == ["etl", "monitor"]
+    final_steps = jobs["finish"]["steps"]
+    confirmation = next(i for i, step in enumerate(final_steps) if "Require Glue success" in step.get("name", ""))
+    reload = next(i for i, step in enumerate(final_steps) if "Reload application" in step.get("name", ""))
+    assert confirmation < reload
+    assert "||" not in final_steps[confirmation]["run"]
+    for name in ("monitor", "finish"):
+        assert jobs[name]["env"]["GLUE_RUN_ID"] == "${{ needs.etl.outputs.glue_run_id }}"
+        assert "--run-id-file" not in commands(name)
+        assert "promote" not in commands(name)
+    for job in jobs.values():
+        assert int(job["timeout-minutes"]) < 180
+        assert any("configure-aws-credentials@" in step.get("uses", "") for step in job["steps"])
+
+
+@pytest.mark.parametrize("provisioned_timeout", [120, 600, None])
+def test_glue_requires_provisioned_timeout_before_start(cloud, monkeypatch, provisioned_timeout):
+    clients = {name: Mock() for name in ("ssm", "s3", "glue")}
+    clients["glue"].get_job.return_value = {"Job": {"Timeout": provisioned_timeout}}
+    clients["glue"].start_job_run.return_value = {"JobRunId": "jr_created"}
+    monkeypatch.setattr(cloud.boto3, "client", lambda name, **kwargs: clients[name])
+    monkeypatch.setattr(cloud, "outputs", lambda path: {"ops_bucket": "ops", "glue_job": "etl-job"})
+    monkeypatch.setattr(cloud, "bundle_manifest", lambda *args: {"revision": "d" * 40})
+    monkeypatch.setattr("sys.argv", ["cloud.py", "glue", "--revision", "d" * 40, "--run-id", "corpus-v1", "--expected-timeout-minutes", "600"])
+    if provisioned_timeout == 600:
+        cloud.main()
+        clients["glue"].start_job_run.assert_called_once()
+    else:
+        with pytest.raises(ValueError, match="novo plano Terraform"):
+            cloud.main()
+        clients["glue"].start_job_run.assert_not_called()
+    clients["glue"].update_job.assert_not_called()

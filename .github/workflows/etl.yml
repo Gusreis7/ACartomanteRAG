@@ -26,20 +26,23 @@ on:
         type: string
 permissions:
   contents: read
+concurrency:
+  group: aws-production
+  cancel-in-progress: false
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  OPS_BUCKET: ${{ vars.OPS_BUCKET }}
 jobs:
   etl:
     if: github.ref == 'refs/heads/main' && vars.AWS_ETL_ROLE_ARN != ''
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
-    concurrency:
-      group: aws-production
-      cancel-in-progress: false
+    timeout-minutes: 90
+    outputs:
+      glue_run_id: ${{ steps.start.outputs.glue_run_id }}
     permissions:
       contents: read
       id-token: write
     env:
-      AWS_REGION: ${{ vars.AWS_REGION }}
-      OPS_BUCKET: ${{ vars.OPS_BUCKET }}
       REQUESTED_REVISION: ${{ inputs.revision }}
       RUN_ID: ${{ inputs.run_id }}
       OPERATION: ${{ inputs.operation }}
@@ -99,7 +102,8 @@ jobs:
           elif [ "$result" -ne 0 ]; then
             exit "$result"
           fi
-      - name: Run Glue and wait for validation
+      - name: Start one Glue execution
+        id: start
         shell: bash
         run: |
           set -euo pipefail
@@ -109,8 +113,84 @@ jobs:
           fi
           [ "$OPERATION" != smoke ] || options+=(--smoke)
           [ "$PROMOTE" != true ] || options+=(--promote)
-          python scripts/cloud.py --outputs "$RUNNER_TEMP/deployment.local.json" glue \
-            --revision "$ETL_REVISION" --run-id "$RUN_ID" --wait "${options[@]}"
+          python -u scripts/cloud.py --outputs "$RUNNER_TEMP/deployment.local.json" glue \
+            --revision "$ETL_REVISION" --run-id "$RUN_ID" \
+            --run-id-file "$RUNNER_TEMP/glue-run-id" --expected-timeout-minutes 600 "${options[@]}"
+          IFS= read -r glue_run_id < "$RUNNER_TEMP/glue-run-id"
+          printf 'glue_run_id=%s\n' "$glue_run_id" >> "$GITHUB_OUTPUT"
+
+  monitor:
+    name: Acompanhar Glue (${{ matrix.window }}/5)
+    needs: etl
+    runs-on: ubuntu-24.04
+    timeout-minutes: 165
+    strategy:
+      max-parallel: 1
+      fail-fast: true
+      matrix:
+        window: [1, 2, 3, 4, 5]
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GLUE_RUN_ID: ${{ needs.etl.outputs.glue_run_id }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Install controller dependencies
+        run: python -m pip install -c requirements-runtime.lock boto3
+      - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
+        with:
+          role-to-assume: ${{ vars.AWS_ETL_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: etl-monitor-${{ github.run_id }}-${{ matrix.window }}
+          role-duration-seconds: 10800
+      - name: Read current deployment context
+        run: aws s3 cp "s3://$OPS_BUCKET/config/deployment.json" "$RUNNER_TEMP/deployment.local.json" --only-show-errors
+      - name: Follow the same Glue execution for up to 135 minutes
+        shell: bash
+        run: |
+          set -euo pipefail
+          result=0
+          python -u scripts/cloud.py --outputs "$RUNNER_TEMP/deployment.local.json" wait-glue \
+            --job-run-id "$GLUE_RUN_ID" --wait-seconds 8100 || result=$?
+          if [ "$result" -ne 0 ] && [ "$result" -ne 3 ]; then
+            exit "$result"
+          fi
+
+  finish:
+    name: Confirmar resultado do ETL
+    needs: [etl, monitor]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GLUE_RUN_ID: ${{ needs.etl.outputs.glue_run_id }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Install controller dependencies
+        run: python -m pip install -c requirements-runtime.lock boto3
+      - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
+        with:
+          role-to-assume: ${{ vars.AWS_ETL_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: etl-finish-${{ github.run_id }}
+          role-duration-seconds: 3600
+      - name: Read current deployment context
+        run: aws s3 cp "s3://$OPS_BUCKET/config/deployment.json" "$RUNNER_TEMP/deployment.local.json" --only-show-errors
+      - name: Require Glue success before finishing
+        run: python -u scripts/cloud.py --outputs "$RUNNER_TEMP/deployment.local.json" wait-glue --job-run-id "$GLUE_RUN_ID" --wait-seconds 60
       - name: Reload application after data promotion
         if: inputs.operation != 'smoke' && inputs.promote
-        run: python scripts/cloud.py --outputs "$RUNNER_TEMP/deployment.local.json" reload-data
+        run: python -u scripts/cloud.py --outputs "$RUNNER_TEMP/deployment.local.json" reload-data
