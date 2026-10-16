@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, model_validator
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ENV_PATH = PROJECT_ROOT / "config" / ".env"
 DEFAULT_YAML_PATH = PROJECT_ROOT / "config" / "config.yaml"
-ENRICHMENT_RUNTIME_FIELDS = {"max_parallel", "timeout_seconds", "keep_alive", "num_batch", "response_retries"}
+ENRICHMENT_RUNTIME_FIELDS = {"max_parallel", "timeout_seconds", "keep_alive", "num_batch", "response_retries", "response_retry_max_tokens"}
 
 
 class RustFSConfig(BaseModel):
@@ -295,6 +295,7 @@ class GenerationConfig(BaseModel):
     reasoning: bool = False
     retry_attempts: int = Field(default=3, ge=1, le=5)
     response_retries: int = Field(default=1, ge=0, le=3)
+    response_retry_max_tokens: int = Field(default=0, ge=0, le=8192)
     input_usd_per_million: float = Field(default=0.0, ge=0)
     output_usd_per_million: float = Field(default=0.0, ge=0)
     model_prices: dict[str, dict[str, float]] = Field(default_factory=dict)
@@ -345,6 +346,12 @@ class GenerationConfig(BaseModel):
         gt=0,
     )
 
+    @model_validator(mode="after")
+    def validate_response_retry_budget(self):
+        if 0 < self.response_retry_max_tokens < self.max_tokens:
+            raise ValueError("response_retry_max_tokens deve ser zero ou pelo menos max_tokens.")
+        return self
+
 
 
 class EnrichmentSemanticConfig(BaseModel):
@@ -355,6 +362,7 @@ class EnrichmentSemanticConfig(BaseModel):
 class EnrichmentConfig(BaseModel):
     pipeline_version: int = Field(default=1, ge=1)
     response_retries: int = Field(default=3, ge=0, le=3)
+    response_retry_max_tokens: int = Field(default=0, ge=0, le=8192)
     model: str = Field(default="qwen3.5:4b", min_length=1)
     provider: Literal["ollama", "bedrock", "bedrock-mantle"] = "ollama"
     region: str = "us-east-1"
@@ -377,6 +385,8 @@ class EnrichmentConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_char_overlap(self):
+        if 0 < self.response_retry_max_tokens < self.max_tokens:
+            raise ValueError("enrichment.response_retry_max_tokens deve ser zero ou pelo menos max_tokens.")
         if self.char_overlap >= self.unit_chars:
             raise ValueError(
                 "enrichment.char_overlap deve ser menor que enrichment.unit_chars."

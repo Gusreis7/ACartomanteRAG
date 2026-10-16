@@ -262,7 +262,7 @@ class WorkEnrichmentService:
         if self.enrichment.provider in {"bedrock", "bedrock-mantle"}:
             generation = config.generation.model_copy(update={
                 **{key: getattr(self.enrichment, key) for key in (
-                    "provider", "region", "model", "temperature", "top_p", "max_tokens", "timeout_seconds", "max_parallel", "reasoning", "response_retries"
+                    "provider", "region", "model", "temperature", "top_p", "max_tokens", "timeout_seconds", "max_parallel", "reasoning", "response_retries", "response_retry_max_tokens"
                 )},
             })
             self.provider = create_generation_provider(generation)

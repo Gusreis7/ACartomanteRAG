@@ -142,6 +142,12 @@ O Glue usa `--retry` (alias de `--resume`): seleciona somente obras pendentes/er
 
 Para adotar este patch em `corpus-raw-v1`, publique a nova revisão e use `revision` vazio, `resume_from_revision` igual ao SHA atualmente registrado no checkpoint, mesmo Raw/run e promoção desmarcada. A atualização verifica a assinatura e salva backup; preserva o dataset e os checkpoints Mantle quando só muda o código/controle de execução. Nas retomadas seguintes, fixe o novo SHA e deixe o campo de origem vazio. Nenhuma mudança adicional de IAM ou Terraform é necessária se a rota Mantle já foi provisionada.
 
+Na run `jr_299f37f11d5012c96cd41e6ebbd3db6d15cf1e0ab6d8c284485a950b374a9323`, 253 das 257 obras ficaram prontas. O exemplo `finish_reason=length`, com 1.024 tokens gerados e permitidos, comprova o corte no teto solicitado; o log isolado não diagnostica as outras três obras.
+
+O overlay AWS passa a usar `enrichment.response_retry_max_tokens: 4096`. A primeira chamada continua em 1.024 tokens; somente um corte no teto de saída permite duplicar o orçamento nos retries: **1.024 → 2.048 → 4.096 → 4.096**. JSON inválido, resposta vazia, corte abaixo do teto e limite de contexto não aumentam esse orçamento. Preflight continua em 64 tokens. O total permanece em quatro chamadas por unidade, com custos dos tokens efetivamente consumidos.
+
+Esse teto de recuperação é operacional: não altera a identidade do dataset ou das unidades. A retomada conserva os objetos concluídos e tenta as quatro obras com erro; os novos JSONs registram a política de retry em `generation`, e o artifact guarda a configuração. Modelo, prompt, schema e teto da primeira chamada permanecem iguais. Se o novo limite também for insuficiente, a obra volta ao manifest como erro, sem aceitar JSON parcial.
+
 ## 5. Configurar DNS e publicar a API
 
 Consulte os servidores da zona:
