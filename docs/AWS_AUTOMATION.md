@@ -154,6 +154,10 @@ Após esgotar os retries, `enrichment_response_error` registra obra, fase (`unit
 
 Esse registro vale para novas tentativas; as respostas antigas descartadas pelo projeto não são recuperadas retroativamente. A instrumentação preserva prompts, schemas, identidade do dataset, checkpoints, limites e critérios de aceitação. Para adotá-la, aguarde o Glue encerrar e siga a mesma migração de revisão descrita acima, usando o SHA atual do checkpoint.
 
+Em `O almada`, o diagnóstico confirmou duas unidades com apenas `I` e linhas de pontos: `s004_p01` (9.933–10.002) e `s017_p01` (18.333–18.411). A triagem do enrichment passa a ignorar unidades inteiras formadas por um marcador romano maiúsculo e uma ou mais linhas com pelo menos três pontos, sem outro conteúdo. A numeração é feita antes da triagem, preservando IDs, posições, prompts e caches das unidades com texto.
+
+O resultado da obra registra `plan.detected_units`, `plan.planned_units`, `plan.skipped_units_count` e `plan.skipped_units` (ID, posição, motivo e hash). O log `[skip] Enrichment` resume as unidades ignoradas, que não seguem para inferência, consolidação ou índice auxiliar. O texto original permanece disponível nas camadas existentes. Uma obra sem unidades processáveis continua falhando; respostas vazias de unidades com texto também continuam rejeitadas. A retomada usa o mesmo procedimento de atualização de revisão e conserva as obras concluídas.
+
 ## 5. Configurar DNS e publicar a API
 
 Consulte os servidores da zona:
