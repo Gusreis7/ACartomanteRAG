@@ -500,3 +500,81 @@ def test_mantle_code_update_preserves_checkpoint_and_runtime_only_settings(check
     assert result["migrations"][-1]["to_revision"]=="c"*40
     assert result["source_revision"]=="c"*40
     assert checkpoint.executions==["src.enrichment.build_enrichment_dataset","src.indexing.build_enrichment_embedding_indexes"]
+
+
+@pytest.mark.parametrize("text,kind,location", [
+    ('{"resumo":', "json_syntax", []),
+    ('{"resumo":"Texto","eventos":"Evento"}', "schema_validation", ["eventos"]),
+    ('{"resumo":"","eventos":[]}', "empty_structure", None),
+    ('{"summary":"Campo desconhecido"}', "empty_structure", None),
+])
+def test_structured_diagnostics_distinguish_syntax_schema_and_empty(text, kind, location, caplog):
+    from src.enrichment.service import UnitSummary
+    provider, _ = mantle(lambda _: httpx.Response(200, json=completion(text)), response_retries=0)
+    with pytest.raises(GenerationResponseError) as error:
+        provider.invoke_structured([("human", "PRIVATE_PROMPT")], UnitSummary)
+    details = error.value.diagnostics
+    assert details["reason"] == "invalid_json" and details["validation_kind"] == kind
+    assert details["schema_name"] == "UnitSummary"
+    assert details["response_sha256"] == hashlib.sha256(text.encode()).hexdigest()
+    assert error.value.response_text == text
+    if location is not None:
+        assert details["validation_errors"][0]["loc"] == location
+    assert text not in caplog.text and "PRIVATE_PROMPT" not in caplog.text
+
+
+def test_rejected_response_is_saved_with_context_and_never_as_success(checkpoint, monkeypatch, caplog):
+    from src.enrichment.service import WorkEnrichmentService, WorkSource
+    provider, _ = mantle(lambda _: httpx.Response(200, json=completion('{"resumo":"","eventos":[]}'), headers={"x-request-id":"request-json-error"}), response_retries=0)
+    monkeypatch.setattr("src.enrichment.service.create_generation_provider", lambda _: provider)
+    service=WorkEnrichmentService(checkpoint.config)
+    source=WorkSource("O almada", "Machado", "Poema", "doc-123", "bronze", "obra.txt", "PRIVATE_SOURCE_TEXT")
+    with pytest.raises(GenerationResponseError) as error:
+        service.enrich(source, checkpoint_prefix="checkpoints/test-json")
+    details=error.value.diagnostics
+    assert details["enrichment_context"]["phase"] == "unit"
+    assert details["enrichment_context"]["title"] == "O almada"
+    assert details["enrichment_context"]["source_document_id"] == "doc-123"
+    assert details["enrichment_context"]["unit_id"]
+    assert details["enrichment_context"]["end_char"] > details["enrichment_context"]["start_char"]
+    payload=production.read_json(checkpoint.storage,details["response_error_bucket"],details["response_error_key"])
+    assert payload["response_text"] == '{"resumo":"","eventos":[]}'
+    assert payload["expected_schema"]["title"] == "UnitSummary"
+    assert not payload["response_capture_truncated"]
+    assert "PRIVATE_SOURCE_TEXT" not in json.dumps(payload) and "PRIVATE_SOURCE_TEXT" not in caplog.text
+    assert payload["response_text"] not in caplog.text
+    objects=checkpoint.storage.client.list_objects_v2(Bucket=details["response_error_bucket"],Prefix="checkpoints/test-json")["Contents"]
+    assert len(objects)==1 and "/diagnostics/UnitSummary/" in objects[0]["Key"]
+
+
+def test_failed_diagnostic_upload_preserves_the_original_validation_error(checkpoint, monkeypatch):
+    from src.enrichment.service import WorkEnrichmentService, UnitSummary
+    provider, _ = mantle(lambda _: httpx.Response(200, json=completion('{"resumo":"","eventos":[]}')), response_retries=0)
+    monkeypatch.setattr("src.enrichment.service.create_generation_provider", lambda _: provider)
+    service=WorkEnrichmentService(checkpoint.config)
+    service._checkpoint_prefix="checkpoints/test-json"
+    monkeypatch.setattr(service.storage,"upload_bytes",Mock(side_effect=RuntimeError("upload-failed")))
+    with pytest.raises(GenerationResponseError) as error:
+        service._cached_summary(service.unit_llm,[("human","PRIVATE_PROMPT")],UnitSummary)
+    assert error.value.diagnostics["validation_kind"]=="empty_structure"
+    assert error.value.diagnostics["response_capture_error"]=="RuntimeError"
+    assert "response_error_key" not in error.value.diagnostics
+
+
+def test_failed_response_capture_is_bounded_and_does_not_change_unit_cache_keys(checkpoint, monkeypatch):
+    from src.enrichment.service import WorkEnrichmentService, UnitSummary
+    monkeypatch.setattr("src.enrichment.service.create_generation_provider",lambda _: Mock())
+    service=WorkEnrichmentService(checkpoint.config)
+    service._checkpoint_prefix="checkpoints/test-json"
+    long_text="x"*70000
+    failure=GenerationResponseError("invalid",diagnostics={"reason":"invalid_json","request_id":"r","response_sha256":hashlib.sha256(long_text.encode()).hexdigest()},response_text=long_text)
+    llm=Mock();llm.invoke.side_effect=failure
+    messages=[("human","PRIVATE_PROMPT")]
+    with pytest.raises(GenerationResponseError):service._cached_summary(llm,messages,UnitSummary)
+    data=production.read_json(checkpoint.storage,failure.diagnostics["response_error_bucket"],failure.diagnostics["response_error_key"])
+    assert len(data["response_text"])==65536 and data["response_capture_truncated"]
+    digest=hashlib.sha256(json.dumps(messages,ensure_ascii=False).encode()).hexdigest()
+    key=f"checkpoints/test-json/UnitSummary/{digest}.json"
+    checkpoint.storage.upload_bytes(checkpoint.config.storage.enrichment_bucket,key,UnitSummary(resumo="Cached",eventos=[]).model_dump_json().encode())
+    assert service._cached_summary(llm,messages,UnitSummary).resumo=="Cached"
+    assert llm.invoke.call_count==1

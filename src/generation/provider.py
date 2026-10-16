@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+import hashlib
 import json
 import logging
 import re
@@ -16,6 +17,7 @@ from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
 from botocore.exceptions import ClientError, NoCredentialsError
 from langchain_core.messages import AIMessage
+from pydantic import ValidationError
 
 logger = logging.getLogger("acartomante.generation")
 
@@ -32,9 +34,11 @@ class GenerationServiceError(RuntimeError):
 
 
 class GenerationResponseError(GenerationServiceError):
-    def __init__(self, message, *, diagnostics=None, retryable=True, batch_fatal=False):
+    def __init__(self, message, *, diagnostics=None, retryable=True, batch_fatal=False, response_text=None):
         super().__init__(message, diagnostics=diagnostics, batch_fatal=batch_fatal)
         self.retryable = retryable
+        # Só o serviço de enrichment persiste esta saída no S3; nunca no log.
+        self.response_text = response_text
 
 
 class GenerationQuotaError(GenerationCapacityError):
@@ -410,6 +414,7 @@ class BedrockGenerationProvider(GenerationProvider):
         raw = None
         max_tokens = self.config.max_tokens
         for attempt in range(self.config.response_retries + 1):
+            raw, parsed = None, None
             try:
                 raw = self.invoke([("system", instruction), *messages], max_tokens=max_tokens)
                 content = raw.content.strip()
@@ -421,11 +426,21 @@ class BedrockGenerationProvider(GenerationProvider):
                 return {"raw": raw, "parsed": parsed, "parsing_error": None} if include_raw else parsed
             except GenerationResponseError as exc:
                 last_error = exc
-            except (ValueError, TypeError):
+            except (ValueError, TypeError) as exc:
                 if raw is None:
                     raise
-                diagnostics = {**raw.response_metadata.get("diagnostics", {}), "reason": "invalid_json"}
-                last_error = GenerationResponseError("Modelo retornou JSON inválido ou fora do schema.", diagnostics=diagnostics)
+                errors = exc.errors(include_url=False, include_context=False, include_input=False) if isinstance(exc, ValidationError) else []
+                kind = "json_syntax" if any(item["type"] == "json_invalid" for item in errors) else "schema_validation" if errors else "empty_structure" if parsed is not None else "validation_error"
+                diagnostics = {
+                    **raw.response_metadata.get("diagnostics", {}), "reason": "invalid_json",
+                    "validation_kind": kind, "schema_name": schema.__name__,
+                    "validation_errors": [{"type": item["type"], "loc": list(item["loc"])} for item in errors[:8]],
+                    "response_chars": len(raw.content),
+                    "response_sha256": hashlib.sha256(raw.content.encode()).hexdigest(),
+                }
+                if parsed is not None:
+                    diagnostics["parsed_fields"] = list(parsed.model_dump())
+                last_error = GenerationResponseError("Modelo retornou JSON inválido ou fora do schema.", diagnostics=diagnostics, response_text=raw.content)
                 logger.warning("generation_response_error %s", json.dumps(diagnostics))
             next_max_tokens = max_tokens
             if (

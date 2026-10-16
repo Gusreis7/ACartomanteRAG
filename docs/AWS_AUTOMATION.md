@@ -148,6 +148,12 @@ O overlay AWS passa a usar `enrichment.response_retry_max_tokens: 4096`. A prime
 
 Esse teto de recuperação é operacional: não altera a identidade do dataset ou das unidades. A retomada conserva os objetos concluídos e tenta as quatro obras com erro; os novos JSONs registram a política de retry em `generation`, e o artifact guarda a configuração. Modelo, prompt, schema e teto da primeira chamada permanecem iguais. Se o novo limite também for insuficiente, a obra volta ao manifest como erro, sem aceitar JSON parcial.
 
+Para investigar `invalid_json`, confira `validation_kind`: `json_syntax` indica sintaxe inválida; `schema_validation`, campos/tipos incompatíveis; `empty_structure`, resultado validado mas vazio. Esse último caso inclui `{"resumo":"","eventos":[]}` e campos desconhecidos ignorados pelo schema. Uma resposta curta com `stop` não identifica, sozinha, qual dessas situações ocorreu.
+
+Após esgotar os retries, `enrichment_response_error` registra obra, fase (`unit`, `reduce` ou `final`), unidade/intervalo quando disponíveis e `response_error_bucket`/`response_error_key`. O objeto em `checkpoints/.../diagnostics/...` contém a última resposta rejeitada (até 65.536 caracteres), schema e diagnóstico. O manifest conserva esses dados em `erro_detalhes_json`; o corpo não vai para o CloudWatch, nem são capturados prompts ou credenciais. Falha ao gravar o diagnóstico mantém o erro original e registra `response_capture_error`.
+
+Esse registro vale para novas tentativas; as respostas antigas descartadas pelo projeto não são recuperadas retroativamente. A instrumentação preserva prompts, schemas, identidade do dataset, checkpoints, limites e critérios de aceitação. Para adotá-la, aguarde o Glue encerrar e siga a mesma migração de revisão descrita acima, usando o SHA atual do checkpoint.
+
 ## 5. Configurar DNS e publicar a API
 
 Consulte os servidores da zona:
