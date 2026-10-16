@@ -18,7 +18,7 @@ from moto import mock_aws
 from pydantic import BaseModel
 import pytest
 
-from src.config.config_manager import ConfigManager, GenerationConfig
+from src.config.config_manager import ConfigManager, GenerationConfig, EnrichmentConfig, ENRICHMENT_RUNTIME_FIELDS
 from src.etl import production
 from src.generation.provider import BedrockGenerationProvider, GenerationServiceError, GenerationResponseError, _MantleClient
 from src.storage.rustfs_manager import RustFSManager
@@ -133,7 +133,7 @@ def checkpoint(monkeypatch):
     config.storage.silver_current_key = "production/candidates/corpus/silver.json"
     raw = b"unchanged raw manifest"
     receipt = {"raw_id": "machado-v1", "manifest_sha256": hashlib.sha256(raw).hexdigest(), "first_page": 1, "last_page": 7, "source_query": "Machado"}
-    inputs = {"source_revision": OLD, "bronze": config.bronze.model_dump(), "pages": [1, 7], "silver": config.silver.model_dump(), "embedding": config.embedding.model_dump(exclude={"execution"}), "enrichment": config.enrichment.model_dump(exclude={"max_parallel", "timeout_seconds", "keep_alive", "num_batch", "response_retries"}), "reuse_index_id": None, "raw": receipt}
+    inputs = {"source_revision": OLD, "bronze": config.bronze.model_dump(), "pages": [1, 7], "silver": config.silver.model_dump(), "embedding": config.embedding.model_dump(exclude={"execution"}), "enrichment": config.enrichment.model_dump(exclude=ENRICHMENT_RUNTIME_FIELDS), "reuse_index_id": None, "raw": receipt}
     inputs["enrichment"].update(provider="bedrock", model="qwen.qwen3-32b-v1:0")
     previous = {"run_id": "corpus", "signature": production.checkpoint_signature(inputs), "completed": ["bronze", "silver", "text-index"], "outputs": {"index_id": "existing-text"}, "raw_id": "machado-v1", "raw_manifest_sha256": receipt["manifest_sha256"], "status": "running", "current_step": "enrichment"}
     args = SimpleNamespace(run_id="corpus", raw_id="machado-v1", steps=list(production.RAW_STEPS), reuse_index_id=None, first_page=1, last_page=7, promote=False, resume_from_revision=OLD)
@@ -224,7 +224,7 @@ def test_enrichment_signature_keeps_provider_and_region(checkpoint):
 def test_legacy_signature_matches_the_checkpoint_reported_in_production(checkpoint):
     from src.etl.crawler_ingestao_raw_rustfs import LIST_URL
     config = checkpoint.config
-    enrichment = config.enrichment.model_dump(exclude={"max_parallel", "timeout_seconds", "keep_alive", "num_batch", "response_retries"})
+    enrichment = config.enrichment.model_dump(exclude=ENRICHMENT_RUNTIME_FIELDS)
     enrichment.update(provider="bedrock", model="qwen.qwen3-32b-v1:0")
     inputs = {"source_revision": "de3ac95e91500f26dcdf43212526fb52f33a2916", "bronze": config.bronze.model_dump(), "pages": [1, 7], "silver": config.silver.model_dump(), "embedding": config.embedding.model_dump(exclude={"execution"}), "enrichment": enrichment, "reuse_index_id": None,
               "raw": {"raw_id": "machado-v1", "manifest_sha256": "292171fb07fceee7f820ed16b0c40e5ccb3a73438461d4ce25025773d670402f", "first_page": 1, "last_page": 7, "source_query": LIST_URL}}
@@ -319,10 +319,68 @@ def test_preflight_retries_response_with_same_64_token_budget(monkeypatch):
         requests.append(request)
         assert json.loads(request.content)["max_tokens"] == 64
         return httpx.Response(200, json=completion("" if len(requests)<4 else "OK"))
-    provider, _ = mantle(serve, response_retries=3)
+    provider, _ = mantle(serve, response_retries=3, response_retry_max_tokens=4096)
     monkeypatch.setattr("src.generation.provider.sleep", lambda _: None)
     provider.preflight()
     assert len(requests) == 4
+
+
+def test_truncated_json_grows_budget_within_three_retries_and_resets_next_call(monkeypatch):
+    budgets = []
+    def serve(request):
+        budget = json.loads(request.content)["max_tokens"]
+        budgets.append(budget)
+        payload = completion("parcial" if len(budgets) < 4 else '{"option":"OK"}', "length" if len(budgets) < 4 else "stop")
+        payload["usage"]["completion_tokens"] = budget if len(budgets) < 4 else 10
+        return httpx.Response(200, json=payload)
+    provider, _ = mantle(serve, max_tokens=1024, response_retries=3, response_retry_max_tokens=4096)
+    monkeypatch.setattr("src.generation.provider.sleep", lambda _: None)
+    assert provider.invoke_structured([("human", "Teste")], Answer).option == "OK"
+    assert budgets == [1024, 2048, 4096, 4096]
+    assert provider.usage_snapshot() == {"calls": 4, "input_tokens": 400, "output_tokens": 7178}
+    assert provider.config.max_tokens == 1024
+    assert provider.invoke_structured([("human", "Outra unidade")], Answer).option == "OK"
+    assert budgets[-1] == 1024
+
+
+@pytest.mark.parametrize("stop,tokens,text", [("length", 100, "parcial"), ("model_context_window_exceeded", 1024, "parcial"), ("stop", 1024, "{}")])
+def test_budget_does_not_grow_for_other_response_failures(monkeypatch, stop, tokens, text):
+    budgets = []
+    def serve(request):
+        budgets.append(json.loads(request.content)["max_tokens"])
+        payload = completion(text, stop)
+        payload["usage"]["completion_tokens"] = tokens
+        return httpx.Response(200, json=payload)
+    provider, _ = mantle(serve, max_tokens=1024, response_retries=3, response_retry_max_tokens=4096)
+    monkeypatch.setattr("src.generation.provider.sleep", lambda _: None)
+    with pytest.raises(GenerationResponseError):
+        provider.invoke_structured([("human", "Teste")], Answer)
+    assert budgets == [1024] * 4
+
+
+def test_truncation_still_fails_at_the_configured_cap(monkeypatch):
+    budgets = []
+    def serve(request):
+        budget = json.loads(request.content)["max_tokens"]
+        budgets.append(budget)
+        payload = completion("parcial", "length")
+        payload["usage"]["completion_tokens"] = budget
+        return httpx.Response(200, json=payload, headers={"x-request-id": "last-request"})
+    provider, _ = mantle(serve, max_tokens=1024, response_retries=3, response_retry_max_tokens=3000)
+    monkeypatch.setattr("src.generation.provider.sleep", lambda _: None)
+    with pytest.raises(GenerationResponseError) as error:
+        provider.invoke_structured([("human", "Teste")], Answer)
+    assert budgets == [1024, 2048, 3000, 3000]
+    assert error.value.diagnostics["max_tokens"] == 3000
+    assert error.value.diagnostics["response_attempts"] == 4
+    assert error.value.diagnostics["request_id"] == "last-request"
+
+
+@pytest.mark.parametrize("model", [GenerationConfig, EnrichmentConfig])
+@pytest.mark.parametrize("cap", [512, 8193])
+def test_retry_budget_rejects_invalid_limits(model, cap):
+    with pytest.raises(ValueError):
+        model(max_tokens=1024, response_retry_max_tokens=cap)
 
 
 @pytest.fixture
@@ -365,6 +423,7 @@ def enrichment_batch(checkpoint, monkeypatch):
 
 def test_manifest_continues_after_work_error_and_retries_only_failed(enrichment_batch):
     b = enrichment_batch
+    b.context.config.enrichment.response_retry_max_tokens = 0
     with pytest.raises(SystemExit) as error: b.builder.main()
     assert error.value.code == 2
     frame, artifact = b.read_manifest()
@@ -376,6 +435,7 @@ def test_manifest_continues_after_work_error_and_retries_only_failed(enrichment_
     assert not b.context.storage.object_exists(b.context.config.storage.enrichment_bucket,b.builder.ENRICHMENT_CURRENT_KEY)
     b.failures.clear()
     b.context.config.enrichment.response_retries = 1
+    b.context.config.enrichment.response_retry_max_tokens = 4096
     b.builder.main()
     frame, artifact = b.read_manifest()
     assert b.calls == ["A falha","B boa","C boa","A falha"]
@@ -426,11 +486,13 @@ def test_pending_enrichment_blocks_auxiliary_index_and_promotion(checkpoint, mon
 def test_mantle_code_update_preserves_checkpoint_and_runtime_only_settings(checkpoint, monkeypatch):
     # Simula a primeira run Mantle interrompida e a adoção explícita do patch seguinte.
     stages=production.run_module
+    checkpoint.config.enrichment.response_retry_max_tokens=0
     monkeypatch.setattr(production,"run_module",lambda *args: (_ for _ in ()).throw(SystemExit(2)))
     with pytest.raises(SystemExit): production.execute(checkpoint.args)
     monkeypatch.setenv("SOURCE_REVISION","c"*40)
     checkpoint.args.resume_from_revision=NEW
     checkpoint.config.enrichment.response_retries=0
+    checkpoint.config.enrichment.response_retry_max_tokens=4096
     monkeypatch.setattr(production,"run_module",stages)
     result=production.execute(checkpoint.args)
     assert result["outputs"]["index_id"]=="existing-text"

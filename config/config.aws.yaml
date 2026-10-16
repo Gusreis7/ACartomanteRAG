@@ -21,6 +21,7 @@ generation:
       output: 0.66
 enrichment:
   response_retries: 3
+  response_retry_max_tokens: 4096
   provider: bedrock-mantle
   region: us-east-1
   model: qwen.qwen3-32b

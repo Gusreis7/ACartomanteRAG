@@ -395,12 +395,12 @@ class BedrockGenerationProvider(GenerationProvider):
         finally:
             self._slots.release()
 
-    def _retry_response(self, error, attempt):
+    def _retry_response(self, error, attempt, *, next_max_tokens=None):
         error.diagnostics["response_attempts"] = attempt + 1
         if not error.retryable or attempt >= self.config.response_retries:
             return False
         delay = 10 * (2 ** attempt)
-        logger.warning("generation_retry retry=%s/%s reason=%s delay_seconds=%s", attempt + 1, self.config.response_retries, error.diagnostics.get("reason"), delay)
+        logger.warning("generation_retry retry=%s/%s reason=%s delay_seconds=%s next_max_tokens=%s", attempt + 1, self.config.response_retries, error.diagnostics.get("reason"), delay, next_max_tokens if next_max_tokens is not None else error.diagnostics.get("max_tokens"))
         sleep(delay)
         return True
 
@@ -408,9 +408,10 @@ class BedrockGenerationProvider(GenerationProvider):
         instruction = "Retorne somente um objeto JSON válido, sem Markdown, conforme este JSON Schema:\n" + json.dumps(schema.model_json_schema(), ensure_ascii=False)
         last_error = None
         raw = None
+        max_tokens = self.config.max_tokens
         for attempt in range(self.config.response_retries + 1):
             try:
-                raw = self.invoke([("system", instruction), *messages])
+                raw = self.invoke([("system", instruction), *messages], max_tokens=max_tokens)
                 content = raw.content.strip()
                 if content.startswith("```"):
                     content = re.sub(r"^```(?:json)?\s*|\s*```$", "", content)
@@ -426,8 +427,17 @@ class BedrockGenerationProvider(GenerationProvider):
                 diagnostics = {**raw.response_metadata.get("diagnostics", {}), "reason": "invalid_json"}
                 last_error = GenerationResponseError("Modelo retornou JSON inválido ou fora do schema.", diagnostics=diagnostics)
                 logger.warning("generation_response_error %s", json.dumps(diagnostics))
-            if not self._retry_response(last_error, attempt):
+            next_max_tokens = max_tokens
+            if (
+                last_error.diagnostics.get("reason") == "truncated"
+                and last_error.diagnostics.get("output_limit_reached")
+                and last_error.diagnostics.get("finish_reason") in {"length", "max_tokens"}
+                and self.config.response_retry_max_tokens > max_tokens
+            ):
+                next_max_tokens = min(max_tokens * 2, self.config.response_retry_max_tokens)
+            if not self._retry_response(last_error, attempt, next_max_tokens=next_max_tokens):
                 break
+            max_tokens = next_max_tokens
         if include_raw:
             return {"raw": raw, "parsed": None, "parsing_error": last_error}
         raise last_error from None
