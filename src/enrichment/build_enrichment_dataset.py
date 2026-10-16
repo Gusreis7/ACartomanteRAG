@@ -18,7 +18,8 @@ from urllib import request as urllib_request
 import pandas as pd
 from tqdm.auto import tqdm
 
-from src.config.config_manager import ConfigManager
+from src.config.config_manager import ConfigManager, ENRICHMENT_RUNTIME_FIELDS
+from src.generation.provider import GenerationServiceError
 from src.enrichment.service import (
     WorkEnrichmentService,
     WorkSource,
@@ -45,7 +46,7 @@ def parse_args() -> argparse.Namespace:
         )
     )
     parser.add_argument(
-        "--resume",
+        "--resume", "--retry",
         action="store_true",
         help="Retoma o artifact determinístico atual, pulando obras success.",
     )
@@ -344,9 +345,21 @@ def build_initial_manifest(
             "status_enrichment": "pending",
             "processed_at_utc": "",
             "erro_enrichment": "",
+            "tentativas_enrichment": 0,
+            "llm_calls": 0, "llm_input_tokens": 0, "llm_output_tokens": 0,
+            "erro_tipo": "", "erro_detalhes_json": "",
         })
 
     return pd.DataFrame(rows).reset_index(drop=True)
+
+
+def ensure_retry_columns(manifest):
+    # Compatível com manifests existentes; identidade e objetos success permanecem.
+    for field, default in {"tentativas_enrichment": 0, "llm_calls": 0, "llm_input_tokens": 0,
+                           "llm_output_tokens": 0, "erro_tipo": "", "erro_detalhes_json": ""}.items():
+        if field not in manifest:
+            manifest[field] = default
+    return manifest
 
 
 def artifact_payload(
@@ -582,6 +595,7 @@ def main() -> None:
             created_at_utc=created_at_utc,
         )
 
+    manifest = ensure_retry_columns(manifest)
     execution_rows = select_execution_rows(
         manifest=manifest,
         title=args.title,
@@ -626,6 +640,15 @@ def main() -> None:
                 )
 
                 work_started = perf_counter()
+                manifest.at[index, "tentativas_enrichment"] = int(manifest.at[index, "tentativas_enrichment"]) + 1
+                before_usage = service.provider.usage_snapshot() if service.provider else {}
+                batch_paused = False
+
+                def record_usage():
+                    usage = service.provider.usage_snapshot() if service.provider else {}
+                    for name, column in {"calls": "llm_calls", "input_tokens": "llm_input_tokens", "output_tokens": "llm_output_tokens"}.items():
+                        manifest.at[index, column] = int(manifest.at[index, column]) + int(usage.get(name, 0) - before_usage.get(name, 0))
+
                 try:
                     bronze_object_key = str(row["source_bronze_object_key"])
                     text = storage.download_bytes(
@@ -648,7 +671,7 @@ def main() -> None:
                         text=text,
                     )
                     generator_signature = hashlib.sha256(json.dumps({
-                        "enrichment": config.enrichment.model_dump(exclude={"max_parallel", "timeout_seconds", "keep_alive", "num_batch"}), "prompt": prompt_hash, "schema": schema_hash,
+                        "enrichment": config.enrichment.model_dump(exclude=ENRICHMENT_RUNTIME_FIELDS), "prompt": prompt_hash, "schema": schema_hash,
                     }, sort_keys=True).encode()).hexdigest()
                     result = service.enrich(source, checkpoint_prefix=f"checkpoints/{generator_signature}/{source_text_sha}")
 
@@ -713,6 +736,8 @@ def main() -> None:
                     manifest.at[index, "status_enrichment"] = "success"
                     manifest.at[index, "processed_at_utc"] = utc_now()
                     manifest.at[index, "erro_enrichment"] = ""
+                    manifest.at[index, "erro_tipo"] = ""
+                    manifest.at[index, "erro_detalhes_json"] = ""
                     successes_run += 1
 
                 except Exception as exc:
@@ -723,6 +748,10 @@ def main() -> None:
                     manifest.at[index, "status_enrichment"] = "error"
                     manifest.at[index, "processed_at_utc"] = utc_now()
                     manifest.at[index, "erro_enrichment"] = str(exc)[:2000]
+                    details = getattr(exc, "diagnostics", {})
+                    manifest.at[index, "erro_tipo"] = details.get("reason", type(exc).__name__)
+                    manifest.at[index, "erro_detalhes_json"] = json.dumps(details, ensure_ascii=False)
+                    record_usage()
                     errors_run += 1
 
                     sync_manifest_and_artifact(
@@ -744,8 +773,12 @@ def main() -> None:
 
                     if args.fail_fast:
                         raise
+                    if isinstance(exc, GenerationServiceError) and exc.batch_fatal:
+                        print(f"[pausa] Serviço indisponível: {manifest.at[index, 'erro_tipo']}; manifest salvo, demais obras preservadas como pendentes.", flush=True)
+                        batch_paused = True
 
                 else:
+                    record_usage()
                     # Persistência imediata após cada obra concluída.
                     sync_manifest_and_artifact(
                         storage=storage,
@@ -771,6 +804,8 @@ def main() -> None:
                     erro=errors_run,
                     refresh=True,
                 )
+                if batch_paused:
+                    break
 
     finally:
         service.unload_model()
@@ -825,6 +860,9 @@ def main() -> None:
     print(f"[+] Success: {int(counts.get('success', 0))}")
     print(f"[+] Errors:  {int(counts.get('error', 0))}")
     print(f"[+] Pending: {int(counts.get('pending', 0))}")
+    if final_status != "complete":
+        print("[pendente] Manifest salvo. Retome com --retry; índice auxiliar e promoção aguardam todas as obras.", flush=True)
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":

@@ -25,7 +25,16 @@ class GenerationCapacityError(RuntimeError):
 
 
 class GenerationServiceError(RuntimeError):
-    pass
+    def __init__(self, message, *, diagnostics=None, batch_fatal=False):
+        super().__init__(message)
+        self.diagnostics = diagnostics or {}
+        self.batch_fatal = batch_fatal
+
+
+class GenerationResponseError(GenerationServiceError):
+    def __init__(self, message, *, diagnostics=None, retryable=True, batch_fatal=False):
+        super().__init__(message, diagnostics=diagnostics, batch_fatal=batch_fatal)
+        self.retryable = retryable
 
 
 class GenerationQuotaError(GenerationCapacityError):
@@ -202,31 +211,37 @@ class _MantleClient:
                 )
             except httpx.TransportError:
                 if attempt + 1 == self.config.retry_attempts:
-                    raise GenerationServiceError("Conexão com Bedrock Mantle indisponível.") from None
+                    raise GenerationServiceError("Conexão com Bedrock Mantle indisponível.", diagnostics={"reason": "network"}, batch_fatal=True) from None
                 sleep(min(2 ** attempt, 8))
                 continue
             if response.status_code == 200:
                 try:
                     return response.json(), response.headers, attempt
                 except ValueError:
-                    raise GenerationServiceError("Bedrock Mantle retornou resposta inválida.") from None
-            if response.status_code in {429, 500, 502, 503, 504} and attempt + 1 < self.config.retry_attempts:
-                retry_after = response.headers.get("retry-after", "")
-                delay = float(retry_after) if retry_after.isdigit() else 2 ** attempt
-                if delay <= 30:
-                    sleep(delay)
-                    continue
+                    raise GenerationResponseError("Bedrock Mantle retornou JSON HTTP inválido.", diagnostics={"reason": "malformed_response", "http_status": 200, "request_id": response.headers.get("x-request-id", "unknown")}) from None
             # Não incluir mensagem, payload, prompt ou headers de autenticação no erro.
             code = f"HTTP{response.status_code}"
+            quota_scope = "unknown"
             try:
                 error = response.json().get("error", {})
                 candidate = error.get("code") or error.get("type") if isinstance(error, dict) else None
                 if isinstance(candidate, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", candidate):
                     code = candidate
+                message = str(error.get("message", "")).lower() if isinstance(error, dict) else ""
+                if "per day" in message or "daily" in message:
+                    quota_scope = "daily"
+                elif "per minute" in message:
+                    quota_scope = "minute"
             except (ValueError, AttributeError):
                 pass
+            if response.status_code in {429, 500, 502, 503, 504} and quota_scope != "daily" and attempt + 1 < self.config.retry_attempts:
+                retry_after = response.headers.get("retry-after", "")
+                delay = float(retry_after) if retry_after.isdigit() else 2 ** attempt
+                if delay <= 60:
+                    sleep(delay)
+                    continue
             raise ClientError({
-                "Error": {"Code": code, "Message": "Falha na API Mantle"},
+                "Error": {"Code": code, "Message": "Falha na API Mantle", "QuotaScope": quota_scope},
                 "ResponseMetadata": {
                     "HTTPStatusCode": response.status_code,
                     "RequestId": response.headers.get("x-amzn-requestid") or response.headers.get("x-request-id", "unknown"),
@@ -249,10 +264,15 @@ class _MantleClient:
         stop = choice.get("finish_reason")
         usage = result.get("usage", {})
         return {
-            "output": {"message": {"content": [{"text": content if stop in {"stop", "length"} else ""}]}},
-            "stopReason": "max_tokens" if stop == "length" else "end_turn",
+            "output": {"message": {"content": [{"text": content}]}},
+            "stopReason": {"length": "max_tokens", "stop": "end_turn"}.get(stop, stop or "unknown"),
             "usage": {"inputTokens": usage.get("prompt_tokens", 0), "outputTokens": usage.get("completion_tokens", 0)},
-            "ResponseMetadata": {"RetryAttempts": retries, "RequestId": headers.get("x-amzn-requestid") or headers.get("x-request-id")},
+            "ResponseMetadata": {
+                "RetryAttempts": retries, "RequestId": headers.get("x-amzn-requestid") or headers.get("x-request-id"),
+                "FinishReason": str(stop or "unknown")[:80],
+                "ReasoningTokens": (usage.get("completion_tokens_details") or {}).get("reasoning_tokens", 0),
+                "ContentChars": len(content),
+            },
         }
 
 
@@ -316,8 +336,34 @@ class BedrockGenerationProvider(GenerationProvider):
                 self._usage["input_tokens"] += incoming
                 self._usage["output_tokens"] += outgoing
                 self._usage["calls"] += 1
-            if not text or response.get("stopReason") == "max_tokens":
-                raise GenerationServiceError("Modelo retornou resposta vazia ou truncada.")
+            metadata = response.get("ResponseMetadata", {})
+            stop = response.get("stopReason")
+            diagnostics = {
+                "provider": self.config.provider, "model": self.config.model,
+                "finish_reason": metadata.get("FinishReason", stop), "request_id": metadata.get("RequestId"),
+                "input_tokens": incoming, "output_tokens": outgoing,
+                "reasoning_tokens": metadata.get("ReasoningTokens", 0),
+                "max_tokens": self.config.max_tokens if max_tokens is None else max_tokens,
+            }
+            reason = None
+            if stop in {"max_tokens", "model_context_window_exceeded"}:
+                reason = "truncated"
+            elif stop in {"quota_exceeded", "rate_limit_exceeded", "throttled"}:
+                reason = "quota"
+            elif stop in {"content_filter", "guardrail_intervened"}:
+                reason = "filtered"
+            elif self.config.provider == "bedrock-mantle" and stop != "end_turn":
+                reason = "unexpected_finish_reason"
+            elif not text:
+                reason = "empty"
+            if reason:
+                diagnostics["reason"] = reason
+                diagnostics["output_limit_reached"] = outgoing >= diagnostics["max_tokens"]
+                logger.warning("generation_response_error %s", json.dumps(diagnostics, ensure_ascii=False))
+                raise GenerationResponseError(
+                    f"Resposta do modelo rejeitada: {reason}; finish_reason={diagnostics['finish_reason']}; request_id={diagnostics['request_id']}.",
+                    diagnostics=diagnostics, retryable=reason in {"empty", "truncated", "unexpected_finish_reason"}, batch_fatal=reason == "quota",
+                )
             prices = self.config.model_prices.get(self.config.model, {})
             return AIMessage(
                 content=text,
@@ -327,6 +373,7 @@ class BedrockGenerationProvider(GenerationProvider):
                     "region": self.config.region, "stop_reason": response.get("stopReason"),
                     "retry_attempts": response.get("ResponseMetadata", {}).get("RetryAttempts", 0),
                     "request_id": response.get("ResponseMetadata", {}).get("RequestId"),
+                    "diagnostics": diagnostics,
                     "estimated_cost_usd": (
                         incoming * prices.get("input", self.config.input_usd_per_million) + outgoing * prices.get("output", self.config.output_usd_per_million)
                     ) / 1_000_000,
@@ -336,18 +383,34 @@ class BedrockGenerationProvider(GenerationProvider):
             raise
         except Exception as exc:
             details = getattr(exc, "response", {}) or {}
-            logger.warning("bedrock_unavailable provider=%s error_type=%s code=%s request_id=%s", self.config.provider, type(exc).__name__, details.get("Error", {}).get("Code", "unknown"), details.get("ResponseMetadata", {}).get("RequestId", "unknown"))
-            raise GenerationServiceError("Bedrock indisponível; consulte o tipo de erro nos logs operacionais.") from exc
+            error = details.get("Error", {})
+            metadata = details.get("ResponseMetadata", {})
+            code, status = error.get("Code", "unknown"), metadata.get("HTTPStatusCode")
+            quota = status == 429 or any(word in code.lower() for word in ("throttl", "quota", "rate_limit"))
+            permission = status in {401, 403} or "credentials" in type(exc).__name__.lower()
+            diagnostics = {"provider": self.config.provider, "reason": "quota" if quota else "permission" if permission else "provider_error", "error_code": code, "error_type": type(exc).__name__,
+                           "http_status": status, "request_id": metadata.get("RequestId", "unknown"), "quota_scope": error.get("QuotaScope", "unknown")}
+            logger.warning("bedrock_unavailable %s", json.dumps(diagnostics))
+            raise GenerationServiceError("Bedrock indisponível; consulte o diagnóstico nos logs e no manifest.", diagnostics=diagnostics, batch_fatal=True) from None
         finally:
             self._slots.release()
+
+    def _retry_response(self, error, attempt):
+        error.diagnostics["response_attempts"] = attempt + 1
+        if not error.retryable or attempt >= self.config.response_retries:
+            return False
+        delay = 10 * (2 ** attempt)
+        logger.warning("generation_retry retry=%s/%s reason=%s delay_seconds=%s", attempt + 1, self.config.response_retries, error.diagnostics.get("reason"), delay)
+        sleep(delay)
+        return True
 
     def invoke_structured(self, messages, schema, *, include_raw=False):
         instruction = "Retorne somente um objeto JSON válido, sem Markdown, conforme este JSON Schema:\n" + json.dumps(schema.model_json_schema(), ensure_ascii=False)
         last_error = None
         raw = None
-        for _ in range(2):
-            raw = self.invoke([("system", instruction), *messages])
+        for attempt in range(self.config.response_retries + 1):
             try:
+                raw = self.invoke([("system", instruction), *messages])
                 content = raw.content.strip()
                 if content.startswith("```"):
                     content = re.sub(r"^```(?:json)?\s*|\s*```$", "", content)
@@ -355,11 +418,19 @@ class BedrockGenerationProvider(GenerationProvider):
                 if not any(parsed.model_dump().values()):
                     raise ValueError("Saída estruturada vazia.")
                 return {"raw": raw, "parsed": parsed, "parsing_error": None} if include_raw else parsed
-            except (ValueError, TypeError) as exc:
+            except GenerationResponseError as exc:
                 last_error = exc
+            except (ValueError, TypeError):
+                if raw is None:
+                    raise
+                diagnostics = {**raw.response_metadata.get("diagnostics", {}), "reason": "invalid_json"}
+                last_error = GenerationResponseError("Modelo retornou JSON inválido ou fora do schema.", diagnostics=diagnostics)
+                logger.warning("generation_response_error %s", json.dumps(diagnostics))
+            if not self._retry_response(last_error, attempt):
+                break
         if include_raw:
             return {"raw": raw, "parsed": None, "parsing_error": last_error}
-        raise GenerationServiceError("Bedrock retornou JSON inválido após duas tentativas.") from last_error
+        raise last_error from None
 
     def usage_snapshot(self):
         with self._usage_lock:
@@ -379,7 +450,13 @@ class BedrockGenerationProvider(GenerationProvider):
 
     def preflight(self) -> None:
         # Uma chamada curta comprova acesso à inferência antes do trabalho em CPU.
-        self.invoke([("human", "Responda somente OK.")], max_tokens=64)
+        for attempt in range(self.config.response_retries + 1):
+            try:
+                self.invoke([("human", "Responda somente OK.")], max_tokens=64)
+                return
+            except GenerationResponseError as exc:
+                if not self._retry_response(exc, attempt):
+                    raise
 
 
 def create_generation_provider(config, **kwargs) -> GenerationProvider:

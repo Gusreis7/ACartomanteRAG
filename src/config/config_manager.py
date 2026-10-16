@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, model_validator
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ENV_PATH = PROJECT_ROOT / "config" / ".env"
 DEFAULT_YAML_PATH = PROJECT_ROOT / "config" / "config.yaml"
+ENRICHMENT_RUNTIME_FIELDS = {"max_parallel", "timeout_seconds", "keep_alive", "num_batch", "response_retries"}
 
 
 class RustFSConfig(BaseModel):
@@ -293,6 +294,7 @@ class GenerationConfig(BaseModel):
     region: str = "us-east-1"
     reasoning: bool = False
     retry_attempts: int = Field(default=3, ge=1, le=5)
+    response_retries: int = Field(default=1, ge=0, le=3)
     input_usd_per_million: float = Field(default=0.0, ge=0)
     output_usd_per_million: float = Field(default=0.0, ge=0)
     model_prices: dict[str, dict[str, float]] = Field(default_factory=dict)
@@ -352,6 +354,7 @@ class EnrichmentSemanticConfig(BaseModel):
 
 class EnrichmentConfig(BaseModel):
     pipeline_version: int = Field(default=1, ge=1)
+    response_retries: int = Field(default=3, ge=0, le=3)
     model: str = Field(default="qwen3.5:4b", min_length=1)
     provider: Literal["ollama", "bedrock", "bedrock-mantle"] = "ollama"
     region: str = "us-east-1"

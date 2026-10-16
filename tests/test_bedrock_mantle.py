@@ -1,6 +1,7 @@
 """Contrato HTTP/IAM e migração de checkpoint, sem inferência ou AWS reais."""
 import hashlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -12,12 +13,14 @@ from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
 from botocore.credentials import Credentials
 import httpx
+import pandas as pd
 from moto import mock_aws
+from pydantic import BaseModel
 import pytest
 
 from src.config.config_manager import ConfigManager, GenerationConfig
 from src.etl import production
-from src.generation.provider import BedrockGenerationProvider, GenerationServiceError, _MantleClient
+from src.generation.provider import BedrockGenerationProvider, GenerationServiceError, GenerationResponseError, _MantleClient
 from src.storage.rustfs_manager import RustFSManager
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -130,7 +133,7 @@ def checkpoint(monkeypatch):
     config.storage.silver_current_key = "production/candidates/corpus/silver.json"
     raw = b"unchanged raw manifest"
     receipt = {"raw_id": "machado-v1", "manifest_sha256": hashlib.sha256(raw).hexdigest(), "first_page": 1, "last_page": 7, "source_query": "Machado"}
-    inputs = {"source_revision": OLD, "bronze": config.bronze.model_dump(), "pages": [1, 7], "silver": config.silver.model_dump(), "embedding": config.embedding.model_dump(exclude={"execution"}), "enrichment": config.enrichment.model_dump(exclude={"max_parallel", "timeout_seconds", "keep_alive", "num_batch"}), "reuse_index_id": None, "raw": receipt}
+    inputs = {"source_revision": OLD, "bronze": config.bronze.model_dump(), "pages": [1, 7], "silver": config.silver.model_dump(), "embedding": config.embedding.model_dump(exclude={"execution"}), "enrichment": config.enrichment.model_dump(exclude={"max_parallel", "timeout_seconds", "keep_alive", "num_batch", "response_retries"}), "reuse_index_id": None, "raw": receipt}
     inputs["enrichment"].update(provider="bedrock", model="qwen.qwen3-32b-v1:0")
     previous = {"run_id": "corpus", "signature": production.checkpoint_signature(inputs), "completed": ["bronze", "silver", "text-index"], "outputs": {"index_id": "existing-text"}, "raw_id": "machado-v1", "raw_manifest_sha256": receipt["manifest_sha256"], "status": "running", "current_step": "enrichment"}
     args = SimpleNamespace(run_id="corpus", raw_id="machado-v1", steps=list(production.RAW_STEPS), reuse_index_id=None, first_page=1, last_page=7, promote=False, resume_from_revision=OLD)
@@ -221,7 +224,7 @@ def test_enrichment_signature_keeps_provider_and_region(checkpoint):
 def test_legacy_signature_matches_the_checkpoint_reported_in_production(checkpoint):
     from src.etl.crawler_ingestao_raw_rustfs import LIST_URL
     config = checkpoint.config
-    enrichment = config.enrichment.model_dump(exclude={"max_parallel", "timeout_seconds", "keep_alive", "num_batch"})
+    enrichment = config.enrichment.model_dump(exclude={"max_parallel", "timeout_seconds", "keep_alive", "num_batch", "response_retries"})
     enrichment.update(provider="bedrock", model="qwen.qwen3-32b-v1:0")
     inputs = {"source_revision": "de3ac95e91500f26dcdf43212526fb52f33a2916", "bronze": config.bronze.model_dump(), "pages": [1, 7], "silver": config.silver.model_dump(), "embedding": config.embedding.model_dump(exclude={"execution"}), "enrichment": enrichment, "reuse_index_id": None,
               "raw": {"raw_id": "machado-v1", "manifest_sha256": "292171fb07fceee7f820ed16b0c40e5ccb3a73438461d4ce25025773d670402f", "first_page": 1, "last_page": 7, "source_query": LIST_URL}}
@@ -243,3 +246,195 @@ def test_controller_forwards_migration_and_rejects_smoke(monkeypatch):
     monkeypatch.setattr("sys.argv", [*argv, "--smoke"])
     with pytest.raises(SystemExit): cloud.main()
     assert clients["glue"].start_job_run.call_count == 1
+
+
+class Answer(BaseModel):
+    option: str
+
+
+@pytest.mark.parametrize("first_stop", ["stop", None])
+def test_three_response_retries_cover_empty_truncated_and_invalid_json(monkeypatch, first_stop):
+    payloads = [completion("", first_stop), completion("parcial", "length"), completion("{}"), completion('{"option":"OK"}')]
+    requests, delays = [], []
+    def serve(request):
+        requests.append(request)
+        return httpx.Response(200, json=payloads[len(requests)-1], headers={"x-request-id": f"request-{len(requests)}"})
+    provider, _ = mantle(serve, response_retries=3)
+    monkeypatch.setattr("src.generation.provider.sleep", delays.append)
+    assert provider.invoke_structured([("human", "Teste")], Answer).option == "OK"
+    assert len(requests) == 4 and delays == [10, 20, 40]
+    assert provider.usage_snapshot() == {"calls": 4, "input_tokens": 400, "output_tokens": 40}
+
+
+def test_exhausted_response_preserves_finish_tokens_reasoning_and_request(monkeypatch, caplog):
+    payload = completion("SECRET_BODY", "length")
+    payload["usage"].update(completion_tokens=512, completion_tokens_details={"reasoning_tokens": 500})
+    requests = []
+    def serve(request):
+        requests.append(request)
+        return httpx.Response(200, json=payload, headers={"x-request-id": "request-last"})
+    provider, _ = mantle(serve, response_retries=3)
+    monkeypatch.setattr("src.generation.provider.sleep", lambda _: None)
+    with pytest.raises(GenerationResponseError) as error:
+        provider.invoke_structured([("human", "SECRET_PROMPT")], Answer)
+    details = error.value.diagnostics
+    assert details["reason"] == "truncated" and details["finish_reason"] == "length"
+    assert details["output_limit_reached"] and details["reasoning_tokens"] == 500
+    assert details["response_attempts"] == 4 and details["request_id"] == "request-last"
+    assert len(requests) == 4 and provider.usage_snapshot()["output_tokens"] == 2048
+    assert "SECRET_BODY" not in caplog.text and "SECRET_PROMPT" not in caplog.text
+
+
+@pytest.mark.parametrize("daily,expected", [(False, 3), (True, 1)])
+def test_quota_is_not_multiplied_by_response_retries(monkeypatch, daily, expected):
+    requests = []
+    def serve(request):
+        requests.append(request)
+        return httpx.Response(429, json={"error": {"type": "rate_limit_exceeded", "message": "Too many tokens per day" if daily else "Too many tokens per minute"}})
+    provider, _ = mantle(serve, response_retries=3)
+    monkeypatch.setattr("src.generation.provider.sleep", lambda _: None)
+    with pytest.raises(GenerationServiceError) as error:
+        provider.invoke_structured([("human", "Teste")], Answer)
+    assert len(requests) == expected
+    assert error.value.batch_fatal and error.value.diagnostics["reason"] == "quota"
+    assert error.value.diagnostics["quota_scope"] == ("daily" if daily else "minute")
+
+
+def test_filtered_response_is_identified_and_not_retried(monkeypatch):
+    requests = []
+    def serve(request):
+        requests.append(request)
+        return httpx.Response(200, json=completion("Texto bloqueado", "content_filter"))
+    provider, _ = mantle(serve, response_retries=3)
+    with pytest.raises(GenerationResponseError) as error:
+        provider.invoke_structured([("human", "Teste")], Answer)
+    assert len(requests) == 1
+    assert error.value.diagnostics["finish_reason"] == "content_filter"
+    assert error.value.diagnostics["reason"] == "filtered"
+
+
+def test_preflight_retries_response_with_same_64_token_budget(monkeypatch):
+    requests = []
+    def serve(request):
+        requests.append(request)
+        assert json.loads(request.content)["max_tokens"] == 64
+        return httpx.Response(200, json=completion("" if len(requests)<4 else "OK"))
+    provider, _ = mantle(serve, response_retries=3)
+    monkeypatch.setattr("src.generation.provider.sleep", lambda _: None)
+    provider.preflight()
+    assert len(requests) == 4
+
+
+@pytest.fixture
+def enrichment_batch(checkpoint, monkeypatch):
+    from src.enrichment import build_enrichment_dataset as builder
+    c = checkpoint
+    titles = ["A falha", "B boa", "C boa"]
+    bronze = pd.DataFrame([{"source_document_id": str(i), "titulo": title, "autor": "Machado", "categoria": "Conto", "bronze_object_key": f"texts/{i}.txt"} for i,title in enumerate(titles)])
+    for key in bronze["bronze_object_key"]:
+        c.storage.upload_bytes(c.config.storage.bronze_bucket, key, b"Texto de teste.")
+    monkeypatch.setattr(builder, "load_bronze_state", lambda **_: ({"bronze_artifact_id": "bronze_production_corpus", "manifest_key": "bronze.parquet"}, bronze, "source-hash"))
+    monkeypatch.setattr(builder, "ENRICHMENT_CURRENT_KEY", "production/candidates/corpus/enrichment-dataset.json")
+    args = SimpleNamespace(resume=True, limit=None, title=None, fail_fast=False, env_file=None, config_file=None)
+    monkeypatch.setattr(builder, "parse_args", lambda: args)
+    calls, prefixes, failures = [], [], {"A falha": GenerationResponseError("Falhou após retries", diagnostics={"reason": "truncated", "finish_reason": "length", "request_id": "req-1", "response_attempts": 4})}
+    class Service:
+        def __init__(self, config):
+            self.provider = self
+            self.usage = {"calls": 0, "input_tokens": 0, "output_tokens": 0}
+        def usage_snapshot(self): return dict(self.usage)
+        def enrich(self, source, *, checkpoint_prefix):
+            calls.append(source.title); prefixes.append(checkpoint_prefix)
+            failure = failures.get(source.title)
+            if failure and not isinstance(failure, GenerationResponseError): raise failure
+            count = 4 if failure else 1
+            for key,value in {"calls": count,"input_tokens": 100*count,"output_tokens": 10*count}.items():self.usage[key]+=value
+            if source.title in failures: raise failures[source.title]
+            return SimpleNamespace(usage={"calls": 1}, plan={"effective_strategy_from_chunker": "fixed", "plan_mode": "window", "planned_units": 1}, blocks=[], summary={"resumo_geral": "OK", "eventos_principais": []}, timings_seconds={"total": .1}, reduce_calls=0)
+        def unload_model(self): pass
+    monkeypatch.setattr(builder, "WorkEnrichmentService", Service)
+    def read_manifest():
+        keys=[x["Key"] for x in c.storage.client.list_objects_v2(Bucket=c.config.storage.enrichment_bucket).get("Contents", []) if x["Key"].endswith("/manifest.parquet")]
+        assert len(keys)==1
+        key=keys[0]
+        frame=pd.read_parquet(io.BytesIO(c.storage.download_bytes(c.config.storage.enrichment_bucket,key)))
+        artifact=production.read_json(c.storage,c.config.storage.enrichment_bucket,key.replace("manifest.parquet","artifact.json"))
+        return frame,artifact
+    return SimpleNamespace(builder=builder, context=c, calls=calls, prefixes=prefixes, failures=failures, read_manifest=read_manifest)
+
+
+def test_manifest_continues_after_work_error_and_retries_only_failed(enrichment_batch):
+    b = enrichment_batch
+    with pytest.raises(SystemExit) as error: b.builder.main()
+    assert error.value.code == 2
+    frame, artifact = b.read_manifest()
+    assert list(frame.status_enrichment) == ["error","success","success"]
+    assert list(frame.tentativas_enrichment) == [1,1,1]
+    assert frame.iloc[0].erro_tipo == "truncated"
+    assert json.loads(frame.iloc[0].erro_detalhes_json)["request_id"] == "req-1"
+    assert artifact["status"] == "complete_with_errors"
+    assert not b.context.storage.object_exists(b.context.config.storage.enrichment_bucket,b.builder.ENRICHMENT_CURRENT_KEY)
+    b.failures.clear()
+    b.context.config.enrichment.response_retries = 1
+    b.builder.main()
+    frame, artifact = b.read_manifest()
+    assert b.calls == ["A falha","B boa","C boa","A falha"]
+    assert b.prefixes[0] == b.prefixes[-1]
+    assert list(frame.tentativas_enrichment)==[2,1,1]
+    assert list(frame.llm_calls)==[5,1,1]
+    assert list(frame.llm_output_tokens)==[50,10,10]
+    assert frame.status_enrichment.eq("success").all()
+    assert artifact["status"] == "complete"
+    assert b.context.storage.object_exists(b.context.config.storage.enrichment_bucket,b.builder.ENRICHMENT_CURRENT_KEY)
+
+
+def test_service_quota_saves_error_and_leaves_unattempted_works_pending(enrichment_batch):
+    b = enrichment_batch
+    b.failures["A falha"] = GenerationServiceError("quota", diagnostics={"reason":"quota","http_status":429,"quota_scope":"daily"}, batch_fatal=True)
+    with pytest.raises(SystemExit) as error: b.builder.main()
+    assert error.value.code == 2 and b.calls == ["A falha"]
+    frame, artifact = b.read_manifest()
+    assert list(frame.status_enrichment)==["error","pending","pending"]
+    assert artifact["documents_error"]==1 and artifact["documents_pending"]==2
+
+
+def test_retry_alias_and_old_manifest_upgrade(monkeypatch):
+    from src.enrichment import build_enrichment_dataset as builder
+    monkeypatch.setattr("sys.argv",["builder","--retry"])
+    assert builder.parse_args().resume
+    original = pd.DataFrame([{"status_enrichment":"success","titulo":"Já pronto"}])
+    upgraded = builder.ensure_retry_columns(original.copy())
+    assert upgraded.iloc[0].status_enrichment=="success" and upgraded.iloc[0].tentativas_enrichment==0
+
+
+def test_pending_enrichment_blocks_auxiliary_index_and_promotion(checkpoint, monkeypatch):
+    calls = []
+    def interrupted(name, arguments=()):
+        calls.append(name)
+        assert arguments == ["--retry"]
+        raise SystemExit(2)
+    monkeypatch.setattr(production,"run_module",interrupted)
+    promotion=Mock();monkeypatch.setattr(production,"promote",promotion)
+    checkpoint.args.promote=True
+    with pytest.raises(SystemExit) as error: production.execute(checkpoint.args)
+    assert error.value.code==2 and calls==["src.enrichment.build_enrichment_dataset"]
+    state=production.read_json(checkpoint.storage,checkpoint.config.storage.embedding_indexes_bucket,"production/runs/corpus.json")
+    assert state["status"]=="pending" and state["completed"]==["bronze","silver","text-index"]
+    promotion.assert_not_called()
+
+
+def test_mantle_code_update_preserves_checkpoint_and_runtime_only_settings(checkpoint, monkeypatch):
+    # Simula a primeira run Mantle interrompida e a adoção explícita do patch seguinte.
+    stages=production.run_module
+    monkeypatch.setattr(production,"run_module",lambda *args: (_ for _ in ()).throw(SystemExit(2)))
+    with pytest.raises(SystemExit): production.execute(checkpoint.args)
+    monkeypatch.setenv("SOURCE_REVISION","c"*40)
+    checkpoint.args.resume_from_revision=NEW
+    checkpoint.config.enrichment.response_retries=0
+    monkeypatch.setattr(production,"run_module",stages)
+    result=production.execute(checkpoint.args)
+    assert result["outputs"]["index_id"]=="existing-text"
+    assert result["migrations"][-1]["from_revision"]==NEW
+    assert result["migrations"][-1]["to_revision"]=="c"*40
+    assert result["source_revision"]=="c"*40
+    assert checkpoint.executions==["src.enrichment.build_enrichment_dataset","src.indexing.build_enrichment_embedding_indexes"]

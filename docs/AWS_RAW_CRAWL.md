@@ -70,7 +70,7 @@ O processamento permanece em CPU no plano FREE. Após aplicar a atualização Te
 ## 4. Retomar e promover
 
 - **Downloads pendentes:** use `--retry` com o mesmo bucket e `raw_id`. Só as obras pendentes são revisitadas. O manifest registra status, erro, contador de tentativas desta versão e data da última tentativa.
-- **Glue interrompido:** repita `run-from-raw` com os mesmos `raw_id`, `run_id` e SHA. Outra revisão ou configuração exige novo `run_id`, exceto a [migração explícita para Mantle](AWS_AUTOMATION.md#qwen-no-mantle).
+- **Glue interrompido:** repita `run-from-raw` com os mesmos `raw_id`, `run_id` e SHA. O enrichment retoma somente pendências. Atualizações operacionais do Mantle admitem [adoção explícita da nova revisão](AWS_AUTOMATION.md#pendências-do-enrichment), preservando os resultados salvos.
 - **Promoção:** repita esses mesmos parâmetros e marque `promote`. O job valida os índices, atualiza `production/current.json` e solicita a recarga da API existente.
 
 Uma interrupção abrupta pode deixar `production/raw/machado-v1/crawl.lock`. Remova somente esse lock após confirmar que a coleta encerrou. Preserve os objetos de um Raw concluído para manter a integridade e a retomada.

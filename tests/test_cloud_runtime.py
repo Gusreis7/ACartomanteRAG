@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.fixture(autouse=True)
 def environment(monkeypatch):
+    monkeypatch.setattr("src.generation.provider.sleep", lambda _: None)
     for key in list(os.environ):
         if key.startswith(("RUSTFS_", "QDRANT_", "REDIS_", "AWS_", "LLM_", "ENRICHMENT_", "DATA_RELEASE", "ACARTOMANTE_")) or key in {"STORAGE_PROVIDER", "CONFIG_FILE", "ENV_FILE", "BRONZE_CURRENT_KEY", "SILVER_CURRENT_KEY", "RAW_MANIFEST_KEY", "COLIBRI_REVISION"}:
             monkeypatch.delenv(key, raising=False)
@@ -33,7 +34,7 @@ def response(text="Resposta", stop="end_turn"):
 def provider(*responses):
     client = Mock()
     client.converse.side_effect = responses or [response()]
-    native = config().generation.model_copy(update={"provider": "bedrock", "model": "qwen.qwen3-32b-v1:0"})
+    native = config().generation.model_copy(update={"provider": "bedrock", "model": "qwen.qwen3-32b-v1:0", "response_retries": 1})
     return BedrockGenerationProvider(native, client=client, control_client=Mock())
 
 def test_aws_iam_and_enrichment_independent_of_chat(monkeypatch):

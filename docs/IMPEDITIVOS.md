@@ -57,3 +57,9 @@ Em 16/10/2026, o enrichment parou por throttling no Bedrock Runtime; as quotas c
 O preço Standard em `us-east-1` permanece US$0,15 por milhão de tokens de entrada e US$0,60 por milhão de saída, além do Glue. Smoke e ETL fazem uma inferência curta antes dos embeddings. A migração explícita do checkpoint preserva Bronze, Silver e o índice textual; o enrichment passa a ter identidade própria da nova rota. Procedimento: [AWS_AUTOMATION.md](AWS_AUTOMATION.md#qwen-no-mantle).
 
 Fontes: [endpoints e quotas](https://docs.aws.amazon.com/bedrock/latest/userguide/endpoints.html), [permissões Mantle](https://docs.aws.amazon.com/service-authorization/latest/reference/list_bedrock-mantle.html) e [preços regionais](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/current/us-east-1/index.json).
+
+## Respostas incompletas no enrichment
+
+A run `jr_52b202ab4666100693d0e4ba81cdf4f6e65db8392655bdaaf135f6ac25f62e2d` terminou com um erro que agrupava resposta vazia e truncamento. O log disponível não preservou o motivo original; a causa permanece sem confirmação. O Mantle também pode cortar a geração ao atingir a quota de saída, conforme a [documentação de quotas](https://docs.aws.amazon.com/bedrock/latest/userguide/quotas-mantle.html).
+
+A decisão foi registrar motivo, tokens e request ID, com até três retries de resposta (10/20/40 segundos), preservando o orçamento de tokens por chamada. Após esgotá-los, a obra fica no manifest e o lote continua; quota, permissão ou indisponibilidade de serviço pausam o lote. Pendências bloqueiam o índice auxiliar e a promoção. A retomada reutiliza obras e unidades concluídas; os novos contadores começam em zero nos manifests antigos.
