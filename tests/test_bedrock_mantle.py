@@ -578,3 +578,96 @@ def test_failed_response_capture_is_bounded_and_does_not_change_unit_cache_keys(
     checkpoint.storage.upload_bytes(checkpoint.config.storage.enrichment_bucket,key,UnitSummary(resumo="Cached",eventos=[]).model_dump_json().encode())
     assert service._cached_summary(llm,messages,UnitSummary).resumo=="Cached"
     assert llm.invoke.call_count==1
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("I\n" + "."*65 + "\n\n", True),
+    ("I\n" + "."*37 + "\n" + "."*37 + "\n", True),
+    ("\r\n IV \r\n ........ \r\n", True),
+    ("I", False),
+    ("", False),
+    ("........\n........", False),
+    ("I\nCamilo leu a carta.", False),
+    ("I\n........\nCamilo partiu.", False),
+    ("I\n...\n— Não!", False),
+    ("CAPÍTULO I\n........", False),
+    ("I\n..", False),
+])
+def test_only_roman_marker_with_dotted_lines_is_ornamental(text, expected):
+    from src.enrichment.service import is_ornamental_unit
+    assert is_ornamental_unit(text) is expected
+
+
+@pytest.fixture
+def ornamental_work(checkpoint, monkeypatch):
+    from src.enrichment import service as module
+    first="I\n"+"."*65+"\n\n"
+    second="I\n"+"."*37+"\n"+"."*37+"\n"
+    lengths=[3311]*3+[len(first)]+[694]*11+[697]+[len(second)]
+    sections=[];start=0
+    for position,length in enumerate(lengths,start=1):
+        text=first if position==4 else second if position==17 else (f"CAPÍTULO {position}\n"+"Camilo leu a carta e partiu. "*150)[:length]
+        sections.append({"section_index":position-1,"section_type":"chapter","section_header":"I" if position in {4,17} else f"CAPÍTULO {position}","section_title":"","start_char":start,"end_char":start+len(text),"text":text})
+        start+=len(text)
+    assert (sections[3]["start_char"],sections[3]["end_char"])==(9933,10002)
+    assert (sections[16]["start_char"],sections[16]["end_char"])==(18333,18411)
+    source=module.WorkSource("O almada","Machado de Assis","Poema","000204","bronze","almada.txt","".join(section["text"] for section in sections))
+    monkeypatch.setattr(module,"build_sections",lambda **_: (sections,"hybrid"))
+    class Provider:
+        def __init__(self):self.calls=[]
+        def usage_snapshot(self):return {"calls":len(self.calls)}
+        def invoke_structured(self,messages,schema):
+            self.calls.append(schema.__name__)
+            if schema is module.UnitSummary:raise AssertionError("Unidade narrativa deveria usar checkpoint; ornamento não deve chamar LLM.")
+            return module.FinalNarrativeSummary(resumo_geral="Camilo leu a carta e partiu.",eventos_principais=["Camilo partiu."])
+    provider=Provider()
+    monkeypatch.setattr(module,"create_generation_provider",lambda _:provider)
+    service=module.WorkEnrichmentService(checkpoint.config)
+    return SimpleNamespace(module=module,service=service,provider=provider,source=source,sections=sections,storage=checkpoint.storage,config=checkpoint.config)
+
+
+def test_real_ornamental_units_are_audited_without_renumbering(ornamental_work):
+    c=ornamental_work
+    units,plan=c.service._plan_units(c.source)
+    assert [unit.unit_id for unit in units]==[f"s{i:03d}_p01" for i in range(1,18) if i not in {4,17}]
+    assert plan["detected_units"]==17 and plan["planned_units"]==15
+    assert plan["skipped_units_count"]==2
+    skipped=plan["skipped_units"]
+    assert [item["unit_id"] for item in skipped]==["s004_p01","s017_p01"]
+    assert [(item["start_char"],item["end_char"]) for item in skipped]==[(9933,10002),(18333,18411)]
+    assert all(item["status"]=="skipped" and item["reason"]=="roman_marker_and_dotted_lines" for item in skipped)
+    for item,index in zip(skipped,[3,16]):
+        assert item["text_sha256"]==hashlib.sha256(c.sections[index]["text"].encode()).hexdigest()
+    assert not c.provider.calls
+
+
+def test_ornamental_fix_reuses_legacy_unit_checkpoints_and_only_generates_final(ornamental_work,capsys):
+    c=ornamental_work
+    prefix="checkpoints/existing-generator-signature/existing-source-hash"
+    bucket=c.config.storage.enrichment_bucket
+    cached={}
+    for position,section in enumerate(c.sections,start=1):
+        if position in {4,17}:continue
+        messages=[("system",c.module.UNIT_SYSTEM_PROMPT),("human",c.module.UNIT_PROMPT_TEMPLATE.format(title=c.source.title,author=c.source.author,max_events=c.module.MAX_EVENTS_PER_BLOCK,unit_id=f"s{position:03d}_p01",section_label=c.module.section_label(section),part_index=1,part_count=1,text=section["text"]))]
+        digest=hashlib.sha256(json.dumps(messages,ensure_ascii=False).encode()).hexdigest()
+        key=f"{prefix}/UnitSummary/{digest}.json"
+        payload=c.module.UnitSummary(resumo=f"Resumo já salvo {position}",eventos=["Camilo partiu."]).model_dump_json().encode()
+        c.storage.upload_bytes(bucket,key,payload);cached[key]=payload
+    result=c.service.enrich(c.source,checkpoint_prefix=prefix)
+    assert c.provider.calls==["FinalNarrativeSummary"]
+    assert len(result.blocks)==15 and result.plan["skipped_units_count"]==2
+    assert [block["unit_id"] for block in result.blocks]==[f"s{i:03d}_p01" for i in range(1,18) if i not in {4,17}]
+    assert all(block["resumo"].startswith("Resumo já salvo") for block in result.blocks)
+    for key,payload in cached.items():assert c.storage.download_bytes(bucket,key)==payload
+    assert result.summary["resumo_geral"]=="Camilo leu a carta e partiu."
+    assert result.usage["calls"]==1
+    output=capsys.readouterr().out
+    assert "[skip] Enrichment:" in output and "s004_p01" in output and "s017_p01" in output
+
+
+def test_work_with_only_ornamental_units_still_fails_without_calling_llm(ornamental_work):
+    c=ornamental_work
+    c.sections[:]=[c.sections[3],c.sections[16]]
+    with pytest.raises(RuntimeError,match="sem unidades processáveis"):
+        c.service.enrich(c.source,checkpoint_prefix="checkpoints/only-ornaments")
+    assert not c.provider.calls

@@ -178,6 +178,15 @@ def normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", value.casefold()).strip()
 
 
+def is_ornamental_unit(text: str) -> bool:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return (
+        len(lines) >= 2
+        and re.fullmatch(r"[IVXLCDM]+", lines[0]) is not None
+        and all(re.fullmatch(r"\.{3,}", line) is not None for line in lines[1:])
+    )
+
+
 def split_char_windows(
     text: str,
     *,
@@ -409,19 +418,43 @@ class WorkEnrichmentService:
         if not units:
             raise RuntimeError("Planejamento do enrichment não gerou blocos.")
 
-        return units, {
+        # Filtrar depois de numerar preserva IDs, posições e chaves dos caches.
+        skipped = [{
+            "unit_id": unit.unit_id, "section_index": unit.section_index,
+            "section_label": unit.section_label, "section_type": unit.section_type,
+            "part_index": unit.part_index, "part_count": unit.part_count,
+            "start_char": unit.start_char, "end_char": unit.end_char,
+            "status": "skipped", "reason": "roman_marker_and_dotted_lines",
+            "text_chars": len(unit.text),
+            "text_sha256": hashlib.sha256(unit.text.encode()).hexdigest(),
+        } for unit in units if is_ornamental_unit(unit.text)]
+        skipped_ids = {item["unit_id"] for item in skipped}
+        active_units = [unit for unit in units if unit.unit_id not in skipped_ids]
+        if not active_units:
+            raise RuntimeError("Enrichment sem unidades processáveis: somente marcadores romanos e linhas pontilhadas.")
+
+        return active_units, {
             "requested_strategy": self.enrichment.strategy,
             "effective_strategy_from_chunker": effective_strategy,
             "plan_mode": plan_mode,
             "detected_sections": len(sections),
             "detected_chapter_sections": len(chapter_sections),
-            "planned_units": len(units),
+            "detected_units": len(units),
+            "planned_units": len(active_units),
+            "skipped_units_count": len(skipped),
+            "skipped_units": skipped,
             "unit_chars": self.enrichment.unit_chars,
             "char_overlap": self.enrichment.char_overlap,
         }
 
     def _plan_node(self, state: EnrichmentState) -> dict[str, Any]:
         units, plan = self._plan_units(state["source"])
+        if plan["skipped_units_count"]:
+            print("[skip] Enrichment: " + json.dumps({
+                "title": state["source"].title,
+                "unit_ids": [item["unit_id"] for item in plan["skipped_units"]],
+                "reason": "roman_marker_and_dotted_lines",
+            }, ensure_ascii=False), flush=True)
         self._map_started = perf_counter()
         return {"units": units, "plan": plan}
 
