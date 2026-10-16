@@ -134,6 +134,14 @@ A migração aceita apenas as três primeiras etapas completas, Raw e configura�
 
 Nas retomadas e na promoção seguintes, mantenha o **novo SHA**, Raw e `run_id`; deixe `resume_from_revision` vazio. Confira que não existe Glue ativo antes de iniciar outra execução; um lock órfão segue o procedimento acima.
 
+### Pendências do enrichment
+
+`response_retries: 3` permite a chamada inicial e mais três tentativas para resposta vazia, truncada ou JSON inválido, com espera de 10/20/40 segundos. O manifest mantém status, `tentativas_enrichment`, consumo observado e `erro_tipo`/`erro_detalhes_json`. HTTP 429 e erros de permissão/serviço pausam o lote após o tratamento limitado de transporte; uma quota diária identificada não é repetida imediatamente.
+
+O Glue usa `--retry` (alias de `--resume`): seleciona somente obras pendentes/erro e reutiliza checkpoints das unidades. Um lote incompleto salva o manifest e encerra com código 2, sem índice auxiliar ou promoção. Consulte `generation_response_error` e `bedrock_unavailable` nos logs: `finish_reason`, `max_tokens`, tokens de saída/raciocínio e request ID permitem investigar o corte. O erro antigo, sozinho, não comprova falta de quota.
+
+Para adotar este patch em `corpus-raw-v1`, publique a nova revisão e use `revision` vazio, `resume_from_revision` igual ao SHA atualmente registrado no checkpoint, mesmo Raw/run e promoção desmarcada. A atualização verifica a assinatura e salva backup; preserva o dataset e os checkpoints Mantle quando só muda o código/controle de execução. Nas retomadas seguintes, fixe o novo SHA e deixe o campo de origem vazio. Nenhuma mudança adicional de IAM ou Terraform é necessária se a rota Mantle já foi provisionada.
+
 ## 5. Configurar DNS e publicar a API
 
 Consulte os servidores da zona:

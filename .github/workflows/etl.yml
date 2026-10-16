@@ -25,7 +25,7 @@ on:
         required: false
         type: string
       resume_from_revision:
-        description: Somente migração Converse para Mantle; SHA original do checkpoint (vazio nas execuções seguintes)
+        description: SHA anterior do checkpoint para adotar nova revisão; vazio nas retomadas da mesma revisão
         required: false
         type: string
 permissions:

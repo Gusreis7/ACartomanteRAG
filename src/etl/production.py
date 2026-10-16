@@ -12,7 +12,7 @@ import sys
 from datetime import datetime, timezone
 
 from botocore.exceptions import ClientError
-from src.config.config_manager import ConfigManager
+from src.config.config_manager import ConfigManager, ENRICHMENT_RUNTIME_FIELDS
 from src.storage.rustfs_manager import RustFSManager
 
 STEPS = ("crawl", "bronze", "silver", "text-index", "enrichment", "enrichment-index")
@@ -70,7 +70,7 @@ def checkpoint_signature(inputs):
 
 
 def migrate_mantle_checkpoint(storage, config, state, inputs, old_revision):
-    """Migração explícita de Converse para Mantle, somente após text-index completo."""
+    """Atualização explícita da revisão, preservando dados e configuração semântica."""
     if (
         not re.fullmatch(r"[0-9a-f]{40}", old_revision)
         or not re.fullmatch(r"[0-9a-f]{40}", inputs.get("source_revision") or "")
@@ -87,9 +87,10 @@ def migrate_mantle_checkpoint(storage, config, state, inputs, old_revision):
         raise ValueError("Migração Mantle exige o mesmo Raw e somente bronze, silver e text-index concluídos.")
     previous_inputs = json.loads(json.dumps(inputs))
     previous_inputs["source_revision"] = old_revision
-    previous_inputs["enrichment"].update(provider="bedrock", model="qwen.qwen3-32b-v1:0")
     if state["signature"] != checkpoint_signature(previous_inputs):
-        raise ValueError("SHA anterior ou configuração divergem do checkpoint; migração recusada.")
+        previous_inputs["enrichment"].update(provider="bedrock", model="qwen.qwen3-32b-v1:0")
+        if state["signature"] != checkpoint_signature(previous_inputs):
+            raise ValueError("SHA anterior ou configuração divergem do checkpoint; migração recusada.")
     bronze = read_json(storage, config.storage.bronze_bucket, config.storage.bronze_current_key)
     silver = read_json(storage, config.storage.silver_bucket, config.storage.silver_current_key)
     index_id = state["outputs"]["index_id"]
@@ -114,6 +115,7 @@ def migrate_mantle_checkpoint(storage, config, state, inputs, old_revision):
         qdrant.close()
     result = json.loads(json.dumps(state))
     result["signature"] = checkpoint_signature(inputs)
+    result["source_revision"] = inputs["source_revision"]
     result.setdefault("migrations", []).append({
         "from_revision": old_revision, "to_revision": inputs["source_revision"],
         "from_signature": state["signature"], "at": timestamp(),
@@ -203,7 +205,7 @@ def execute(args):
         "source_revision": os.getenv("SOURCE_REVISION"),
         "bronze": config.bronze.model_dump(), "pages": [args.first_page, args.last_page],
         "silver": config.silver.model_dump(), "embedding": config.embedding.model_dump(exclude={"execution"}),
-        "enrichment": config.enrichment.model_dump(exclude={"max_parallel", "timeout_seconds", "keep_alive", "num_batch"}), "reuse_index_id": args.reuse_index_id,
+        "enrichment": config.enrichment.model_dump(exclude=ENRICHMENT_RUNTIME_FIELDS), "reuse_index_id": args.reuse_index_id,
     }
     if raw_dataset:
         receipt, raw_payload = raw_dataset
@@ -218,7 +220,7 @@ def execute(args):
         if old_revision and not exists:
             raise ValueError("Checkpoint anterior ausente; não é possível migrar para Mantle.")
         state = read_json(storage, bucket, key) if exists else {
-            "run_id": args.run_id, "signature": signature, "completed": [], "outputs": {},
+            "run_id": args.run_id, "signature": signature, "source_revision": signature_inputs["source_revision"], "completed": [], "outputs": {},
         }
         previous = None
         if state["signature"] != signature:
@@ -237,7 +239,7 @@ def execute(args):
             from src.generation.provider import create_generation_provider
             probe = config.generation.model_copy(update={
                 name: getattr(config.enrichment, name)
-                for name in ("provider", "region", "model", "timeout_seconds", "reasoning")
+                for name in ("provider", "region", "model", "timeout_seconds", "reasoning", "response_retries")
             })
             create_generation_provider(probe).preflight()
             print("[ok] inferência Mantle validada (até 64 tokens de saída)", flush=True)
@@ -260,7 +262,7 @@ def execute(args):
                 )
             state["migrations"][-1]["backup_key"] = backup_key
             write_json(storage, bucket, key, state)
-            print("[ok] checkpoint migrado para Mantle; índice textual preservado", flush=True)
+            print("[ok] checkpoint atualizado para nova revisão; etapas concluídas preservadas", flush=True)
         active = read_json(storage, bucket, "production/current.json") if storage.object_exists(bucket, "production/current.json") else {}
         if active.get("index_id"):
             state["outputs"].setdefault("index_id", active["index_id"])
@@ -322,7 +324,15 @@ def execute(args):
                 finally:
                     qdrant.close()
             elif step == "enrichment":
-                run_module("src.enrichment.build_enrichment_dataset", ["--resume", "--fail-fast"])
+                try:
+                    run_module("src.enrichment.build_enrichment_dataset", ["--retry"])
+                except SystemExit as exc:
+                    if exc.code != 2:
+                        raise
+                    state.update(status="pending", current_step="enrichment", updated_at=timestamp())
+                    write_json(storage, bucket, key, state)
+                    print("[pendente] Enrichment incompleto; manifest salvo, sem índice auxiliar ou promoção.", flush=True)
+                    raise
                 pointer = read_json(storage, config.storage.enrichment_bucket, os.environ["ENRICHMENT_DATASET_POINTER"])
                 state["outputs"]["enrichment_dataset_id"] = pointer["enrichment_dataset_id"]
             elif step == "enrichment-index":
@@ -349,7 +359,7 @@ def main():
     parser.add_argument("--steps", nargs="+", choices=STEPS, default=list(STEPS[:4]))
     parser.add_argument("--reuse-index-id")
     parser.add_argument("--raw-id", default="")
-    parser.add_argument("--resume-from-revision", default="", help="SHA Converse original, somente para migrar um checkpoint concluído até text-index para Mantle")
+    parser.add_argument("--resume-from-revision", default="", help="SHA anterior do checkpoint: migração para Mantle ou atualização de código com a mesma configuração")
     parser.add_argument("--promote", action="store_true")
     parser.add_argument("--first-page", type=int, default=1)
     parser.add_argument("--last-page", type=int, default=7)

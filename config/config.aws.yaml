@@ -6,6 +6,7 @@ generation:
   max_tokens: 1024
   max_parallel: 2
   retry_attempts: 3
+  response_retries: 3
   daily_request_limit: 300
   session_requests_per_minute: 6
   model_prices:
@@ -19,6 +20,7 @@ generation:
       input: 0.17
       output: 0.66
 enrichment:
+  response_retries: 3
   provider: bedrock-mantle
   region: us-east-1
   model: qwen.qwen3-32b
