@@ -49,3 +49,11 @@ Como referência de planejamento, duas DPUs a US$0,44 por hora representam US$0,
 O novo prazo exige um plano Terraform atualizado e vale para execuções seguintes. Para retomar o processamento existente, manter Raw, `run_id` e SHA da revisão ETL. As etapas concluídas são reutilizadas; o índice parcial ainda recalcula os lotes e faz upsert dos mesmos IDs. Uma interrupção forçada pode deixar o lock do ETL no S3; sua remoção exige confirmar que não existe job ativo. O procedimento está em [AWS_AUTOMATION.md](AWS_AUTOMATION.md).
 
 Referências: [preços do Glue](https://aws.amazon.com/glue/pricing/), [planos e créditos AWS](https://aws.amazon.com/free/free-tier-faqs/) e [limites do GitHub Actions](https://docs.github.com/en/actions/reference/limits).
+
+## Qwen pela rota Mantle
+
+Em 16/10/2026, o enrichment parou por throttling no Bedrock Runtime; as quotas consultadas para Qwen estavam zeradas. O mesmo Qwen3 32B respondeu pela API Chat Completions do Mantle no notebook. Adotamos essa rota com assinatura IAM das roles, mantendo o plano FREE e o processamento no Glue. O Mantle tem quotas próprias; o teste curto não garante capacidade para todo o corpus.
+
+O preço Standard em `us-east-1` permanece US$0,15 por milhão de tokens de entrada e US$0,60 por milhão de saída, além do Glue. Smoke e ETL fazem uma inferência curta antes dos embeddings. A migração explícita do checkpoint preserva Bronze, Silver e o índice textual; o enrichment passa a ter identidade própria da nova rota. Procedimento: [AWS_AUTOMATION.md](AWS_AUTOMATION.md#qwen-no-mantle).
+
+Fontes: [endpoints e quotas](https://docs.aws.amazon.com/bedrock/latest/userguide/endpoints.html), [permissões Mantle](https://docs.aws.amazon.com/service-authorization/latest/reference/list_bedrock-mantle.html) e [preços regionais](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/current/us-east-1/index.json).

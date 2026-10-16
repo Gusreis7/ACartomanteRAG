@@ -287,7 +287,7 @@ class RetrievalBenchmarkConfig(BaseModel):
 
 
 class GenerationConfig(BaseModel):
-    provider: Literal["ollama", "bedrock"] = "ollama"
+    provider: Literal["ollama", "bedrock", "bedrock-mantle"] = "ollama"
     model: str = "qwen3.5:4b"
     base_url: str = "http://localhost:11434"
     region: str = "us-east-1"
@@ -353,7 +353,7 @@ class EnrichmentSemanticConfig(BaseModel):
 class EnrichmentConfig(BaseModel):
     pipeline_version: int = Field(default=1, ge=1)
     model: str = Field(default="qwen3.5:4b", min_length=1)
-    provider: Literal["ollama", "bedrock"] = "ollama"
+    provider: Literal["ollama", "bedrock", "bedrock-mantle"] = "ollama"
     region: str = "us-east-1"
     prompt_version: str = Field(default="summary_events_v1", min_length=1)
     schema_version: str = Field(default="summary_events_v1", min_length=1)

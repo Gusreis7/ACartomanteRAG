@@ -86,7 +86,7 @@ Versione o código, `production.tfvars.json` e `infra/aws/.terraform.lock.hcl`; 
 
 ## 4. Preparar os dados
 
-Em **GitHub → Actions → AWS ETL → main**, rode `operation=smoke`, `run_id=smoke-v1`, revisão vazia e promoção desmarcada. O smoke verifica bibliotecas, S3, Qdrant, catálogo Bedrock e Colibri; a permissão de inferência é validada no processamento real.
+Em **GitHub → Actions → AWS ETL → main**, rode `operation=smoke`, `run_id=smoke-v1`, revisão vazia e promoção desmarcada. O smoke verifica bibliotecas, S3, Qdrant, catálogo, uma inferência de até 64 tokens de saída e Colibri.
 
 Siga [AWS_RAW_CRAWL.md](AWS_RAW_CRAWL.md) para coletar o Raw e executar `run-from-raw` no Glue. Para retomar ou promover, mantenha o mesmo `raw_id`, `run_id` e SHA. Os bundles são fixados por revisão, sem reaplicar Terraform para cada versão do ETL.
 
@@ -98,7 +98,7 @@ O plano FREE foi mantido. O Glue tem limite de dez horas com os mesmos dois work
 
 Para ativar o novo prazo, publique o patch no Gitea e confira o espelho da `main`. Execute **AWS infrastructure → plan**, revise o novo plano e depois **apply**; o ajuste esperado é `aws_glue_job.etl.timeout`, de 120 para 600. Outros desvios exigem revisão. Não reutilize um plano salvo antes da alteração. O novo workflow confere o prazo provisionado antes de iniciar outro ETL.
 
-Uma execução já iniciada deve ser acompanhada pelo seu próprio `StartedOn` e `Timeout`; não conte com o patch para estendê-la. Para retomar `corpus-raw-v1`, selecione novamente `run-from-raw`, Raw `machado-v1` e a revisão ETL original `de3ac95e91500f26dcdf43212526fb52f33a2916`. Mantenha a promoção desmarcada até conferir o resultado. O controlador atualizado pode acompanhar o bundle antigo sem alterar a assinatura dos dados.
+Uma execução já iniciada mantém seu próprio `StartedOn`, `Timeout` e bundle. Retomadas comuns preservam Raw, `run_id` e revisão ETL. Para trocar a rota Converse por Mantle no checkpoint `corpus-raw-v1`, use o procedimento abaixo.
 
 O checkpoint fica no bucket de índices, em `production/runs/corpus-raw-v1.json`. `completed` registra etapas concluídas; `current_step` identifica a etapa atual. O horário muda nas transições, sem representar um sinal periódico de atividade. Os logs detalhados ficam em `/aws-glue/jobs/output` e `/aws-glue/jobs/error`, filtrados pelo `jr_`.
 
@@ -113,6 +113,26 @@ python -u scripts/cloud.py wait-glue --job-run-id jr_ID_DA_EXECUCAO --wait-secon
 ```
 
 Esse comando usa os outputs do Terraform local; `--outputs` aceita o contexto JSON existente. Retorno 0 indica sucesso do Glue; 3 indica que ele ainda estava ativo no fim da janela. Falhas e timeout são propagados. As estimativas e a decisão financeira estão em [IMPEDITIVOS.md](IMPEDITIVOS.md).
+
+### Qwen no Mantle
+
+O overlay AWS usa `provider: bedrock-mantle` e `model: qwen.qwen3-32b`, com IAM/SigV4. Nenhum secret novo é necessário no GitHub ou SSM. O provider `bedrock` continua disponível para Converse, inclusive Scout; selecione provider e modelo juntos ao configurar esse benchmark.
+
+1. Publique o patch no Gitea e confira o espelho na `main` do GitHub.
+2. Execute **AWS infrastructure → plan** e depois **apply**, revisando as permissões Mantle das roles de aplicação e Glue. Não reaproveite plano antigo.
+3. Execute **AWS ETL → smoke**, revisão vazia e sem promoção. Só continue após sucesso.
+4. Execute **AWS ETL** com os campos abaixo para migrar o checkpoint já existente.
+
+| Campo | Migração de `corpus-raw-v1` |
+|---|---|
+| `operation` / `raw_id` / `run_id` | `run-from-raw` / `machado-v1` / `corpus-raw-v1` |
+| `revision` | Vazio; use a nova revisão exibida e anote seu SHA |
+| `resume_from_revision` | `de3ac95e91500f26dcdf43212526fb52f33a2916` |
+| `promote` | Desmarcado |
+
+A migração aceita apenas as três primeiras etapas completas, Raw e configuração correspondentes à assinatura antiga, manifests consistentes e contagem exata no Qdrant. Salva o checkpoint anterior em `production/runs/corpus-raw-v1/before-mantle-<assinatura>.json`. Reutiliza o índice textual e inicia o enrichment da nova rota, sem alterar os artefatos antigos. Divergências interrompem a migração.
+
+Nas retomadas e na promoção seguintes, mantenha o **novo SHA**, Raw e `run_id`; deixe `resume_from_revision` vazio. Confira que não existe Glue ativo antes de iniciar outra execução; um lock órfão segue o procedimento acima.
 
 ## 5. Configurar DNS e publicar a API
 

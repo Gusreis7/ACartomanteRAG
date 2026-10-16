@@ -352,6 +352,7 @@ def main():
     g.add_argument("--steps", default=",".join(ETL_STEPS))
     g.add_argument("--reuse-index-id", default="")
     g.add_argument("--raw-id", default="")
+    g.add_argument("--resume-from-revision", default="")
     g.add_argument("--promote", action="store_true")
     g.add_argument("--smoke", action="store_true")
     g.add_argument("--wait", action="store_true")
@@ -376,6 +377,9 @@ def main():
     r = commands.add_parser("data-rollback")
     r.add_argument("--run-id", required=True)
     args = p.parse_args()
+    if args.command == "glue" and args.resume_from_revision:
+        if args.smoke or not args.raw_id or args.resume_from_revision == args.revision or not re.fullmatch(r"[0-9a-f]{40}", args.resume_from_revision):
+            p.error("resume-from-revision exige Raw, SHA completo e execução sem smoke")
     if args.command == "glue" and args.expected_timeout_minutes is not None:
         if not 1 <= args.expected_timeout_minutes < 10080:
             p.error("--expected-timeout-minutes deve estar entre 1 e 10079")
@@ -475,6 +479,8 @@ def main():
                 )
         if args.reuse_index_id:
             arguments["--reuse-index-id"] = args.reuse_index_id
+        if args.resume_from_revision:
+            arguments["--resume-from-revision"] = args.resume_from_revision
         run_id = client.start_job_run(JobName=out["glue_job"], Arguments=arguments)[
             "JobRunId"
         ]

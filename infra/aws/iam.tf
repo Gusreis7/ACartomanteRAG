@@ -30,6 +30,8 @@ resource "aws_iam_role_policy" "app" {
     { Effect = "Allow", Action = ["bedrock:GetFoundationModel"], Resource = [
       "arn:aws:bedrock:${var.region}::foundation-model/${local.qwen}"
     ] },
+    { Effect = "Allow", Action = ["bedrock-mantle:CreateInference"], Resource = ["arn:aws:bedrock-mantle:${var.region}:${data.aws_caller_identity.current.account_id}:project/*"], Condition = { StringEquals = { "bedrock-mantle:Model" = "qwen.qwen3-32b" } } },
+    { Effect = "Allow", Action = ["bedrock-mantle:GetModel"], Resource = ["arn:aws:bedrock-mantle:${var.region}:${data.aws_caller_identity.current.account_id}:project/*"] },
     { Effect = "Allow", Action = ["bedrock:GetInferenceProfile"], Resource = [
       "arn:aws:bedrock:${var.region}:${data.aws_caller_identity.current.account_id}:inference-profile/us.${local.scout}"
     ] },
@@ -102,6 +104,8 @@ resource "aws_iam_role_policy" "etl" {
     { Effect = "Allow", Action = ["s3:DeleteObject"], Resource = ["${aws_s3_bucket.data["indexes"].arn}/production/etl.lock"] },
     { Effect = "Allow", Action = ["ssm:GetParameter"], Resource = ["arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter${local.settings_etl}"] },
     { Effect = "Allow", Action = ["bedrock:InvokeModel", "bedrock:GetFoundationModel"], Resource = ["arn:aws:bedrock:${var.region}::foundation-model/${local.qwen}"] },
+    { Effect = "Allow", Action = ["bedrock-mantle:CreateInference"], Resource = ["arn:aws:bedrock-mantle:${var.region}:${data.aws_caller_identity.current.account_id}:project/*"], Condition = { StringEquals = { "bedrock-mantle:Model" = "qwen.qwen3-32b" } } },
+    { Effect = "Allow", Action = ["bedrock-mantle:GetModel"], Resource = ["arn:aws:bedrock-mantle:${var.region}:${data.aws_caller_identity.current.account_id}:project/*"] },
     { Effect = "Allow", Action = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"], Resource = ["arn:aws:logs:${var.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws-glue/*"] }
   ] })
 }
