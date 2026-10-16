@@ -20,6 +20,7 @@ def main():
     p.add_argument("--steps", default="crawl,bronze,silver,text-index")
     p.add_argument("--reuse-index-id", default="")
     p.add_argument("--raw-id", default="")
+    p.add_argument("--resume-from-revision", default="")
     p.add_argument("--promote", default="false", choices=["true", "false"])
     p.add_argument("--smoke", default="false", choices=["true", "false"])
     args, _ = p.parse_known_args()
@@ -68,18 +69,22 @@ def main():
                 qdrant.info()
             finally:
                 qdrant.close()
-            create_generation_provider(config.generation).healthcheck()
+            provider = create_generation_provider(config.generation)
+            provider.healthcheck()
+            provider.preflight()
             embedder = EmbedderRegistry().create(config.embedding.models["colibri"], normalize_embeddings=config.embedding.index.normalize_embeddings, device="cpu", batch_size=1)
             vectors = embedder.embed_documents(["Machado de Assis escreveu A Cartomante."])
             if len(vectors) != 1:
                 raise ValueError("Smoke de embeddings falhou")
-            print("[ok] Glue, PyMuPDF, S3, Qdrant, catálogo Bedrock e Colibri; nenhuma geração LLM executada.")
+            print("[ok] Glue, PyMuPDF, S3, Qdrant, inferência Bedrock (até 64 tokens de saída) e Colibri.")
             return
         sys.argv = ["src.etl.production", "--run-id", args.run_id, "--steps", *args.steps.split(",")]
         if args.reuse_index_id:
             sys.argv += ["--reuse-index-id", args.reuse_index_id]
         if args.raw_id:
             sys.argv += ["--raw-id", args.raw_id]
+        if args.resume_from_revision:
+            sys.argv += ["--resume-from-revision", args.resume_from_revision]
         if args.promote == "true":
             sys.argv += ["--promote"]
         runpy.run_module("src.etl.production", run_name="__main__")

@@ -237,7 +237,7 @@ def build_signature(
         "source_bronze_manifest_sha256": bronze_manifest_sha256,
         "model": enrichment.model,
         "provider": enrichment.provider,
-        "region": enrichment.region if enrichment.provider == "bedrock" else None,
+        "region": enrichment.region if enrichment.provider in {"bedrock", "bedrock-mantle"} else None,
         "model_digest": model_digest,
         "prompt_version": enrichment.prompt_version,
         "prompt_sha256": prompt_hash,
@@ -496,8 +496,8 @@ def main() -> None:
     bronze_artifact_id = str(bronze_current["bronze_artifact_id"])
 
     model_digest = (
-        f"bedrock:{config.enrichment.region}:{config.enrichment.model}"
-        if config.enrichment.provider == "bedrock" else resolve_ollama_model_digest(
+        f"{config.enrichment.provider}:{config.enrichment.region}:{config.enrichment.model}"
+        if config.enrichment.provider in {"bedrock", "bedrock-mantle"} else resolve_ollama_model_digest(
             base_url=config.generation.base_url, model=config.enrichment.model,
         )
     )

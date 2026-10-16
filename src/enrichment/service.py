@@ -259,7 +259,7 @@ class WorkEnrichmentService:
         self.provider = None
         self._checkpoint_prefix = None
         self.storage = RustFSManager.from_config(config.environment.rustfs)
-        if self.enrichment.provider == "bedrock":
+        if self.enrichment.provider in {"bedrock", "bedrock-mantle"}:
             generation = config.generation.model_copy(update={
                 **{key: getattr(self.enrichment, key) for key in (
                     "provider", "region", "model", "temperature", "top_p", "max_tokens", "timeout_seconds", "max_parallel", "reasoning"
@@ -604,7 +604,7 @@ class WorkEnrichmentService:
         )
 
     def unload_model(self) -> None:
-        if self.enrichment.provider == "bedrock":
+        if self.enrichment.provider in {"bedrock", "bedrock-mantle"}:
             return
         endpoint = str(self.config.generation.base_url).rstrip("/") + "/api/generate"
         payload = json.dumps({

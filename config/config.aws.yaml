@@ -1,14 +1,17 @@
 extends: config.yaml
 generation:
-  provider: bedrock
+  provider: bedrock-mantle
   region: us-east-1
-  model: qwen.qwen3-32b-v1:0
+  model: qwen.qwen3-32b
   max_tokens: 1024
   max_parallel: 2
   retry_attempts: 3
   daily_request_limit: 300
   session_requests_per_minute: 6
   model_prices:
+    qwen.qwen3-32b:
+      input: 0.15
+      output: 0.6
     qwen.qwen3-32b-v1:0:
       input: 0.15
       output: 0.6
@@ -16,9 +19,9 @@ generation:
       input: 0.17
       output: 0.66
 enrichment:
-  provider: bedrock
+  provider: bedrock-mantle
   region: us-east-1
-  model: qwen.qwen3-32b-v1:0
+  model: qwen.qwen3-32b
   max_parallel: 2
 retrieval_index:
   index_id: null

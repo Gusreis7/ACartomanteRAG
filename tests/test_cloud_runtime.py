@@ -33,15 +33,19 @@ def response(text="Resposta", stop="end_turn"):
 def provider(*responses):
     client = Mock()
     client.converse.side_effect = responses or [response()]
-    return BedrockGenerationProvider(config().generation, client=client, control_client=Mock())
+    native = config().generation.model_copy(update={"provider": "bedrock", "model": "qwen.qwen3-32b-v1:0"})
+    return BedrockGenerationProvider(native, client=client, control_client=Mock())
 
 def test_aws_iam_and_enrichment_independent_of_chat(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "bedrock")
     monkeypatch.setenv("LLM_MODEL", "us.meta.llama4-scout-17b-instruct-v1:0")
     value = config()
     assert value.environment.rustfs.provider == "s3"
     assert value.environment.rustfs.access_key is None
     assert value.generation.model.startswith("us.meta")
-    assert value.enrichment.model == "qwen.qwen3-32b-v1:0"
+    assert value.generation.provider == "bedrock"
+    assert value.enrichment.model == "qwen.qwen3-32b"
+    assert value.enrichment.provider == "bedrock-mantle"
     assert value.enrichment_retrieval.fallback_embedder == "colibri"
 
 def test_local_credentials_and_model_preserved(monkeypatch):

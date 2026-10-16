@@ -566,6 +566,7 @@ def test_glue_runs_all_five_stages_resumes_and_promotes_same_raw(
         receipt, payload = ready(aws, monkeypatch)
     conf = production_config(monkeypatch)
     monkeypatch.setattr(production.ConfigManager, "load", lambda: conf)
+    monkeypatch.setattr("src.generation.provider.create_generation_provider", Mock())
     monkeypatch.setenv("SOURCE_REVISION", "a" * 40)
     import src.storage.qdrant_manager as qdrant_module
 

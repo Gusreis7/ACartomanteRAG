@@ -24,6 +24,10 @@ on:
         description: Para run-from-raw, snapshot concluído no S3 pelo crawler local (ex. machado-v1)
         required: false
         type: string
+      resume_from_revision:
+        description: Somente migração Converse para Mantle; SHA original do checkpoint (vazio nas execuções seguintes)
+        required: false
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -48,6 +52,7 @@ jobs:
       OPERATION: ${{ inputs.operation }}
       PROMOTE: ${{ inputs.promote }}
       RAW_ID: ${{ inputs.raw_id }}
+      RESUME_FROM_REVISION: ${{ inputs.resume_from_revision }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
@@ -63,6 +68,11 @@ jobs:
           revision="${REQUESTED_REVISION:-$GITHUB_SHA}"
           [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || { echo 'Use um SHA completo'; exit 1; }
           git merge-base --is-ancestor "$revision" "$GITHUB_SHA"
+          if [ -n "$RESUME_FROM_REVISION" ]; then
+            [[ "$OPERATION" = run-from-raw && "$RESUME_FROM_REVISION" =~ ^[0-9a-f]{40}$ && "$RESUME_FROM_REVISION" != "$revision" ]] || { echo 'Migração exige run-from-raw e SHA anterior completo'; exit 1; }
+            git merge-base --is-ancestor "$RESUME_FROM_REVISION" "$revision"
+            git show "$revision:infra/glue/job.py" | grep -F -- 'p.add_argument("--resume-from-revision"' >/dev/null || { echo 'Use uma revisão com suporte ao Mantle'; exit 1; }
+          fi
           if [ "$OPERATION" = run-from-raw ]; then
             [[ "$RAW_ID" =~ ^[A-Za-z0-9_-]{1,100}$ ]] || { echo 'Preencha raw_id'; exit 1; }
             git show "$revision:infra/glue/job.py" | grep -F -- 'p.add_argument("--raw-id"' >/dev/null || { echo 'A revisão escolhida não suporta Raw local; use o SHA deste patch'; exit 1; }
@@ -113,6 +123,7 @@ jobs:
           fi
           [ "$OPERATION" != smoke ] || options+=(--smoke)
           [ "$PROMOTE" != true ] || options+=(--promote)
+          [ -z "$RESUME_FROM_REVISION" ] || options+=(--resume-from-revision "$RESUME_FROM_REVISION")
           python -u scripts/cloud.py --outputs "$RUNNER_TEMP/deployment.local.json" glue \
             --revision "$ETL_REVISION" --run-id "$RUN_ID" \
             --run-id-file "$RUNNER_TEMP/glue-run-id" --expected-timeout-minutes 600 "${options[@]}"

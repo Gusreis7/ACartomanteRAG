@@ -5,11 +5,16 @@ import json
 import logging
 import re
 from threading import BoundedSemaphore, Lock
+from time import sleep
 from typing import Any
+from urllib.parse import quote
 
 import boto3
 import httpx
 from botocore.config import Config as AWSConfig
+from botocore.auth import SigV4Auth
+from botocore.awsrequest import AWSRequest
+from botocore.exceptions import ClientError, NoCredentialsError
 from langchain_core.messages import AIMessage
 
 logger = logging.getLogger("acartomante.generation")
@@ -167,8 +172,92 @@ class OllamaGenerationProvider(GenerationProvider):
             raise GenerationServiceError("Modelo Ollama não instalado.")
 
 
+class _MantleClient:
+    """Chat Completions com SigV4; adapta a resposta ao contrato interno Converse."""
+
+    def __init__(self, config, *, session=None, http_client=None) -> None:
+        self.config = config
+        self.session = session or boto3.Session()
+        self.url = f"https://bedrock-mantle.{config.region}.api.aws/v1"
+        self.http = http_client or httpx.Client(
+            timeout=httpx.Timeout(config.timeout_seconds, connect=5),
+            follow_redirects=False,
+        )
+
+    def _request(self, method, path, payload=None):
+        body = json.dumps(payload, ensure_ascii=False).encode() if payload is not None else b""
+        for attempt in range(self.config.retry_attempts):
+            credentials = self.session.get_credentials()
+            if credentials is None:
+                raise NoCredentialsError()
+            request = AWSRequest(
+                method=method, url=self.url + path, data=body,
+                headers={"Content-Type": "application/json"},
+            )
+            # Renova credenciais temporárias e assinatura a cada tentativa.
+            SigV4Auth(credentials.get_frozen_credentials(), "bedrock-mantle", self.config.region).add_auth(request)
+            try:
+                response = self.http.request(
+                    method, request.url, content=body, headers=dict(request.headers),
+                )
+            except httpx.TransportError:
+                if attempt + 1 == self.config.retry_attempts:
+                    raise GenerationServiceError("Conexão com Bedrock Mantle indisponível.") from None
+                sleep(min(2 ** attempt, 8))
+                continue
+            if response.status_code == 200:
+                try:
+                    return response.json(), response.headers, attempt
+                except ValueError:
+                    raise GenerationServiceError("Bedrock Mantle retornou resposta inválida.") from None
+            if response.status_code in {429, 500, 502, 503, 504} and attempt + 1 < self.config.retry_attempts:
+                retry_after = response.headers.get("retry-after", "")
+                delay = float(retry_after) if retry_after.isdigit() else 2 ** attempt
+                if delay <= 30:
+                    sleep(delay)
+                    continue
+            # Não incluir mensagem, payload, prompt ou headers de autenticação no erro.
+            code = f"HTTP{response.status_code}"
+            try:
+                error = response.json().get("error", {})
+                candidate = error.get("code") or error.get("type") if isinstance(error, dict) else None
+                if isinstance(candidate, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", candidate):
+                    code = candidate
+            except (ValueError, AttributeError):
+                pass
+            raise ClientError({
+                "Error": {"Code": code, "Message": "Falha na API Mantle"},
+                "ResponseMetadata": {
+                    "HTTPStatusCode": response.status_code,
+                    "RequestId": response.headers.get("x-amzn-requestid") or response.headers.get("x-request-id", "unknown"),
+                },
+            }, "CreateInference" if method == "POST" else "GetModel")
+
+    def get_model(self):
+        self._request("GET", "/models/" + quote(self.config.model, safe=""))
+
+    def converse(self, *, modelId, system, messages, inferenceConfig):
+        chat = [{"role": "system", "content": "\n\n".join(item["text"] for item in system)}] if system else []
+        chat.extend({"role": item["role"], "content": "\n".join(block["text"] for block in item["content"])} for item in messages)
+        result, headers, retries = self._request("POST", "/chat/completions", {
+            "model": modelId, "messages": chat, "stream": False,
+            "max_tokens": inferenceConfig["maxTokens"],
+            "temperature": inferenceConfig["temperature"], "top_p": inferenceConfig["topP"],
+        })
+        choice = result["choices"][0]
+        content = choice["message"].get("content") or ""
+        stop = choice.get("finish_reason")
+        usage = result.get("usage", {})
+        return {
+            "output": {"message": {"content": [{"text": content if stop in {"stop", "length"} else ""}]}},
+            "stopReason": "max_tokens" if stop == "length" else "end_turn",
+            "usage": {"inputTokens": usage.get("prompt_tokens", 0), "outputTokens": usage.get("completion_tokens", 0)},
+            "ResponseMetadata": {"RetryAttempts": retries, "RequestId": headers.get("x-amzn-requestid") or headers.get("x-request-id")},
+        }
+
+
 class BedrockGenerationProvider(GenerationProvider):
-    """Converse com IAM. JSON é validado aqui, sem presumir tool calling do modelo."""
+    """Converse ou Mantle com IAM, mantendo validação JSON e métricas comuns."""
 
     def __init__(self, config, *, client=None, control_client=None) -> None:
         self.config = config
@@ -179,8 +268,9 @@ class BedrockGenerationProvider(GenerationProvider):
             connect_timeout=5, read_timeout=config.timeout_seconds,
             retries={"mode": "standard", "total_max_attempts": config.retry_attempts},
         )
-        self.client = client or boto3.client("bedrock-runtime", region_name=config.region, config=sdk_config)
-        self.control_client = control_client or boto3.client("bedrock", region_name=config.region, config=sdk_config)
+        mantle = config.provider == "bedrock-mantle"
+        self.client = client or (_MantleClient(config) if mantle else boto3.client("bedrock-runtime", region_name=config.region, config=sdk_config))
+        self.control_client = control_client if mantle else (control_client or boto3.client("bedrock", region_name=config.region, config=sdk_config))
 
     @staticmethod
     def _messages(messages: list) -> tuple[list, list]:
@@ -202,12 +292,12 @@ class BedrockGenerationProvider(GenerationProvider):
                 conversation.append({"role": role, "content": [{"text": content}]})
         return system, conversation
 
-    def invoke(self, messages: list) -> AIMessage:
+    def invoke(self, messages: list, *, max_tokens=None) -> AIMessage:
         if not self._slots.acquire(timeout=self.config.acquire_timeout_seconds):
             raise GenerationCapacityError("Serviço de geração ocupado. Tente novamente.")
         try:
             system, conversation = self._messages(messages)
-            if self.config.model == "qwen.qwen3-32b-v1:0" and not self.config.reasoning:
+            if self.config.model in {"qwen.qwen3-32b-v1:0", "qwen.qwen3-32b"} and not self.config.reasoning:
                 # Soft switch documentado pelo Qwen; não presumir um parâmetro
                 # de template privado na API Converse gerenciada.
                 system.append({"text": "/no_think"})
@@ -215,7 +305,7 @@ class BedrockGenerationProvider(GenerationProvider):
                 modelId=self.config.model, system=system, messages=conversation,
                 inferenceConfig={
                     "temperature": self.config.temperature, "topP": self.config.top_p,
-                    "maxTokens": self.config.max_tokens,
+                    "maxTokens": self.config.max_tokens if max_tokens is None else max_tokens,
                 },
             )
             text = "\n".join(item["text"] for item in response["output"]["message"]["content"] if "text" in item)
@@ -233,7 +323,7 @@ class BedrockGenerationProvider(GenerationProvider):
                 content=text,
                 usage_metadata={"input_tokens": incoming, "output_tokens": outgoing, "total_tokens": incoming + outgoing},
                 response_metadata={
-                    "provider": "bedrock", "model": self.config.model,
+                    "provider": self.config.provider, "model": self.config.model,
                     "region": self.config.region, "stop_reason": response.get("stopReason"),
                     "retry_attempts": response.get("ResponseMetadata", {}).get("RetryAttempts", 0),
                     "request_id": response.get("ResponseMetadata", {}).get("RequestId"),
@@ -246,7 +336,7 @@ class BedrockGenerationProvider(GenerationProvider):
             raise
         except Exception as exc:
             details = getattr(exc, "response", {}) or {}
-            logger.warning("bedrock_unavailable error_type=%s code=%s request_id=%s", type(exc).__name__, details.get("Error", {}).get("Code", "unknown"), details.get("ResponseMetadata", {}).get("RequestId", "unknown"))
+            logger.warning("bedrock_unavailable provider=%s error_type=%s code=%s request_id=%s", self.config.provider, type(exc).__name__, details.get("Error", {}).get("Code", "unknown"), details.get("ResponseMetadata", {}).get("RequestId", "unknown"))
             raise GenerationServiceError("Bedrock indisponível; consulte o tipo de erro nos logs operacionais.") from exc
         finally:
             self._slots.release()
@@ -277,7 +367,9 @@ class BedrockGenerationProvider(GenerationProvider):
 
     def healthcheck(self) -> None:
         # APIs de catálogo: não geram tokens nem provam autorização de InvokeModel.
-        if self.config.model.startswith(("us.", "eu.", "apac.")):
+        if self.config.provider == "bedrock-mantle":
+            self.client.get_model()
+        elif self.config.model.startswith(("us.", "eu.", "apac.")):
             self.control_client.get_inference_profile(inferenceProfileIdentifier=self.config.model)
         else:
             self.control_client.get_foundation_model(modelIdentifier=self.config.model)
@@ -285,9 +377,13 @@ class BedrockGenerationProvider(GenerationProvider):
     def warmup(self) -> None:
         self.healthcheck()
 
+    def preflight(self) -> None:
+        # Uma chamada curta comprova acesso à inferência antes do trabalho em CPU.
+        self.invoke([("human", "Responda somente OK.")], max_tokens=64)
+
 
 def create_generation_provider(config, **kwargs) -> GenerationProvider:
-    if config.provider == "bedrock":
+    if config.provider in {"bedrock", "bedrock-mantle"}:
         return BedrockGenerationProvider(config)
     kwargs.setdefault("reasoning", config.reasoning)
     return OllamaGenerationProvider(config, **kwargs)
