@@ -18,3 +18,11 @@ Os pesos de `qwen3.5:4b`, o cache da aplicação, as imagens e os dados persiste
 ## Decisão temporária
 
 Preservar o Raspberry para o Gitea e o fluxo do repositório que espelha no GitHub. Pausar a carga de execução local do ACartomanteRAG até revisar armazenamento e capacidade da máquina.
+
+## Acesso ao MEC pelo crawler no Glue
+
+O job Glue recebeu HTTP 403 nas sete páginas consultadas do portal Domínio Público. A mesma consulta via Python/Requests no notebook retornou HTTP 200, com `server: cloudflare`. O motivo exato da diferença não foi identificado; não é um erro de permissão S3 ou de credenciais do GitHub demonstrado por esses logs.
+
+Por decisão operacional, executar somente o crawler no notebook uma vez, enviando os PDFs e o manifest diretamente ao S3 Raw. A coleta publica um recibo de conclusão após verificar páginas, downloads e integridade dos objetos. Bronze, Silver, embeddings e enrichment permanecem no Glue, usando o modo `run-from-raw` e sem voltar ao portal. Não se migram artefatos processados locais.
+
+O procedimento, os checkpoints e as limitações estão em [AWS_RAW_CRAWL.md](AWS_RAW_CRAWL.md). Não há retomada do runtime no Raspberry nem coleta automática recorrente. Se o notebook também passar a receber 403, a coleta permanece bloqueada até resolver o acesso à fonte; um Raw parcial não será promovido como completo.

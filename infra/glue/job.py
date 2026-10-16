@@ -19,6 +19,7 @@ def main():
     p.add_argument("--run-id", required=True)
     p.add_argument("--steps", default="crawl,bronze,silver,text-index")
     p.add_argument("--reuse-index-id", default="")
+    p.add_argument("--raw-id", default="")
     p.add_argument("--promote", default="false", choices=["true", "false"])
     p.add_argument("--smoke", default="false", choices=["true", "false"])
     args, _ = p.parse_known_args()
@@ -77,6 +78,8 @@ def main():
         sys.argv = ["src.etl.production", "--run-id", args.run_id, "--steps", *args.steps.split(",")]
         if args.reuse_index_id:
             sys.argv += ["--reuse-index-id", args.reuse_index_id]
+        if args.raw_id:
+            sys.argv += ["--raw-id", args.raw_id]
         if args.promote == "true":
             sys.argv += ["--promote"]
         runpy.run_module("src.etl.production", run_name="__main__")

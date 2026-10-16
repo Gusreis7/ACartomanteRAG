@@ -193,13 +193,13 @@ Essa delegação inicial ocorre no provedor do domínio e não é executada pelo
 
 ## O ETL que realmente preciso publicar
 
-O processamento é integralmente em nuvem, começando pelo crawler. A seleção continua fixed/256/o32 + Colibri, com recuperação Dense + CrossEncoder. Os objetos são escritos diretamente no S3 e as collections no Qdrant Cloud, sem migração de dados locais.
+O crawler é uma coleta única no notebook, gravando PDFs e manifest diretamente no S3 Raw. É o contorno do HTTP 403 observado no acesso ao MEC pelo Glue; a mesma consulta retornou 200 no notebook. Não há migração de Bronze, Silver ou índices locais. Todas as etapas após Raw continuam no Glue. O procedimento e os limites estão em [AWS_RAW_CRAWL.md](AWS_RAW_CRAWL.md). A seleção continua fixed/256/o32 + Colibri, com recuperação Dense + CrossEncoder e collections no Qdrant Cloud.
 
-Em GitHub Actions, o workflow AWS ETL oferece smoke e execução completa. Ele publica um bundle da revisão escolhida e inicia o Glue com script, fontes e wheels daquela revisão. Um manifest final identifica a publicação completa; o controlador recusa bundles incompletos ou alterados e não sobrescreve artefatos existentes. A seleção por execução não exige reaplicar Terraform para trocar o código do ETL.
+Em GitHub Actions, o workflow AWS ETL oferece smoke, run-from-raw e o modo legado run. Ele publica um bundle da revisão escolhida e inicia o Glue com script, fontes e wheels daquela revisão. Um manifest final identifica a publicação completa; o controlador recusa bundles incompletos ou alterados e não sobrescreve artefatos existentes. A seleção por execução não exige reaplicar Terraform para trocar o código do ETL.
 
-O smoke importa as bibliotecas, verifica S3/Qdrant, consulta o catálogo Bedrock e calcula um embedding Colibri. Não gera resposta LLM nem prova permissão de inferência. A execução do Glue tem custo. Depois dele, o modo run executa crawl, bronze, silver, text-index, enrichment e enrichment-index. O pipeline usa o driver Python do Glue, sem distribuir essas funções em Spark.
+O smoke importa as bibliotecas, verifica S3/Qdrant, consulta o catálogo Bedrock e calcula um embedding Colibri. Não gera resposta LLM nem prova permissão de inferência. A execução do Glue tem custo. Para este corpus, run-from-raw verifica o snapshot pronto e executa bronze, silver, text-index, enrichment e enrichment-index. O crawler não é chamado. O pipeline usa o driver Python do Glue, sem distribuir essas funções em Spark.
 
-Uso um run_id e um SHA estáveis para retomar o processamento ou promover o candidato. Na promoção, o pipeline reutiliza as etapas concluídas e valida os artefatos antes de selecionar production/current.json. O documento SSM de recarga reinicia somente a API existente; antes do primeiro deploy, registra que a publicação da aplicação ainda está pendente.
+Uso raw_id, run_id e SHA estáveis para retomar o processamento ou promover o candidato. O Raw concluído pode ser reprocessado com outro run_id sem uma nova coleta no MEC. Na promoção, o pipeline reutiliza as etapas concluídas e valida os artefatos antes de selecionar production/current.json. O documento SSM de recarga reinicia somente a API existente; antes do primeiro deploy, registra que a publicação da aplicação ainda está pendente.
 
 O enrichment usa somente Qwen3 32B. Cada resumo concluído é persistido por prompt, configuração e texto. Deploys, reinícios, troca para Scout e benchmarks reutilizam os artefatos compatíveis. Uma interrupção entre a resposta e o checkpoint ainda pode repetir uma chamada. O ETL é acionado explicitamente; uma feature da aplicação não reenriquece o corpus.
 
@@ -209,7 +209,7 @@ As etapas usam lock global e checkpoint por run_id no S3. Crawler incompleto, Br
 
 Depois do smoke, dos dados promovidos e do DNS delegado, habilito AWS_APP_DEPLOY_ENABLED=true nas variáveis do GitHub e executo CI and AWS deploy na main. O bootstrap já cadastrou OIDC e as demais variáveis. A configuração detalhada está em [AWS_AUTOMATION.md](AWS_AUTOMATION.md).
 
-Nas próximas publicações, sigo as branches habituais. O workflow valida, aplica a infraestrutura por uma role própria e publica a imagem por digest via SSM. Ele lê o contexto de deploy atualizado pelo Terraform no S3, sem depender de IDs EC2 antigos em variáveis GitHub. Crawler e enrichment continuam no workflow AWS ETL separado.
+Nas próximas publicações, sigo as branches habituais. O workflow valida, aplica a infraestrutura por uma role própria e publica a imagem por digest via SSM. Ele lê o contexto de deploy atualizado pelo Terraform no S3, sem depender de IDs EC2 antigos em variáveis GitHub. O enrichment continua no workflow AWS ETL separado; a coleta Raw é explícita no notebook e não se repete a cada feature.
 
 Antes de uma atualização, salvo um RDB consistente do Redis. Se a nova release falhar no readiness ou HTTPS, o aplicador de deploy tenta restabelecer a imagem anterior. O volume EBS e o Elastic IP são independentes da EC2; a substituição do host remonta o volume e reutiliza a última release. Há um timer de backup diário para S3, com retenção de 30 dias.
 

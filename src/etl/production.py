@@ -16,6 +16,7 @@ from src.config.config_manager import ConfigManager
 from src.storage.rustfs_manager import RustFSManager
 
 STEPS = ("crawl", "bronze", "silver", "text-index", "enrichment", "enrichment-index")
+RAW_STEPS = STEPS[1:]
 
 
 def timestamp():
@@ -101,6 +102,9 @@ def promote(storage, config, state, run_id):
         "raw_manifest_key": config.storage.raw_manifest_key,
         "enrichment_dataset_pointer": os.environ["ENRICHMENT_DATASET_POINTER"],
     }
+    if state.get("raw_id"):
+        release["raw_id"] = state["raw_id"]
+        release["raw_manifest_sha256"] = state["raw_manifest_sha256"]
     bucket = config.storage.embedding_indexes_bucket
     immutable = f"production/releases/{run_id}.json"
     if storage.object_exists(bucket, immutable):
@@ -125,18 +129,29 @@ def execute(args):
     validate_production_config(config)
     storage = RustFSManager.from_config(config.environment.rustfs)
     bucket = config.storage.embedding_indexes_bucket
+    raw_id = getattr(args, "raw_id", "")
+    raw_dataset = None
+    if raw_id:
+        if tuple(args.steps) != RAW_STEPS or args.reuse_index_id:
+            raise ValueError("Raw exige bronze, silver, text-index, enrichment e enrichment-index, sem reuse-index-id.")
+        from src.etl.raw_dataset import load_raw_dataset
+        raw_dataset = load_raw_dataset(storage, config.storage.raw_bucket, raw_id)
     if args.reuse_index_id:
         selected = read_json(storage, bucket, f"{args.reuse_index_id}/manifest.json")
         revision = selected["embedding"]["resolved_revision"]
         config.embedding.models["colibri"].revision = revision
         os.environ["COLIBRI_REVISION"] = revision
     key = f"production/runs/{args.run_id}.json"
-    signature = hashlib.sha256(json.dumps({
+    signature_inputs = {
         "source_revision": os.getenv("SOURCE_REVISION"),
         "bronze": config.bronze.model_dump(), "pages": [args.first_page, args.last_page],
         "silver": config.silver.model_dump(), "embedding": config.embedding.model_dump(exclude={"execution"}),
         "enrichment": config.enrichment.model_dump(exclude={"max_parallel", "timeout_seconds", "keep_alive", "num_batch"}), "reuse_index_id": args.reuse_index_id,
-    }, sort_keys=True).encode()).hexdigest()
+    }
+    if raw_dataset:
+        receipt, raw_payload = raw_dataset
+        signature_inputs["raw"] = {name: receipt[name] for name in ("raw_id", "manifest_sha256", "first_page", "last_page", "source_query")}
+    signature = hashlib.sha256(json.dumps(signature_inputs, sort_keys=True).encode()).hexdigest()
     state = read_json(storage, bucket, key) if storage.object_exists(bucket, key) else {
         "run_id": args.run_id, "signature": signature, "completed": [], "outputs": {},
     }
@@ -146,6 +161,13 @@ def execute(args):
     os.environ["ENRICHMENT_DATASET_POINTER"] = f"production/candidates/{args.run_id}/enrichment-dataset.json"
     os.environ["ENRICHMENT_INDEX_POINTER"] = f"production/candidates/{args.run_id}/enrichment-indexes.json"
     with execution_lock(storage, bucket, args.run_id):
+        if raw_dataset:
+            state.update(raw_id=raw_id, raw_manifest_sha256=receipt["manifest_sha256"])
+            if storage.object_exists(config.storage.raw_bucket, config.storage.raw_manifest_key):
+                if storage.download_bytes(config.storage.raw_bucket, config.storage.raw_manifest_key) != raw_payload:
+                    raise ValueError("Manifest Raw candidato já existe e diverge do snapshot. Use outro run-id.")
+            else:
+                storage.upload_bytes(config.storage.raw_bucket, config.storage.raw_manifest_key, raw_payload)
         active = read_json(storage, bucket, "production/current.json") if storage.object_exists(bucket, "production/current.json") else {}
         if active.get("index_id"):
             state["outputs"].setdefault("index_id", active["index_id"])
@@ -233,6 +255,7 @@ def main():
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--steps", nargs="+", choices=STEPS, default=list(STEPS[:4]))
     parser.add_argument("--reuse-index-id")
+    parser.add_argument("--raw-id", default="")
     parser.add_argument("--promote", action="store_true")
     parser.add_argument("--first-page", type=int, default=1)
     parser.add_argument("--last-page", type=int, default=7)
