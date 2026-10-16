@@ -3,9 +3,9 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Smoke verifica o ambiente; run executa o pipeline completo na nuvem
+        description: Smoke verifica; run-from-raw processa o Raw coletado no notebook
         type: choice
-        options: [smoke, run]
+        options: [smoke, run-from-raw, run]
         default: smoke
       run_id:
         description: Identificador estável do processamento, por exemplo corpus-v1
@@ -20,6 +20,10 @@ on:
         description: Após validar, selecionar os dados para produção e recarregar a API existente
         type: boolean
         default: false
+      raw_id:
+        description: Para run-from-raw, snapshot concluído no S3 pelo crawler local (ex. machado-v1)
+        required: false
+        type: string
 permissions:
   contents: read
 jobs:
@@ -40,6 +44,7 @@ jobs:
       RUN_ID: ${{ inputs.run_id }}
       OPERATION: ${{ inputs.operation }}
       PROMOTE: ${{ inputs.promote }}
+      RAW_ID: ${{ inputs.raw_id }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
@@ -49,12 +54,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          case "$OPERATION" in smoke|run) ;; *) exit 1 ;; esac
+          case "$OPERATION" in smoke|run|run-from-raw) ;; *) exit 1 ;; esac
           [[ "$RUN_ID" =~ ^[A-Za-z0-9_-]{1,100}$ ]] || { echo 'run_id inválido'; exit 1; }
           [[ "$OPERATION" != smoke || "$PROMOTE" != true ]] || { echo 'Smoke não promove dados'; exit 1; }
           revision="${REQUESTED_REVISION:-$GITHUB_SHA}"
           [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || { echo 'Use um SHA completo'; exit 1; }
           git merge-base --is-ancestor "$revision" "$GITHUB_SHA"
+          if [ "$OPERATION" = run-from-raw ]; then
+            [[ "$RAW_ID" =~ ^[A-Za-z0-9_-]{1,100}$ ]] || { echo 'Preencha raw_id'; exit 1; }
+            git show "$revision:infra/glue/job.py" | grep -F -- 'p.add_argument("--raw-id"' >/dev/null || { echo 'A revisão escolhida não suporta Raw local; use o SHA deste patch'; exit 1; }
+          elif [ -n "$RAW_ID" ]; then
+            echo 'raw_id é exclusivo de run-from-raw'; exit 1
+          fi
           echo "ETL_REVISION=$revision" >> "$GITHUB_ENV"
           echo "Revisão ETL: $revision; run_id: $RUN_ID; operação: $OPERATION; promoção: $PROMOTE"
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
@@ -93,10 +104,13 @@ jobs:
         run: |
           set -euo pipefail
           options=()
+          if [ "$OPERATION" = run-from-raw ]; then
+            options+=(--raw-id "$RAW_ID" --steps bronze,silver,text-index,enrichment,enrichment-index)
+          fi
           [ "$OPERATION" != smoke ] || options+=(--smoke)
           [ "$PROMOTE" != true ] || options+=(--promote)
           python scripts/cloud.py --outputs "$RUNNER_TEMP/deployment.local.json" glue \
             --revision "$ETL_REVISION" --run-id "$RUN_ID" --wait "${options[@]}"
       - name: Reload application after data promotion
-        if: inputs.operation == 'run' && inputs.promote
+        if: inputs.operation != 'smoke' && inputs.promote
         run: python scripts/cloud.py --outputs "$RUNNER_TEMP/deployment.local.json" reload-data

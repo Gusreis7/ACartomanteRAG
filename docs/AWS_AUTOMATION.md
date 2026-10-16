@@ -1,28 +1,24 @@
-# AWS: configuração inicial e operação pelo GitHub
+# Infraestrutura AWS e publicação da aplicação
 
-O ETL é executado integralmente no Glue: crawler → Raw → Bronze → Silver → índice textual → enrichment → índice auxiliar. Os artefatos são gravados no S3 e os vetores no Qdrant Cloud. Não há migração de dados do notebook ou do Raspberry nesse fluxo.
+## Arquitetura e decisões
 
-## O que configurar, onde e quando
+O Gitea no Raspberry mantém o repositório e o espelho do GitHub. O GitHub Actions executa CI/CD; o runtime local permanece suspenso durante a manutenção do Raspberry.
 
-| Informação | Onde | Quando |
+O Terraform define rede, EC2, discos, buckets, ECR, IAM, SSM, Glue, DNS e alerta de orçamento. O state fica no S3 com lock. A coleta Raw ocorre uma vez no notebook; as demais etapas do ETL rodam no Glue, com vetores no Qdrant Cloud.
+
+| Configuração | Local | Uso |
 |---|---|---|
-| Sessão AWS do usuário `terraform` | Perfis locais `terraform-login` e `terraform` já configurados | Bootstrap inicial e operações administrativas locais; renovar com `aws login`. |
-| Região, domínio, e-mails, tamanho da EC2, volume e ID numérico do GitHub | `infra/aws/production.tfvars.json`, versionado | Antes do primeiro plano; depois por alteração de código. Não colocar segredos nesse arquivo. |
-| Endpoint HTTPS e chaves Qdrant de produção | `config/aws-bootstrap.env`, privado e ignorado pelo Git | Antes do bootstrap; atualizar somente quando endpoint/chaves mudarem. |
-| Políticas do grupo `server` | IAM da conta AWS | Uma vez antes do primeiro apply deste patch, incluindo as duas novas roles GitHub. |
-| Roles OIDC e identificadores públicos de bootstrap | GitHub → Settings → Secrets and variables → Actions → Variables | O bootstrap cadastra automaticamente. Não cadastrar chaves AWS ou Qdrant em GitHub Secrets. |
-| Segredos em execução | SSM Parameter Store, `SecureString` | O bootstrap importa do arquivo privado; EC2/Glue leem usando suas roles. |
-| Delegação DNS do subdomínio | Provedor DNS de `gustavodreis.dev.br` | Uma vez após obter os nameservers, antes de publicar HTTPS. |
-| Liberação do deploy da API | Variável GitHub `AWS_APP_DEPLOY_ENABLED=true` | Após o ETL promovido e a delegação DNS. |
-| Versão do corpus e promoção | GitHub Actions → AWS ETL → Run workflow | Primeiro processamento e mudanças de dados/pipeline; não em cada feature. |
+| Região, domínio, e-mails, ID do GitHub, EC2, discos e AMI | `infra/aws/production.tfvars.json` | Configuração pública versionada |
+| Sessão do usuário `terraform` | Perfis locais `terraform-login` e `terraform` | Bootstrap, coleta e administração |
+| Endpoint e chaves Qdrant | `config/aws-bootstrap.env` | Arquivo privado importado no bootstrap |
+| Segredos de execução | SSM Parameter Store | EC2 e Glue acessam pelas próprias roles |
+| Roles e identificadores públicos | GitHub Actions → Variables | Cadastrados pelo bootstrap |
 
-## 1. Preparar no notebook Debian
+O GitHub usa OIDC para obter credenciais AWS temporárias; as chaves Qdrant ficam no SSM. As roles de infraestrutura, deploy e ETL têm funções separadas. O perfil local e a role de infraestrutura possuem acesso administrativo amplo; a revisão da `main` no Gitea controla o código publicado pelo espelho.
 
-O Raspberry continua com os checks estáticos e o runtime suspenso. Gitea hospeda o repositório e espelha o GitHub; os runners da AWS são hospedados pelo GitHub.
+## 1. Preparar um ambiente novo
 
-São necessários AWS CLI v2.32+, Terraform **1.11.4**, GitHub CLI e Python **3.11+**. Docker no notebook não é necessário para este bootstrap: as imagens e wheels serão construídas no runner GitHub. O build real e a compatibilidade do Glue ainda devem ser confirmados na conta.
-
-Na raiz do checkout:
+Ferramentas: AWS CLI v2.32+, Terraform 1.11.4, GitHub CLI e Python 3.11+. Na raiz do projeto:
 
 ```bash
 export AWS_PROFILE=terraform
@@ -35,34 +31,24 @@ source .venv/bin/activate
 python -m pip install -c requirements-runtime.lock boto3 python-dotenv
 ```
 
-O ARN deve ser do usuário `terraform`. A operação de bootstrap recusa root. Para renovar a sessão, executar `aws login --profile terraform-login`; o perfil `terraform` continua usando o `credential_process` já configurado.
+Confirme a identidade `terraform`. Para renovar a sessão: `aws login --profile terraform-login`. Em novos terminais, selecione novamente `AWS_PROFILE=terraform`.
 
-## 2. Preencher a configuração pública e o arquivo privado
+## 2. Configurar o bootstrap
 
-Os comandos não sobrescrevem arquivos já existentes:
+Crie os arquivos apenas se ainda não existirem:
 
 ```bash
 test -f infra/aws/production.tfvars.json || cp infra/aws/production.tfvars.json.example infra/aws/production.tfvars.json
 test -f config/aws-bootstrap.env || cp config/aws-bootstrap.env.example config/aws-bootstrap.env
 chmod 600 config/aws-bootstrap.env
-```
 
-Definir o repositório real e consultar o ID, sem mudar configurações:
-
-```bash
-github_repo="SEU_USUARIO/ACartomanteRAG"
+github_repo="Gusreis7/ACartomanteRAG"
 gh api "repos/$github_repo" --jq '.id'
 ```
 
-Editar `production.tfvars.json`: preencher `acme_email`, `budget_email` e `github_repository_id`. Conferir domínio, região, zona de disponibilidade, EC2, disco e orçamento. O padrão é `m7i-flex.large` (2 vCPUs, 8 GiB de RAM, x86_64), 40 GB de sistema e 50 GB de dados. Esse tipo foi confirmado como elegível ao Free Tier nesta conta em `us-east-1`; elegibilidade não elimina o consumo de créditos. O orçamento de US$ 75 é um alerta; não limita gastos. E-mails e IDs nesse arquivo serão versionados, sem credenciais.
+Preencha o arquivo público com os valores da tabela e o ID retornado. Em infraestrutura existente, preserve a AMI, as escolhas do state e os IDs de zona/OIDC usados. O bootstrap fixa a AMI inicial quando necessário; versionar esse valor evita trocas involuntárias. Ele recusa arquivos `terraform.tfvars` ou `*.auto.tfvars*` concorrentes no checkout.
 
-Se o primeiro apply falhar por tipo de instância não elegível, alterar `instance_type` no arquivo preenchido para `m7i-flex.large`, preservando os demais campos, inclusive a AMI já fixada. Gerar um novo `bootstrap_aws.py plan`, revisar e então executar `apply`: o novo plano usa o state para reutilizar os recursos já criados. A configuração preenchida tem precedência sobre o default de `variables.tf`.
-
-Se já há infraestrutura, transportar para esse arquivo as escolhas reais do antigo `terraform.tfvars`, inclusive `hosted_zone_id` e `oidc_provider_arn` quando usados. A configuração explícita de produção passa a ser a referência do bootstrap e do GitHub. O bootstrap fixa `ami_id` se estiver nulo, preservando a AMI do state existente ou consultando a AMI inicial.
-
-Após transportar as escolhas, guardar o antigo `terraform.tfvars`, `terraform.tfvars.json` e eventuais `*.auto.tfvars*` fora do checkout. O bootstrap recusa esses arquivos carregados automaticamente para evitar uma configuração local diferente da usada pelo runner GitHub.
-
-Em `config/aws-bootstrap.env`, preencher somente:
+No arquivo privado, preencha:
 
 ```dotenv
 QDRANT_URL=https://SEU_CLUSTER_QDRANT:6333
@@ -70,112 +56,65 @@ QDRANT_READ_API_KEY=CHAVE_DE_LEITURA
 QDRANT_WRITE_API_KEY=CHAVE_DE_ESCRITA
 ```
 
-Usar o endpoint do Qdrant Cloud, sem credenciais embutidas na URL. O arquivo é lido como dotenv com interpolação desativada; não é executado com `source`. Outros campos não são importados. Chaves e senhas não entram no pacote da aplicação, no bundle Glue ou nos argumentos Terraform. As senhas Redis são geradas na primeira configuração e preservadas nas seguintes.
+O bootstrap lê esse arquivo e grava os valores em SSM `SecureString`. As senhas Redis são geradas inicialmente e preservadas nas configurações seguintes.
 
-## 3. Atualizar a política IAM do grupo server
-
-A política complementar anterior autorizava somente as roles de runtime, Glue e deploy. Agora também são necessárias `acartomanterag-github-infra` e `acartomanterag-github-etl`.
-
-Gerar o JSON para a conta e o projeto configurados:
+Para preparar a política IAM complementar:
 
 ```bash
 python scripts/bootstrap_aws.py policy > infra/aws/server-terraform-policy.local.json
 ```
 
-Com um acesso administrativo que possa editar IAM, abrir **IAM → Policies → ServerTerraformIAM → Edit → JSON** e substituir pelo conteúdo gerado. Manter `PowerUserAccess` anexada ao grupo `server` e o usuário `terraform` nesse grupo. O gerador apenas consulta a identidade e imprime a política; não altera IAM.
+Com acesso administrativo, atualize **IAM → Policies → ServerTerraformIAM** com o JSON gerado. O usuário `terraform` pertence ao grupo `server`, com essa política e `PowerUserAccess`.
 
-O perfil local e a role GitHub de infraestrutura têm poder amplo de provisionamento, inclusive para modificar as políticas das roles do projeto. São acessos administrativos da infraestrutura e devem ficar restritos ao mantenedor e ao código confiável da `main`. A role do ETL aciona apenas o job e a recarga de dados; a de deploy publica a aplicação.
+## 3. Provisionar e publicar o código
 
-## 4. Gerar o plano e aplicar a primeira infraestrutura
+Gere o plano:
 
 ```bash
 python scripts/bootstrap_aws.py plan --repo "$github_repo"
 ```
 
-Antes de provisionar, o script valida o arquivo privado e confirma que o ID do repositório corresponde ao arquivo público. Prepara o bucket de state exclusivo, privado, versionado e criptografado; inicializa o backend com lock no S3; valida Terraform e salva `infra/aws/bootstrap.tfplan`.
-
-Conferir as alterações e os recursos com cobrança, especialmente EC2, discos, IP público, DNS e Glue. O plano não é enviado como artifact ao GitHub. Depois da revisão:
+Revise os recursos e os custos previstos. Depois, aplique o plano salvo:
 
 ```bash
 python scripts/bootstrap_aws.py apply --repo "$github_repo"
 ```
 
-Esse comando aplica **o plano salvo**, sem outra confirmação interativa. Recusa mudanças de conta, repositório ou arquivos de infraestrutura após o plano; nesse caso, gerar `plan` novamente. Terraform também verifica a validade do state do plano.
+O comando prepara o SSM e as variáveis/OIDC do GitHub após o apply. Se essa configuração final falhar, corrija a causa e execute `python scripts/bootstrap_aws.py configure --repo "$github_repo"`. Alterações de conta, repositório, infraestrutura ou configuração após o plano exigem novo `plan`.
 
-Após o apply, o bootstrap grava os segredos no SSM e configura OIDC/variáveis do GitHub. Nenhum ETL é iniciado. Se a infraestrutura foi criada mas a configuração final falhou, corrigir a causa e repetir somente:
+Versione o código, `production.tfvars.json` e `infra/aws/.terraform.lock.hcl`; mantenha segredos, state, planos, `backend.hcl` e outputs locais fora do Git. Confira a mesma revisão na `main` do GitHub após o push ao Gitea. O deploy da API começa desabilitado por `AWS_APP_DEPLOY_ENABLED=false`.
+
+## 4. Preparar os dados
+
+Em **GitHub → Actions → AWS ETL → main**, rode `operation=smoke`, `run_id=smoke-v1`, revisão vazia e promoção desmarcada. O smoke verifica bibliotecas, S3, Qdrant, catálogo Bedrock e Colibri; a permissão de inferência é validada no processamento real.
+
+Siga [AWS_RAW_CRAWL.md](AWS_RAW_CRAWL.md) para coletar o Raw e executar `run-from-raw` no Glue. Para retomar ou promover, mantenha o mesmo `raw_id`, `run_id` e SHA. Os bundles são fixados por revisão, sem reaplicar Terraform para cada versão do ETL.
+
+A promoção seleciona `production/current.json` e solicita a recarga da API. Antes do primeiro deploy, a recarga registra que a aplicação ainda não foi publicada. Cancelar o workflow não encerra necessariamente o Glue: confira o job antes de repetir.
+
+## 5. Configurar DNS e publicar a API
+
+Consulte os servidores da zona:
 
 ```bash
-python scripts/bootstrap_aws.py configure --repo "$github_repo"
+terraform -chdir=infra/aws output nameservers
 ```
 
-O bucket e a chave de state são derivados de projeto/conta/região. O formato padrão mantém compatibilidade com `acartomanterag-tfstate-<CONTA>-us-east-1` e `acartomanterag/production.tfstate`. O cadastro inicial do usuário/grupo e o próprio backend precedem o Terraform da aplicação.
+Na zona autoritativa de `gustavodreis.dev.br`, delegue `acartomanterag.gustavodreis.dev.br` para esses servidores, preservando os demais registros. Se o Terraform utiliza uma zona existente, confira o registro nela.
 
-## 5. Versionar e conferir o espelhamento
+Com DNS resolvendo e dados promovidos:
 
-Versionar as alterações do patch, `production.tfvars.json` com a AMI resolvida e `infra/aws/.terraform.lock.hcl`. Não versionar `config/aws-bootstrap.env`, state, planos, `backend.hcl`, outputs ou arquivos `*.local.json`. Guardar a embalagem do ZIP fora do checkout.
+1. Defina `AWS_APP_DEPLOY_ENABLED=true` nas variáveis do GitHub Actions.
+2. Execute **CI and AWS deploy → Run workflow → main**.
+3. Valide HTTPS, prontidão, uma pergunta real, reinício, restauração e rollback.
 
-Seguir o fluxo de branches do Gitea e conferir que a mesma revisão chegou à `main` do GitHub. Inicialmente `AWS_APP_DEPLOY_ENABLED` é criada como `false`; as validações e o Terraform podem rodar sem tentar iniciar uma API ainda sem corpus.
+## Operação posterior
 
-Por padrão o bootstrap usa o modo de repositório espelhado: configura OIDC e preserva as proteções GitHub existentes, sem criar a exigência de PR no GitHub que bloquearia o push espelhado. A proteção/revisão da `main` fica no Gitea. Se já existir no GitHub uma proteção incompatível com o espelhamento, ajustá-la conscientemente na configuração do repositório; o script não remove proteções existentes. Para um GitHub que seja a origem principal, `--protect-main` aplica a proteção de PR e check `validate`.
-
-As variáveis cadastradas automaticamente incluem `AWS_REGION`, `AWS_INFRA_ROLE_ARN`, `AWS_ETL_ROLE_ARN`, `AWS_DEPLOY_ROLE_ARN`, `TF_STATE_BUCKET`, `TF_STATE_KEY`, `OPS_BUCKET` e `ECR_REPOSITORY`. IDs de instância/documentos ficam também nos outputs para diagnóstico, mas os workflows leem o contexto atualizado em `s3://<OPS_BUCKET>/config/deployment.json`. Um novo apply atualiza esse contexto, sem exigir recadastro manual do ID EC2.
-
-## 6. Executar o ETL na nuvem pelo GitHub
-
-Abrir **GitHub → Actions → AWS ETL → Run workflow**, sempre na branch `main`.
-
-Primeiro smoke:
-
-| Campo | Valor |
+| Alteração | Procedimento |
 |---|---|
-| operation | `smoke` |
-| run_id | `smoke-v1` |
-| revision | Vazio para usar a revisão exibida na execução |
-| promote | Desmarcado |
+| Feature da aplicação | Gitea → espelho GitHub → testes → Terraform → imagem ECR → deploy SSM. O ETL é separado. |
+| Infraestrutura | Atualizar `.tf`/configuração pública e publicar; ou usar **AWS infrastructure → plan/apply**. |
+| Reprocessamento de dados | AWS ETL `run-from-raw`, mesmo Raw e novo `run_id` para outra revisão/configuração. |
+| Rotação Qdrant | Atualizar o arquivo privado, executar `bootstrap_aws.py configure` e publicar novamente a API. |
 
-O runner publica/reutiliza um bundle completo da revisão. O processamento ocorre no Glue, que testa bibliotecas, S3, Qdrant, catálogo Bedrock e um embedding Colibri. Smoke tem custo de Glue; não gera uma resposta LLM e não comprova permissão efetiva de inferência.
-
-Depois, executar o pipeline completo:
-
-| Campo | Valor |
-|---|---|
-| operation | `run` |
-| run_id | `corpus-v1`, ou outro identificador novo |
-| revision | Vazio no primeiro processamento; anotar o SHA mostrado |
-| promote | Desmarcado para gerar um candidato; marcado para validar e publicar ao concluir |
-
-Todas as seis etapas rodam na nuvem. O enriquecimento usa Qwen no Bedrock e tem custo de inferência. Não usa um índice local nem precisa de dados do Raspberry.
-
-Para retomar ou promover um candidato, usar **o mesmo run_id e o mesmo SHA completo** da execução original. Na promoção, selecionar `run` e marcar `promote`: as etapas concluídas são reutilizadas e a promoção valida os artefatos antes de selecionar `production/current.json`. A inicialização de um novo job Glue ainda tem custo, mesmo reutilizando o trabalho concluído. Uma nova configuração/revisão exige novo run_id.
-
-O workflow aceita somente revisões que já pertençam à história da `main` selecionada. Script, fontes e wheels são fixados por execução, usando os overrides de argumentos do Glue; não é necessário mudar `glue_bundle_prefix` e reaplicar Terraform a cada revisão. Um manifest final no S3 identifica um bundle completo. Artefatos existentes não são sobrescritos; publicação incompleta pode ser retomada.
-
-Após a promoção, um documento SSM restrito recarrega a aplicação se houver release instalada. Se ainda não houve primeiro deploy, registra essa situação e não cria uma publicação incompleta. Cancelar o workflow não equivale a parar o Glue: conferir o job antes de repetir. Falhas no controlador após promoção podem ser recuperadas repetindo a mesma revisão/run_id. O lock de ETL e os checkpoints ficam no S3.
-
-## 7. DNS e primeira publicação da aplicação
-
-Consultar os nameservers com `terraform -chdir=infra/aws output nameservers`. No provedor do domínio, delegar somente `acartomanterag.gustavodreis.dev.br`, preservando os outros registros. Se já usa uma zona Route 53 existente configurada no Terraform, conferir o registro nessa zona.
-
-Após o ETL promovido, a resolução DNS correta e a revisão do resultado:
-
-1. Abrir **Settings → Secrets and variables → Actions → Variables** e mudar `AWS_APP_DEPLOY_ENABLED` para `true`.
-2. Abrir **Actions → CI and AWS deploy → Run workflow → main**.
-3. Aguardar os checks, Terraform, publicação da imagem e deploy via SSM. Conferir HTTPS, prontidão, uma pergunta real, reinício, restauração e rollback antes de considerar a publicação validada.
-
-## Operação após o bootstrap
-
-| Alteração | Fluxo |
-|---|---|
-| Feature de UI/API | Push/PR habitual → espelho GitHub → testes → Terraform plan/apply → imagem ECR e deploy. Não executa ETL. |
-| Infraestrutura | Alterar `.tf` ou `production.tfvars.json`, revisar e publicar na main; o mesmo fluxo aplica antes do deploy da API. |
-| Consultar um plano sem aplicar | Actions → AWS infrastructure → Run workflow → `plan`. |
-| Aplicar infraestrutura separadamente | AWS infrastructure → `apply`; usa o plano gerado naquela execução. |
-| Novos dados ou mudança no pipeline | AWS ETL com novo run_id e revisão escolhida. |
-| Retomar/promover dados | AWS ETL com o run_id e SHA originais. |
-| Rotacionar chave Qdrant | Atualizar `config/aws-bootstrap.env`, executar `bootstrap_aws.py configure` e o workflow de publicação da API para reler o SSM. Não reenriquecer o corpus. |
-
-Terraform, ETL e deploy compartilham o grupo de concorrência `aws-production`, sem cancelar a execução ativa. O deploy da API aguarda o apply correspondente. O ETL continua sendo um acionamento explícito pelo workflow, para não reprocessar o corpus em cada feature.
-
-O bootstrap é uma operação inicial assistida; as próximas publicações não precisam de Docker, arquivos privados ou login AWS do notebook. A conta conserva o state e os segredos, e o GitHub assume as roles temporariamente. Se a infraestrutura for recriada em outra conta, repetir o bootstrap com sua identidade, configuração pública e segredos daquele ambiente.
-
-Referências: [variáveis Terraform](https://developer.hashicorp.com/terraform/language/values/variables), [state S3](https://developer.hashicorp.com/terraform/language/backend/s3), [OIDC GitHub/AWS](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws), [argumentos por execução Glue](https://docs.aws.amazon.com/glue/latest/dg/aws-glue-programming-etl-glue-arguments.html).
+Terraform, deploy e ETL compartilham a concorrência `aws-production`. Os workflows consultam o contexto atualizado no S3, sem depender de IDs EC2 antigos. O benchmark Qwen/Scout permanece separado do deploy e reutiliza a base, com DEV e holdout separados.

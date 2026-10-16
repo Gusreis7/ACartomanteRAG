@@ -205,7 +205,9 @@ def publish_glue(s3, bucket, revision, directory):
     return True
 
 
-def glue_arguments(revision, bucket, run_id, steps, promote=False, smoke=False):
+def glue_arguments(
+    revision, bucket, run_id, steps, promote=False, smoke=False, raw_id=""
+):
     prefix = revision_prefix(revision)
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", run_id):
         raise ValueError(
@@ -218,7 +220,15 @@ def glue_arguments(revision, bucket, run_id, steps, promote=False, smoke=False):
         raise ValueError("Etapas inválidas ou fora da ordem do pipeline.")
     if smoke and promote:
         raise ValueError("Smoke não promove dados.")
-    return {
+    if raw_id and (
+        not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", raw_id)
+        or tuple(selected) != ETL_STEPS[1:]
+        or smoke
+    ):
+        raise ValueError(
+            "raw-id exige somente bronze, silver, text-index, enrichment e enrichment-index."
+        )
+    arguments = {
         "--scriptLocation": f"s3://{bucket}/{prefix}/job.py",
         "--additional-python-modules": f"s3://{bucket}/{prefix}/dependencies.gluewheels.zip",
         "--bundle-prefix": prefix,
@@ -227,6 +237,9 @@ def glue_arguments(revision, bucket, run_id, steps, promote=False, smoke=False):
         "--promote": str(promote).lower(),
         "--smoke": str(smoke).lower(),
     }
+    if raw_id:
+        arguments["--raw-id"] = raw_id
+    return arguments
 
 
 def outputs(path):
@@ -329,6 +342,7 @@ def main():
     g.add_argument("--run-id", required=True)
     g.add_argument("--steps", default=",".join(ETL_STEPS))
     g.add_argument("--reuse-index-id", default="")
+    g.add_argument("--raw-id", default="")
     g.add_argument("--promote", action="store_true")
     g.add_argument("--smoke", action="store_true")
     g.add_argument("--wait", action="store_true")
@@ -419,7 +433,12 @@ def main():
             args.steps,
             args.promote,
             args.smoke,
+            args.raw_id,
         )
+        if args.raw_id and args.reuse_index_id:
+            raise ValueError(
+                "O processamento a partir do Raw gera um novo índice; não use reuse-index-id."
+            )
         if not bundle_manifest(s3, out["ops_bucket"], args.revision):
             raise ValueError("Publique o bundle Glue completo antes de iniciar o job.")
         client = boto3.client("glue", region_name=region)

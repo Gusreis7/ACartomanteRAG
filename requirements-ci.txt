@@ -19,3 +19,5 @@ moto[s3,ssm]>=5,<7
 
 pandas
 pyarrow
+
+-r requirements-crawler.txt
