@@ -57,9 +57,7 @@ class ConversationMessageResponse(BaseModel):
     content: str
     content_html: str | None = None
     created_at: datetime
-    evidences: list[EvidenceResponse] = Field(
-        default_factory=list
-    )
+    evidences: list[EvidenceResponse] = Field(default_factory=list)
 
 
 class ConversationHistoryResponse(BaseModel):

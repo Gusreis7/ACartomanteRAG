@@ -95,10 +95,7 @@ def main() -> None:
     print(f"source: {current['source_enrichment_dataset_id']}")
     for alias, item in indexes.items():
         print(f"{alias}: {item['collection']}")
-    print(
-        "current: s3://"
-        f"{indexes_bucket}/{ENRICHMENT_INDEX_CURRENT_KEY}"
-    )
+    print("current: s3://" f"{indexes_bucket}/{ENRICHMENT_INDEX_CURRENT_KEY}")
 
 
 if __name__ == "__main__":

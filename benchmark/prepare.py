@@ -136,9 +136,11 @@ def validate_benchmark(df: pd.DataFrame) -> None:
         raise ValueError("Benchmark possui query_id nulo.")
 
     if df["query_id"].duplicated().any():
-        duplicated = df.loc[
-            df["query_id"].duplicated(keep=False), "query_id"
-        ].astype(str).tolist()
+        duplicated = (
+            df.loc[df["query_id"].duplicated(keep=False), "query_id"]
+            .astype(str)
+            .tolist()
+        )
         raise ValueError(f"query_id duplicado: {duplicated[:10]}")
 
 
@@ -154,13 +156,9 @@ def allocate_holdout_by_difficulty(
     counts = group["difficulty"].astype(str).value_counts().to_dict()
     total = len(group)
 
-    raw = {
-        key: target * count / total
-        for key, count in counts.items()
-    }
+    raw = {key: target * count / total for key, count in counts.items()}
     allocation = {
-        key: min(counts[key], int(math.floor(value)))
-        for key, value in raw.items()
+        key: min(counts[key], int(math.floor(value))) for key, value in raw.items()
     }
 
     remaining = target - sum(allocation.values())
@@ -213,9 +211,7 @@ def build_split(df: pd.DataFrame) -> pd.DataFrame:
                 )
                 for query_id in subset["query_id"]
             ]
-            selected.extend(
-                subset.sort_values("_rank").head(count).index.tolist()
-            )
+            selected.extend(subset.sort_values("_rank").head(count).index.tolist())
 
         result.loc[selected, "split"] = "holdout"
 
@@ -279,7 +275,9 @@ def ensure_split(
     csv_key = f"{BENCHMARK_PREFIX}/prepared/splits/benchmark_with_split.csv"
     manifest_key = f"{BENCHMARK_PREFIX}/prepared/splits/manifest.json"
 
-    if storage.object_exists(bucket, manifest_key) and storage.object_exists(bucket, csv_key):
+    if storage.object_exists(bucket, manifest_key) and storage.object_exists(
+        bucket, csv_key
+    ):
         old_manifest = load_json(storage, bucket, manifest_key)
         if (
             old_manifest.get("benchmark_sha256") == benchmark_sha256
@@ -358,12 +356,8 @@ def resolve_bronze_source(
             f"s3://{bucket}/{BRONZE_CURRENT_KEY}"
         ) from exc
 
-    bronze_artifact_id = str(
-        current.get("bronze_artifact_id", "")
-    ).strip()
-    manifest_key = str(
-        current.get("manifest_key", "")
-    ).strip()
+    bronze_artifact_id = str(current.get("bronze_artifact_id", "")).strip()
+    manifest_key = str(current.get("manifest_key", "")).strip()
 
     if not bronze_artifact_id or not manifest_key:
         raise RuntimeError(
@@ -376,9 +370,7 @@ def resolve_bronze_source(
         manifest_key,
     )
     manifest_sha256 = sha256_bytes(manifest_bytes)
-    expected_sha256 = str(
-        current.get("manifest_sha256", "")
-    ).strip()
+    expected_sha256 = str(current.get("manifest_sha256", "")).strip()
 
     if expected_sha256 and manifest_sha256 != expected_sha256:
         raise RuntimeError(
@@ -430,10 +422,7 @@ def load_bronze_manifest(
         )
 
     manifest_artifact_ids = set(
-        bronze_manifest["bronze_artifact_id"]
-        .dropna()
-        .astype(str)
-        .unique()
+        bronze_manifest["bronze_artifact_id"].dropna().astype(str).unique()
     )
 
     if manifest_artifact_ids != {bronze_artifact_id}:
@@ -522,19 +511,13 @@ def ensure_silver(
 
     if chunks_exists and manifest_exists:
         manifest = pd.read_parquet(
-            io.BytesIO(
-                storage.download_bytes(bucket, manifest_key)
-            )
+            io.BytesIO(storage.download_bytes(bucket, manifest_key))
         )
         print(f"[reuse] Silver {dataset_id}")
         return {
             "status": "reused",
             "silver_dataset_id": dataset_id,
-            "manifest": (
-                manifest.iloc[0].to_dict()
-                if not manifest.empty
-                else {}
-            ),
+            "manifest": (manifest.iloc[0].to_dict() if not manifest.empty else {}),
         }
 
     if chunks_exists != manifest_exists:
@@ -583,10 +566,7 @@ def ensure_silver(
         source_document_id = row.get("source_document_id")
         if pd.isna(source_document_id):
             source_document_id = ""
-        elif (
-            isinstance(source_document_id, float)
-            and source_document_id.is_integer()
-        ):
+        elif isinstance(source_document_id, float) and source_document_id.is_integer():
             source_document_id = str(int(source_document_id))
         else:
             source_document_id = str(source_document_id)
@@ -605,9 +585,7 @@ def ensure_silver(
                     f"{dataset_id}|{source_document_id}|"
                     f"{section['section_index']}|{chunk_index}|{chunk['text']}"
                 )
-                chunk_id = hashlib.sha256(
-                    identity.encode("utf-8")
-                ).hexdigest()[:24]
+                chunk_id = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24]
 
                 chunks.append(
                     {
@@ -662,15 +640,9 @@ def ensure_silver(
                 "config_hash": config_hash,
                 "created_at_utc": utc_now(),
                 "source_bronze_bucket": config.storage.bronze_bucket,
-                "source_bronze_artifact_id": bronze_source[
-                    "bronze_artifact_id"
-                ],
-                "source_bronze_manifest_key": bronze_source[
-                    "manifest_key"
-                ],
-                "source_bronze_manifest_sha256": bronze_source[
-                    "manifest_sha256"
-                ],
+                "source_bronze_artifact_id": bronze_source["bronze_artifact_id"],
+                "source_bronze_manifest_key": bronze_source["manifest_key"],
+                "source_bronze_manifest_sha256": bronze_source["manifest_sha256"],
                 "strategy": chunking.strategy,
                 "chunk_size": chunking.chunk_size,
                 "overlap": chunking.overlap,
@@ -693,6 +665,7 @@ def ensure_silver(
         "manifest": manifest_df.iloc[0].to_dict(),
     }
 
+
 def make_qdrant_manager(config: AppConfig) -> QdrantManager:
     qcfg = config.environment.qdrant
     factory = getattr(QdrantManager, "from_config", None)
@@ -713,7 +686,9 @@ class ReuseRegistry:
         return self.embedder
 
 
-def index_identity(indexer: EmbeddingIndex, silver_dataset_id: str, embedder: Any) -> dict[str, Any]:
+def index_identity(
+    indexer: EmbeddingIndex, silver_dataset_id: str, embedder: Any
+) -> dict[str, Any]:
     info = embedder.info
     signature = indexer._build_index_signature(silver_dataset_id, info)
     index_hash = hashlib.sha256(
@@ -985,7 +960,9 @@ def main() -> None:
                 )
             manifest = pd.read_parquet(
                 io.BytesIO(
-                    storage.download_bytes(base_config.storage.silver_bucket, manifest_key)
+                    storage.download_bytes(
+                        base_config.storage.silver_bucket, manifest_key
+                    )
                 )
             )
             silver_results.append(

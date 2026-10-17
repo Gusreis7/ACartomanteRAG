@@ -8,7 +8,6 @@ from src.embeddings.sentence_transformer import (
     SentenceTransformerEmbedder,
 )
 
-
 EmbedderFactory = Callable[..., Embedder]
 
 
@@ -30,15 +29,10 @@ class EmbedderRegistry:
         factory: EmbedderFactory,
     ) -> None:
         if not backend:
-            raise ValueError(
-                "backend não pode ser vazio."
-            )
+            raise ValueError("backend não pode ser vazio.")
 
         if backend in self._backends:
-            raise ValueError(
-                "Backend já registrado: "
-                f"{backend}"
-            )
+            raise ValueError("Backend já registrado: " f"{backend}")
 
         self._backends[backend] = factory
 
@@ -50,14 +44,10 @@ class EmbedderRegistry:
         device: str,
         batch_size: int,
     ) -> Embedder:
-        factory = self._backends.get(
-            model_config.backend
-        )
+        factory = self._backends.get(model_config.backend)
 
         if factory is None:
-            available = ", ".join(
-                sorted(self._backends)
-            )
+            available = ", ".join(sorted(self._backends))
 
             raise ValueError(
                 "Backend de embedding não "
@@ -68,9 +58,7 @@ class EmbedderRegistry:
 
         return factory(
             model_config=model_config,
-            normalize_embeddings=(
-                normalize_embeddings
-            ),
+            normalize_embeddings=(normalize_embeddings),
             device=device,
             batch_size=batch_size,
         )
@@ -78,6 +66,4 @@ class EmbedderRegistry:
     def available_backends(
         self,
     ) -> tuple[str, ...]:
-        return tuple(
-            sorted(self._backends)
-        )
+        return tuple(sorted(self._backends))

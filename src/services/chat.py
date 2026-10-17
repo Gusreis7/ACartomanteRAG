@@ -20,7 +20,6 @@ from src.storage.redis_message_repository import (
     RedisMessageRepository,
 )
 
-
 logger = logging.getLogger("acartomante.chat")
 
 
@@ -55,9 +54,7 @@ class ChatService:
         )
 
         if conversation is None:
-            raise ChatNotFoundError(
-                "Conversa não encontrada."
-            )
+            raise ChatNotFoundError("Conversa não encontrada.")
 
         self._check_quota(session_id)
 
@@ -95,8 +92,10 @@ class ChatService:
             content=result["answer"],
             evidences=evidences,
             metadata={
-                "persona": persona, "timings_ms": result["timings_ms"],
-                "index_id": result.get("index_id"), **result.get("generation_usage", {}),
+                "persona": persona,
+                "timings_ms": result["timings_ms"],
+                "index_id": result.get("index_id"),
+                **result.get("generation_usage", {}),
                 "input_guard": guard,
             },
         )
@@ -105,8 +104,12 @@ class ChatService:
             session_id=session_id,
             chat_id=chat_id,
         )
-        decision = "allow" if guard["decision"] in {"allow", "disabled"} else guard["decision"]
-        self.usage.record_chat(decision, guard["usage"], result.get("generation_usage", {}))
+        decision = (
+            "allow" if guard["decision"] in {"allow", "disabled"} else guard["decision"]
+        )
+        self.usage.record_chat(
+            decision, guard["usage"], result.get("generation_usage", {})
+        )
 
         if conversation["title"] == "Nova conversa":
             self.repository.rename(
@@ -134,7 +137,8 @@ class ChatService:
         if not config.daily_request_limit and not config.session_requests_per_minute:
             return
         day = datetime.now(timezone.utc).strftime("%Y%m%d")
-        allowed = self.repository.redis.eval("""
+        allowed = self.repository.redis.eval(
+            """
             local minute = tonumber(redis.call('GET', KEYS[1]) or '0')
             local day = tonumber(redis.call('GET', KEYS[2]) or '0')
             if (tonumber(ARGV[1]) > 0 and minute >= tonumber(ARGV[1])) or
@@ -142,10 +146,17 @@ class ChatService:
             redis.call('INCR', KEYS[1]); redis.call('EXPIRE', KEYS[1], 120)
             redis.call('INCR', KEYS[2]); redis.call('EXPIRE', KEYS[2], 172800)
             return 1
-        """, 2, f"acartomante:limits:session:{session_id}:{int(time() // 60)}", f"acartomante:limits:day:{day}",
-            config.session_requests_per_minute, config.daily_request_limit)
+        """,
+            2,
+            f"acartomante:limits:session:{session_id}:{int(time() // 60)}",
+            f"acartomante:limits:day:{day}",
+            config.session_requests_per_minute,
+            config.daily_request_limit,
+        )
         if not allowed:
-            raise GenerationQuotaError("Limite de consultas atingido. Tente novamente mais tarde.")
+            raise GenerationQuotaError(
+                "Limite de consultas atingido. Tente novamente mais tarde."
+            )
 
     def list_messages(
         self,
@@ -159,9 +170,7 @@ class ChatService:
         )
 
         if conversation is None:
-            raise ChatNotFoundError(
-                "Conversa não encontrada."
-            )
+            raise ChatNotFoundError("Conversa não encontrada.")
 
         return {
             "chat_id": chat_id,

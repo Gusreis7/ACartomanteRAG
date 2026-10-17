@@ -19,7 +19,6 @@ from src.embeddings.registry import EmbedderRegistry
 from src.storage.qdrant_manager import QdrantManager
 from src.storage.rustfs_manager import RustFSManager
 
-
 ENRICHMENT_CURRENT_KEY = os.getenv("ENRICHMENT_DATASET_POINTER", "current.json")
 ENRICHMENT_INDEX_CURRENT_KEY = "enrichment/current.json"
 ENRICHMENT_DOCUMENT_SCHEMA_VERSION = "summary_units_v1"
@@ -98,7 +97,9 @@ class EnrichmentEmbeddingIndex:
         dataset_id = str(current.get("enrichment_dataset_id") or "").strip()
         manifest_key = str(current.get("manifest_key") or "").strip()
         if not dataset_id or not manifest_key:
-            raise RuntimeError("current.json do enrichment sem dataset_id/manifest_key.")
+            raise RuntimeError(
+                "current.json do enrichment sem dataset_id/manifest_key."
+            )
 
         manifest_bytes = self.rustfs.download_bytes(bucket, manifest_key)
         manifest_sha = sha256_bytes(manifest_bytes)
@@ -138,7 +139,9 @@ class EnrichmentEmbeddingIndex:
             plan = payload.get("plan") or {}
             title = str(source.get("titulo") or getattr(item, "titulo", ""))
             author = str(source.get("autor") or getattr(item, "autor", "") or "")
-            category = str(source.get("categoria") or getattr(item, "categoria", "") or "")
+            category = str(
+                source.get("categoria") or getattr(item, "categoria", "") or ""
+            )
             source_document_id = str(
                 source.get("source_document_id")
                 or getattr(item, "source_document_id", "")
@@ -150,7 +153,9 @@ class EnrichmentEmbeddingIndex:
                 identity = f"{dataset_id}|{source_document_id}|work_summary"
                 rows.append(
                     {
-                        "enrichment_document_id": hashlib.sha256(identity.encode()).hexdigest()[:24],
+                        "enrichment_document_id": hashlib.sha256(
+                            identity.encode()
+                        ).hexdigest()[:24],
                         "enrichment_dataset_id": dataset_id,
                         "source_document_id": source_document_id,
                         "titulo": title,
@@ -166,7 +171,9 @@ class EnrichmentEmbeddingIndex:
                         "start_char": None,
                         "end_char": None,
                         "plan_mode": plan.get("plan_mode"),
-                        "effective_strategy": plan.get("effective_strategy_from_chunker"),
+                        "effective_strategy": plan.get(
+                            "effective_strategy_from_chunker"
+                        ),
                         "text": overall_text,
                         "events": list(overall.get("eventos_principais") or []),
                         "source_enrichment_bucket": bucket,
@@ -184,7 +191,9 @@ class EnrichmentEmbeddingIndex:
                 )
                 rows.append(
                     {
-                        "enrichment_document_id": hashlib.sha256(identity.encode()).hexdigest()[:24],
+                        "enrichment_document_id": hashlib.sha256(
+                            identity.encode()
+                        ).hexdigest()[:24],
                         "enrichment_dataset_id": dataset_id,
                         "source_document_id": source_document_id,
                         "titulo": title,
@@ -200,7 +209,9 @@ class EnrichmentEmbeddingIndex:
                         "start_char": block.get("start_char"),
                         "end_char": block.get("end_char"),
                         "plan_mode": plan.get("plan_mode"),
-                        "effective_strategy": plan.get("effective_strategy_from_chunker"),
+                        "effective_strategy": plan.get(
+                            "effective_strategy_from_chunker"
+                        ),
                         "text": text,
                         "events": list(block.get("eventos") or []),
                         "source_enrichment_bucket": bucket,
@@ -254,7 +265,9 @@ class EnrichmentEmbeddingIndex:
             "distance": self.config.embedding.index.distance,
         }
         index_hash = hashlib.sha256(
-            json.dumps(signature, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+            json.dumps(
+                signature, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            ).encode()
         ).hexdigest()
         index_id = f"enr_idx_{slug(model_alias)}_{index_hash[:12]}"
         collection = index_id
@@ -273,21 +286,38 @@ class EnrichmentEmbeddingIndex:
             )
             if old.get("status") != "success" or old.get("index_hash") != index_hash:
                 raise RuntimeError(f"Índice enrichment existente inválido: {index_id}")
-            if collection_exists and self.qdrant.count(collection_name=collection, exact=True) == len(documents):
+            if collection_exists and self.qdrant.count(
+                collection_name=collection, exact=True
+            ) == len(documents):
                 print(f"[reuse] {model_alias} -> {collection}")
                 return old
             if not resume:
-                raise RuntimeError("Collection enrichment incompleta; use retomada explícita.")
+                raise RuntimeError(
+                    "Collection enrichment incompleta; use retomada explícita."
+                )
         elif collection_exists:
-            if not resume or not self.rustfs.object_exists(indexes_bucket, building_key):
-                raise RuntimeError("Collection sem manifest nem checkpoint de construção.")
-            marker = json.loads(self.rustfs.download_bytes(indexes_bucket, building_key))
+            if not resume or not self.rustfs.object_exists(
+                indexes_bucket, building_key
+            ):
+                raise RuntimeError(
+                    "Collection sem manifest nem checkpoint de construção."
+                )
+            marker = json.loads(
+                self.rustfs.download_bytes(indexes_bucket, building_key)
+            )
             if marker.get("index_hash") != index_hash:
-                raise ValueError("Collection parcial de enrichment diverge da assinatura.")
+                raise ValueError(
+                    "Collection parcial de enrichment diverge da assinatura."
+                )
 
         first = embedder.embed_documents([str(documents.iloc[0]["text"])])
         self._validate_vectors(first, 1, info.dimension)
-        self.rustfs.upload_bytes(indexes_bucket, building_key, json.dumps({"index_hash": index_hash}).encode(), "application/json")
+        self.rustfs.upload_bytes(
+            indexes_bucket,
+            building_key,
+            json.dumps({"index_hash": index_hash}).encode(),
+            "application/json",
+        )
         if not collection_exists:
             self.qdrant.create_collection(
                 collection_name=collection,
@@ -343,8 +373,12 @@ class EnrichmentEmbeddingIndex:
             "documents": {
                 "schema_version": ENRICHMENT_DOCUMENT_SCHEMA_VERSION,
                 "total": len(documents),
-                "work_summaries": int(documents["document_type"].eq("work_summary").sum()),
-                "section_summaries": int(documents["document_type"].eq("section_summary").sum()),
+                "work_summaries": int(
+                    documents["document_type"].eq("work_summary").sum()
+                ),
+                "section_summaries": int(
+                    documents["document_type"].eq("section_summary").sum()
+                ),
                 "embedding_field": "text",
                 "rechunked": False,
             },
@@ -428,6 +462,7 @@ def release_memory() -> None:
     gc.collect()
     try:
         import torch
+
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
     except Exception:

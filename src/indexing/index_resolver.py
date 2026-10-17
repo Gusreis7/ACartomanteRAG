@@ -38,7 +38,9 @@ class IndexResolver:
         pointer = self.releases.load(release)
         return self._from_index(pointer.index_id, "release", pointer.release)
 
-    def _from_index(self, index_id: str, selection: str, release: str | None) -> ResolvedIndex:
+    def _from_index(
+        self, index_id: str, selection: str, release: str | None
+    ) -> ResolvedIndex:
         manifest = self.releases.load_index_manifest(index_id)
         if manifest.get("status") != "success":
             raise ValueError("Índice selecionado não possui status=success.")
@@ -55,7 +57,24 @@ class IndexResolver:
             "dimension": embedding.get("dimension"),
             "distance": embedding.get("distance"),
         }
-        missing = [k for k, v in values.items() if v is None or (isinstance(v, str) and not v.strip())]
+        missing = [
+            k
+            for k, v in values.items()
+            if v is None or (isinstance(v, str) and not v.strip())
+        ]
         if missing:
             raise ValueError("Manifest incompleto: " + ", ".join(missing))
-        return ResolvedIndex(selection, release, index_id, str(values["collection"]), str(values["silver_dataset_id"]), str(values["model_alias"]), str(values["model"]), str(values["configured_revision"]), str(values["resolved_revision"]), int(values["dimension"]), str(values["distance"]), manifest)
+        return ResolvedIndex(
+            selection,
+            release,
+            index_id,
+            str(values["collection"]),
+            str(values["silver_dataset_id"]),
+            str(values["model_alias"]),
+            str(values["model"]),
+            str(values["configured_revision"]),
+            str(values["resolved_revision"]),
+            int(values["dimension"]),
+            str(values["distance"]),
+            manifest,
+        )

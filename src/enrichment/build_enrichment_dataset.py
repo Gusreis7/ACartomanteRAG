@@ -28,7 +28,6 @@ from src.enrichment.service import (
 )
 from src.storage.rustfs_manager import RustFSManager
 
-
 BRONZE_CURRENT_KEY = "current.json"
 ENRICHMENT_CURRENT_KEY = os.getenv("ENRICHMENT_DATASET_POINTER", "current.json")
 ENRICHMENT_DATASETS_PREFIX = "datasets"
@@ -46,7 +45,8 @@ def parse_args() -> argparse.Namespace:
         )
     )
     parser.add_argument(
-        "--resume", "--retry",
+        "--resume",
+        "--retry",
         action="store_true",
         help="Retoma o artifact determinístico atual, pulando obras success.",
     )
@@ -200,9 +200,7 @@ def load_bronze_state(
         )
 
     manifest = load_parquet_bytes(manifest_bytes)
-    artifact_ids = set(
-        manifest["bronze_artifact_id"].dropna().astype(str).unique()
-    )
+    artifact_ids = set(manifest["bronze_artifact_id"].dropna().astype(str).unique())
     if artifact_ids != {bronze_artifact_id}:
         raise RuntimeError(
             "bronze_artifact_id do manifest não corresponde ao current.json. "
@@ -238,7 +236,11 @@ def build_signature(
         "source_bronze_manifest_sha256": bronze_manifest_sha256,
         "model": enrichment.model,
         "provider": enrichment.provider,
-        "region": enrichment.region if enrichment.provider in {"bedrock", "bedrock-mantle"} else None,
+        "region": (
+            enrichment.region
+            if enrichment.provider in {"bedrock", "bedrock-mantle"}
+            else None
+        ),
         "model_digest": model_digest,
         "prompt_version": enrichment.prompt_version,
         "prompt_sha256": prompt_hash,
@@ -276,15 +278,15 @@ def work_object_key(
     source_document_id: str,
     title: str,
 ) -> str:
-    document = re.sub(
-        r"[^0-9A-Za-z_-]+",
-        "-",
-        str(source_document_id).strip(),
-    ).strip("-") or "sem-id"
-    return (
-        f"{dataset_prefix}/works/"
-        f"{document}_{safe_filename(title)}.json"
+    document = (
+        re.sub(
+            r"[^0-9A-Za-z_-]+",
+            "-",
+            str(source_document_id).strip(),
+        ).strip("-")
+        or "sem-id"
     )
+    return f"{dataset_prefix}/works/" f"{document}_{safe_filename(title)}.json"
 
 
 def normalize_source_document_id(value: Any) -> str:
@@ -317,46 +319,57 @@ def build_initial_manifest(
             source_document_id=source_document_id,
             title=title,
         )
-        rows.append({
-            "enrichment_dataset_id": dataset_id,
-            "pipeline_version": config.enrichment.pipeline_version,
-            "source_bronze_artifact_id": bronze_artifact_id,
-            "source_document_id": source_document_id,
-            "titulo": title,
-            "autor": row.get("autor"),
-            "categoria": row.get("categoria"),
-            "source_bronze_bucket": config.storage.bronze_bucket,
-            "source_bronze_object_key": row.get("bronze_object_key"),
-            "enrichment_bucket": enrichment_bucket,
-            "enrichment_object_key": object_key,
-            "enrichment_uri": f"s3://{enrichment_bucket}/{object_key}",
-            "model": config.enrichment.model,
-            "model_digest": model_digest,
-            "requested_strategy": config.enrichment.strategy,
-            "effective_strategy": "",
-            "plan_mode": "",
-            "blocks": 0,
-            "source_chars": 0,
-            "output_json_bytes": 0,
-            "elapsed_seconds": 0.0,
-            "reduce_calls": 0,
-            "source_text_sha256": "",
-            "work_sha256": "",
-            "status_enrichment": "pending",
-            "processed_at_utc": "",
-            "erro_enrichment": "",
-            "tentativas_enrichment": 0,
-            "llm_calls": 0, "llm_input_tokens": 0, "llm_output_tokens": 0,
-            "erro_tipo": "", "erro_detalhes_json": "",
-        })
+        rows.append(
+            {
+                "enrichment_dataset_id": dataset_id,
+                "pipeline_version": config.enrichment.pipeline_version,
+                "source_bronze_artifact_id": bronze_artifact_id,
+                "source_document_id": source_document_id,
+                "titulo": title,
+                "autor": row.get("autor"),
+                "categoria": row.get("categoria"),
+                "source_bronze_bucket": config.storage.bronze_bucket,
+                "source_bronze_object_key": row.get("bronze_object_key"),
+                "enrichment_bucket": enrichment_bucket,
+                "enrichment_object_key": object_key,
+                "enrichment_uri": f"s3://{enrichment_bucket}/{object_key}",
+                "model": config.enrichment.model,
+                "model_digest": model_digest,
+                "requested_strategy": config.enrichment.strategy,
+                "effective_strategy": "",
+                "plan_mode": "",
+                "blocks": 0,
+                "source_chars": 0,
+                "output_json_bytes": 0,
+                "elapsed_seconds": 0.0,
+                "reduce_calls": 0,
+                "source_text_sha256": "",
+                "work_sha256": "",
+                "status_enrichment": "pending",
+                "processed_at_utc": "",
+                "erro_enrichment": "",
+                "tentativas_enrichment": 0,
+                "llm_calls": 0,
+                "llm_input_tokens": 0,
+                "llm_output_tokens": 0,
+                "erro_tipo": "",
+                "erro_detalhes_json": "",
+            }
+        )
 
     return pd.DataFrame(rows).reset_index(drop=True)
 
 
 def ensure_retry_columns(manifest):
     # Compatível com manifests existentes; identidade e objetos success permanecem.
-    for field, default in {"tentativas_enrichment": 0, "llm_calls": 0, "llm_input_tokens": 0,
-                           "llm_output_tokens": 0, "erro_tipo": "", "erro_detalhes_json": ""}.items():
+    for field, default in {
+        "tentativas_enrichment": 0,
+        "llm_calls": 0,
+        "llm_input_tokens": 0,
+        "llm_output_tokens": 0,
+        "erro_tipo": "",
+        "erro_detalhes_json": "",
+    }.items():
         if field not in manifest:
             manifest[field] = default
     return manifest
@@ -454,9 +467,7 @@ def select_execution_rows(
     title: str | None,
     limit: int | None,
 ) -> list[int]:
-    candidates = manifest[
-        ~manifest["status_enrichment"].eq("success")
-    ].copy()
+    candidates = manifest[~manifest["status_enrichment"].eq("success")].copy()
 
     if title:
         wanted = normalize_text(title)
@@ -510,8 +521,10 @@ def main() -> None:
 
     model_digest = (
         f"{config.enrichment.provider}:{config.enrichment.region}:{config.enrichment.model}"
-        if config.enrichment.provider in {"bedrock", "bedrock-mantle"} else resolve_ollama_model_digest(
-            base_url=config.generation.base_url, model=config.enrichment.model,
+        if config.enrichment.provider in {"bedrock", "bedrock-mantle"}
+        else resolve_ollama_model_digest(
+            base_url=config.generation.base_url,
+            model=config.enrichment.model,
         )
     )
     prompt_hash = prompt_sha256()
@@ -549,8 +562,9 @@ def main() -> None:
             storage.download_bytes(bucket=enrichment_bucket, key=manifest_key)
         )
         artifact = json.loads(
-            storage.download_bytes(bucket=enrichment_bucket, key=artifact_key)
-            .decode("utf-8")
+            storage.download_bytes(bucket=enrichment_bucket, key=artifact_key).decode(
+                "utf-8"
+            )
         )
         if str(artifact.get("config_hash", "")) != config_hash:
             raise RuntimeError(
@@ -606,7 +620,11 @@ def main() -> None:
     print(f"[+] Bronze source: {bronze_artifact_id}")
     print(
         f"[+] Model: {config.enrichment.model}"
-        + (f" | digest={model_digest[:12]}" if model_digest else " | digest=unavailable")
+        + (
+            f" | digest={model_digest[:12]}"
+            if model_digest
+            else " | digest=unavailable"
+        )
     )
     print(
         f"[+] Pipeline: {config.enrichment.prompt_version} | "
@@ -640,14 +658,26 @@ def main() -> None:
                 )
 
                 work_started = perf_counter()
-                manifest.at[index, "tentativas_enrichment"] = int(manifest.at[index, "tentativas_enrichment"]) + 1
-                before_usage = service.provider.usage_snapshot() if service.provider else {}
+                manifest.at[index, "tentativas_enrichment"] = (
+                    int(manifest.at[index, "tentativas_enrichment"]) + 1
+                )
+                before_usage = (
+                    service.provider.usage_snapshot() if service.provider else {}
+                )
                 batch_paused = False
 
                 def record_usage():
-                    usage = service.provider.usage_snapshot() if service.provider else {}
-                    for name, column in {"calls": "llm_calls", "input_tokens": "llm_input_tokens", "output_tokens": "llm_output_tokens"}.items():
-                        manifest.at[index, column] = int(manifest.at[index, column]) + int(usage.get(name, 0) - before_usage.get(name, 0))
+                    usage = (
+                        service.provider.usage_snapshot() if service.provider else {}
+                    )
+                    for name, column in {
+                        "calls": "llm_calls",
+                        "input_tokens": "llm_input_tokens",
+                        "output_tokens": "llm_output_tokens",
+                    }.items():
+                        manifest.at[index, column] = int(
+                            manifest.at[index, column]
+                        ) + int(usage.get(name, 0) - before_usage.get(name, 0))
 
                 try:
                     bronze_object_key = str(row["source_bronze_object_key"])
@@ -658,9 +688,7 @@ def main() -> None:
                     if not text.strip():
                         raise RuntimeError("Texto Bronze vazio.")
 
-                    source_text_sha = hashlib.sha256(
-                        text.encode("utf-8")
-                    ).hexdigest()
+                    source_text_sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
                     source = WorkSource(
                         title=title,
                         author=str(row.get("autor", "") or "Machado de Assis"),
@@ -670,10 +698,22 @@ def main() -> None:
                         bronze_object_key=bronze_object_key,
                         text=text,
                     )
-                    generator_signature = hashlib.sha256(json.dumps({
-                        "enrichment": config.enrichment.model_dump(exclude=ENRICHMENT_RUNTIME_FIELDS), "prompt": prompt_hash, "schema": schema_hash,
-                    }, sort_keys=True).encode()).hexdigest()
-                    result = service.enrich(source, checkpoint_prefix=f"checkpoints/{generator_signature}/{source_text_sha}")
+                    generator_signature = hashlib.sha256(
+                        json.dumps(
+                            {
+                                "enrichment": config.enrichment.model_dump(
+                                    exclude=ENRICHMENT_RUNTIME_FIELDS
+                                ),
+                                "prompt": prompt_hash,
+                                "schema": schema_hash,
+                            },
+                            sort_keys=True,
+                        ).encode()
+                    ).hexdigest()
+                    result = service.enrich(
+                        source,
+                        checkpoint_prefix=f"checkpoints/{generator_signature}/{source_text_sha}",
+                    )
 
                     work_payload = {
                         "enrichment_dataset_id": dataset_id,
@@ -752,8 +792,12 @@ def main() -> None:
                     manifest.at[index, "processed_at_utc"] = utc_now()
                     manifest.at[index, "erro_enrichment"] = str(exc)[:2000]
                     details = getattr(exc, "diagnostics", {})
-                    manifest.at[index, "erro_tipo"] = details.get("reason", type(exc).__name__)
-                    manifest.at[index, "erro_detalhes_json"] = json.dumps(details, ensure_ascii=False)
+                    manifest.at[index, "erro_tipo"] = details.get(
+                        "reason", type(exc).__name__
+                    )
+                    manifest.at[index, "erro_detalhes_json"] = json.dumps(
+                        details, ensure_ascii=False
+                    )
                     record_usage()
                     errors_run += 1
 
@@ -777,7 +821,10 @@ def main() -> None:
                     if args.fail_fast:
                         raise
                     if isinstance(exc, GenerationServiceError) and exc.batch_fatal:
-                        print(f"[pausa] Serviço indisponível: {manifest.at[index, 'erro_tipo']}; manifest salvo, demais obras preservadas como pendentes.", flush=True)
+                        print(
+                            f"[pausa] Serviço indisponível: {manifest.at[index, 'erro_tipo']}; manifest salvo, demais obras preservadas como pendentes.",
+                            flush=True,
+                        )
                         batch_paused = True
 
                 else:
@@ -864,7 +911,10 @@ def main() -> None:
     print(f"[+] Errors:  {int(counts.get('error', 0))}")
     print(f"[+] Pending: {int(counts.get('pending', 0))}")
     if final_status != "complete":
-        print("[pendente] Manifest salvo. Retome com --retry; índice auxiliar e promoção aguardam todas as obras.", flush=True)
+        print(
+            "[pendente] Manifest salvo. Retome com --retry; índice auxiliar e promoção aguardam todas as obras.",
+            flush=True,
+        )
         raise SystemExit(2)
 
 

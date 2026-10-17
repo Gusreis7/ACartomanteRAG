@@ -207,10 +207,6 @@ def check_qdrant_collection_ready(
     )
 
     if response.status_code == 404:
-        raise ValueError(
-            "Collection Qdrant não encontrada: "
-            f"{collection_name}"
-        )
+        raise ValueError("Collection Qdrant não encontrada: " f"{collection_name}")
 
     response.raise_for_status()
-

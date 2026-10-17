@@ -16,7 +16,9 @@ def read_terraform_config(path, repository_id):
     if not isinstance(config, dict):
         raise ValueError("Tfvars de produção deve conter um objeto JSON.")
     if str(config.get("github_repository_id", "")) != repository_id:
-        raise ValueError("Os tfvars pertencem a outro repositório; nenhuma configuração foi alterada.")
+        raise ValueError(
+            "Os tfvars pertencem a outro repositório; nenhuma configuração foi alterada."
+        )
     return payload
 
 
@@ -38,7 +40,11 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--repo", required=True, help="owner/repository")
     p.add_argument("--terraform-output", type=Path)
-    p.add_argument("--terraform-config", type=Path, help="Tfvars privado enviado ao Secret TF_PRODUCTION_TFVARS_JSON")
+    p.add_argument(
+        "--terraform-config",
+        type=Path,
+        help="Tfvars privado enviado ao Secret TF_PRODUCTION_TFVARS_JSON",
+    )
     p.add_argument("--state-bucket")
     p.add_argument("--state-key", default="acartomanterag/production.tfstate")
     p.add_argument(
@@ -59,7 +65,8 @@ def main():
         return
     terraform_config = (
         read_terraform_config(args.terraform_config, repository_id)
-        if args.terraform_config else None
+        if args.terraform_config
+        else None
     )
     outputs = None
     if args.terraform_output:

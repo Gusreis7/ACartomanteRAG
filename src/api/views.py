@@ -6,7 +6,6 @@ from uuid import UUID
 from fastapi import APIRouter
 from fastapi.responses import FileResponse
 
-
 WEB_ROOT = Path(__file__).resolve().parent / "web"
 router = APIRouter(include_in_schema=False)
 

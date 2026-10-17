@@ -47,17 +47,10 @@ class EmbeddingIndex:
         resume: bool = False,
         publish_default: bool = True,
     ) -> dict[str, Any]:
-        alias = (
-            model_alias
-            or self.config.embedding.selected_model
-        )
+        alias = model_alias or self.config.embedding.selected_model
 
         if alias not in self.config.embedding.models:
-            available = ", ".join(
-                sorted(
-                    self.config.embedding.models
-                )
-            )
+            available = ", ".join(sorted(self.config.embedding.models))
 
             raise ValueError(
                 f"Embedding model '{alias}' "
@@ -65,29 +58,13 @@ class EmbeddingIndex:
                 f"Disponíveis: {available}."
             )
 
-        model_config = (
-            self.config.embedding.models[
-                alias
-            ]
-        )
+        model_config = self.config.embedding.models[alias]
 
         embedder = self.registry.create(
             model_config,
-            normalize_embeddings=(
-                self.config.embedding
-                .index
-                .normalize_embeddings
-            ),
-            device=(
-                self.config.embedding
-                .execution
-                .device
-            ),
-            batch_size=(
-                self.config.embedding
-                .execution
-                .batch_size
-            ),
+            normalize_embeddings=(self.config.embedding.index.normalize_embeddings),
+            device=(self.config.embedding.execution.device),
+            batch_size=(self.config.embedding.execution.batch_size),
         )
 
         info = embedder.info
@@ -97,13 +74,9 @@ class EmbeddingIndex:
             model_config,
         )
 
-        signature = (
-            self._build_index_signature(
-                silver_dataset_id=(
-                    silver_dataset_id
-                ),
-                info=info,
-            )
+        signature = self._build_index_signature(
+            silver_dataset_id=(silver_dataset_id),
+            info=info,
         )
 
         index_hash = hashlib.sha256(
@@ -121,47 +94,43 @@ class EmbeddingIndex:
         )
 
         collection_name = index_id
-        manifest_key = (
-            f"{index_id}/manifest.json"
-        )
+        manifest_key = f"{index_id}/manifest.json"
 
-        indexes_bucket = (
-            self.config.storage
-            .embedding_indexes_bucket
-        )
+        indexes_bucket = self.config.storage.embedding_indexes_bucket
 
-        if not self.rustfs.bucket_exists(
-            indexes_bucket
-        ):
-            self.rustfs.create_bucket(
-                indexes_bucket
-            )
+        if not self.rustfs.bucket_exists(indexes_bucket):
+            self.rustfs.create_bucket(indexes_bucket)
 
-        collection_exists = (
-            self.qdrant.collection_exists(
-                collection_name
-            )
-        )
+        collection_exists = self.qdrant.collection_exists(collection_name)
 
-        manifest_exists = (
-            self.rustfs.object_exists(
-                indexes_bucket,
-                manifest_key,
-            )
+        manifest_exists = self.rustfs.object_exists(
+            indexes_bucket,
+            manifest_key,
         )
 
         building_key = f"{index_id}/building.json"
         if resume and manifest_exists:
-            previous = json.loads(self.rustfs.download_bytes(indexes_bucket, manifest_key))
-            if previous.get("status") != "success" or previous.get("index_hash") != index_hash:
+            previous = json.loads(
+                self.rustfs.download_bytes(indexes_bucket, manifest_key)
+            )
+            if (
+                previous.get("status") != "success"
+                or previous.get("index_hash") != index_hash
+            ):
                 raise ValueError("Manifest existente diverge da assinatura do índice.")
             if collection_exists:
                 count = self.qdrant.count(collection_name=collection_name, exact=True)
                 if count == previous["validation"]["silver_chunks"]:
                     return previous
                 # Reenvia IDs determinísticos de um índice pertencente à assinatura.
-        elif resume and collection_exists and self.rustfs.object_exists(indexes_bucket, building_key):
-            marker = json.loads(self.rustfs.download_bytes(indexes_bucket, building_key))
+        elif (
+            resume
+            and collection_exists
+            and self.rustfs.object_exists(indexes_bucket, building_key)
+        ):
+            marker = json.loads(
+                self.rustfs.download_bytes(indexes_bucket, building_key)
+            )
             if marker.get("index_hash") != index_hash:
                 raise ValueError("Collection parcial não pertence a esta execução.")
         elif collection_exists or manifest_exists:
@@ -175,55 +144,33 @@ class EmbeddingIndex:
                 f"{manifest_exists}."
             )
 
-        chunks = self._load_silver_chunks(
-            silver_dataset_id
-        )
+        chunks = self._load_silver_chunks(silver_dataset_id)
 
         if chunks.empty:
-            raise ValueError(
-                "O dataset Silver "
-                "não possui chunks."
-            )
+            raise ValueError("O dataset Silver " "não possui chunks.")
 
-        first_vector = (
-            embedder.embed_documents(
-                [
-                    str(
-                        chunks.iloc[0][
-                            "text"
-                        ]
-                    )
-                ]
-            )
-        )
+        first_vector = embedder.embed_documents([str(chunks.iloc[0]["text"])])
 
         self._validate_vectors(
             first_vector,
             expected_rows=1,
-            expected_dimension=(
-                info.dimension
-            ),
+            expected_dimension=(info.dimension),
         )
 
-        self.rustfs.upload_bytes(indexes_bucket, building_key, json.dumps({"index_hash": index_hash}).encode(), "application/json")
+        self.rustfs.upload_bytes(
+            indexes_bucket,
+            building_key,
+            json.dumps({"index_hash": index_hash}).encode(),
+            "application/json",
+        )
         if not collection_exists:
             self.qdrant.create_collection(
-                collection_name=(
-                    collection_name
-                ),
+                collection_name=(collection_name),
                 vector_size=info.dimension,
-                distance=(
-                    self.config.embedding
-                    .index
-                    .distance
-                ),
+                distance=(self.config.embedding.index.distance),
             )
 
-        configured_batch_size = (
-            self.config.embedding
-            .execution
-            .batch_size
-        )
+        configured_batch_size = self.config.embedding.execution.batch_size
 
         total_vectors = 0
 
@@ -238,59 +185,32 @@ class EmbeddingIndex:
                 len(chunks),
                 configured_batch_size,
             ):
-                batch = chunks.iloc[
-                    start :
-                    start
-                    + configured_batch_size
-                ]
+                batch = chunks.iloc[start : start + configured_batch_size]
 
-                texts = (
-                    batch["text"]
-                    .astype(str)
-                    .tolist()
-                )
+                texts = batch["text"].astype(str).tolist()
 
-                vectors = (
-                    embedder.embed_documents(
-                        texts
-                    )
-                )
+                vectors = embedder.embed_documents(texts)
 
                 self._validate_vectors(
                     vectors,
                     expected_rows=len(batch),
-                    expected_dimension=(
-                        info.dimension
-                    ),
+                    expected_dimension=(info.dimension),
                 )
 
                 ids = [
                     str(
                         uuid.uuid5(
                             uuid.NAMESPACE_URL,
-                            (
-                                "acartomante:"
-                                f"{index_id}:"
-                                f"{chunk_id}"
-                            ),
+                            ("acartomante:" f"{index_id}:" f"{chunk_id}"),
                         )
                     )
-                    for chunk_id
-                    in batch[
-                        "chunk_id"
-                    ].tolist()
+                    for chunk_id in batch["chunk_id"].tolist()
                 ]
 
-                payloads = [
-                    self._build_payload(row)
-                    for _, row
-                    in batch.iterrows()
-                ]
+                payloads = [self._build_payload(row) for _, row in batch.iterrows()]
 
                 self.qdrant.upsert_points(
-                    collection_name=(
-                        collection_name
-                    ),
+                    collection_name=(collection_name),
                     ids=ids,
                     vectors=vectors.tolist(),
                     payloads=payloads,
@@ -301,20 +221,13 @@ class EmbeddingIndex:
 
                 progress.update(len(batch))
                 progress.set_postfix(
-                    batch=(
-                        embedder.info
-                        .batch_size_effective
-                    ),
+                    batch=(embedder.info.batch_size_effective),
                     vectors=total_vectors,
                 )
 
-        qdrant_count = (
-            self.qdrant.count(
-                collection_name=(
-                    collection_name
-                ),
-                exact=True,
-            )
+        qdrant_count = self.qdrant.count(
+            collection_name=(collection_name),
+            exact=True,
         )
 
         if qdrant_count != len(chunks):
@@ -335,129 +248,53 @@ class EmbeddingIndex:
             "status": "success",
             "index_id": index_id,
             "index_hash": index_hash,
-            "created_at_utc": (
-                datetime.now(
-                    timezone.utc
-                ).isoformat()
-            ),
+            "created_at_utc": (datetime.now(timezone.utc).isoformat()),
             "source": {
-                "silver_bucket": (
-                    self.config.storage
-                    .silver_bucket
-                ),
-                "silver_dataset_id": (
-                    silver_dataset_id
-                ),
-                "chunks_key": (
-                    "datasets/"
-                    f"{silver_dataset_id}/"
-                    "chunks.parquet"
-                ),
+                "silver_bucket": (self.config.storage.silver_bucket),
+                "silver_dataset_id": (silver_dataset_id),
+                "chunks_key": ("datasets/" f"{silver_dataset_id}/" "chunks.parquet"),
                 "manifest_key": (
-                    "datasets/"
-                    f"{silver_dataset_id}/"
-                    "manifest.parquet"
+                    "datasets/" f"{silver_dataset_id}/" "manifest.parquet"
                 ),
             },
             "embedding": {
-                "pipeline_version": (
-                    self.config.embedding
-                    .pipeline_version
-                ),
+                "pipeline_version": (self.config.embedding.pipeline_version),
                 "model_alias": alias,
-                "backend": (
-                    final_info.backend
-                ),
-                "model": (
-                    final_info.model
-                ),
-                "configured_revision": (
-                    final_info
-                    .configured_revision
-                ),
-                "resolved_revision": (
-                    final_info
-                    .resolved_revision
-                ),
-                "dimension": (
-                    final_info.dimension
-                ),
-                "output_dtype": (
-                    final_info.output_dtype
-                ),
-                "inference_dtype": (
-                    final_info
-                    .inference_dtype
-                ),
-                "pooling": (
-                    final_info.pooling
-                ),
-                "truncate_dim": (
-                    final_info.truncate_dim
-                ),
-                "normalize_embeddings": (
-                    final_info
-                    .normalize_embeddings
-                ),
-                "distance": (
-                    self.config.embedding
-                    .index
-                    .distance
-                ),
+                "backend": (final_info.backend),
+                "model": (final_info.model),
+                "configured_revision": (final_info.configured_revision),
+                "resolved_revision": (final_info.resolved_revision),
+                "dimension": (final_info.dimension),
+                "output_dtype": (final_info.output_dtype),
+                "inference_dtype": (final_info.inference_dtype),
+                "pooling": (final_info.pooling),
+                "truncate_dim": (final_info.truncate_dim),
+                "normalize_embeddings": (final_info.normalize_embeddings),
+                "distance": (self.config.embedding.index.distance),
                 "configured_document_prompt_name": (
-                    final_info
-                    .configured_document_prompt_name
+                    final_info.configured_document_prompt_name
                 ),
                 "configured_query_prompt_name": (
-                    final_info
-                    .configured_query_prompt_name
+                    final_info.configured_query_prompt_name
                 ),
-                "document_prompt_name": (
-                    final_info
-                    .document_prompt_name
-                ),
-                "query_prompt_name": (
-                    final_info
-                    .query_prompt_name
-                ),
+                "document_prompt_name": (final_info.document_prompt_name),
+                "query_prompt_name": (final_info.query_prompt_name),
             },
             "execution": {
-                "batch_size_requested": (
-                    final_info
-                    .batch_size_requested
-                ),
-                "batch_size_effective": (
-                    final_info
-                    .batch_size_effective
-                ),
-                "requested_device": (
-                    final_info
-                    .requested_device
-                ),
-                "resolved_device": (
-                    final_info
-                    .resolved_device
-                ),
+                "batch_size_requested": (final_info.batch_size_requested),
+                "batch_size_effective": (final_info.batch_size_effective),
+                "requested_device": (final_info.requested_device),
+                "resolved_device": (final_info.resolved_device),
             },
             "qdrant": {
-                "collection": (
-                    collection_name
-                ),
+                "collection": (collection_name),
             },
             "validation": {
-                "silver_chunks": len(
-                    chunks
-                ),
-                "generated_vectors": (
-                    total_vectors
-                ),
-                "qdrant_vectors": (
-                    qdrant_count
-                ),
+                "silver_chunks": len(chunks),
+                "generated_vectors": (total_vectors),
+                "qdrant_vectors": (qdrant_count),
             },
-            "index_signature": (
-                signature
-            ),
+            "index_signature": (signature),
         }
 
         self.rustfs.upload_bytes(
@@ -468,9 +305,7 @@ class EmbeddingIndex:
                 ensure_ascii=False,
                 indent=2,
             ).encode("utf-8"),
-            content_type=(
-                "application/json"
-            ),
+            content_type=("application/json"),
         )
 
         release_manager = ReleaseManager(
@@ -479,18 +314,14 @@ class EmbeddingIndex:
         )
 
         bootstrapped = publish_default and (
-            release_manager
-            .bootstrap_if_missing(
+            release_manager.bootstrap_if_missing(
                 index_id=index_id,
                 release="default",
             )
         )
 
         if bootstrapped:
-            print(
-                "[+] Bootstrap release: "
-                f"default -> {index_id}"
-            )
+            print("[+] Bootstrap release: " f"default -> {index_id}")
 
         return manifest
 
@@ -498,11 +329,7 @@ class EmbeddingIndex:
         self,
         silver_dataset_id: str,
     ) -> pd.DataFrame:
-        chunks_key = (
-            "datasets/"
-            f"{silver_dataset_id}/"
-            "chunks.parquet"
-        )
+        chunks_key = "datasets/" f"{silver_dataset_id}/" "chunks.parquet"
 
         if not self.rustfs.object_exists(
             self.config.storage.silver_bucket,
@@ -516,46 +343,24 @@ class EmbeddingIndex:
                 f"{chunks_key}"
             )
 
-        payload = (
-            self.rustfs.download_bytes(
-                self.config.storage
-                .silver_bucket,
-                chunks_key,
-            )
+        payload = self.rustfs.download_bytes(
+            self.config.storage.silver_bucket,
+            chunks_key,
         )
 
-        chunks = pd.read_parquet(
-            BytesIO(payload)
-        )
+        chunks = pd.read_parquet(BytesIO(payload))
 
-        missing_columns = (
-            self.REQUIRED_CHUNK_COLUMNS
-            - set(chunks.columns)
-        )
+        missing_columns = self.REQUIRED_CHUNK_COLUMNS - set(chunks.columns)
 
         if missing_columns:
             raise ValueError(
                 "Silver chunks sem "
-                "colunas obrigatórias: "
-                + ", ".join(
-                    sorted(
-                        missing_columns
-                    )
-                )
+                "colunas obrigatórias: " + ", ".join(sorted(missing_columns))
             )
 
-        dataset_ids = set(
-            chunks[
-                "silver_dataset_id"
-            ]
-            .dropna()
-            .astype(str)
-            .unique()
-        )
+        dataset_ids = set(chunks["silver_dataset_id"].dropna().astype(str).unique())
 
-        if dataset_ids != {
-            silver_dataset_id
-        }:
+        if dataset_ids != {silver_dataset_id}:
             raise ValueError(
                 "silver_dataset_id interno "
                 "não corresponde ao dataset "
@@ -573,44 +378,21 @@ class EmbeddingIndex:
         info: EmbedderInfo,
     ) -> dict[str, Any]:
         return {
-            "pipeline_version": (
-                self.config.embedding
-                .pipeline_version
-            ),
-            "silver_dataset_id": (
-                silver_dataset_id
-            ),
+            "pipeline_version": (self.config.embedding.pipeline_version),
+            "silver_dataset_id": (silver_dataset_id),
             "embedding": {
                 "backend": info.backend,
                 "model": info.model,
-                "resolved_revision": (
-                    info.resolved_revision
-                ),
-                "dimension": (
-                    info.dimension
-                ),
-                "inference_dtype": (
-                    info.inference_dtype
-                ),
+                "resolved_revision": (info.resolved_revision),
+                "dimension": (info.dimension),
+                "inference_dtype": (info.inference_dtype),
                 "pooling": info.pooling,
-                "truncate_dim": (
-                    info.truncate_dim
-                ),
-                "normalize_embeddings": (
-                    info.normalize_embeddings
-                ),
-                "document_prompt_name": (
-                    info.document_prompt_name
-                ),
-                "query_prompt_name": (
-                    info.query_prompt_name
-                ),
+                "truncate_dim": (info.truncate_dim),
+                "normalize_embeddings": (info.normalize_embeddings),
+                "document_prompt_name": (info.document_prompt_name),
+                "query_prompt_name": (info.query_prompt_name),
             },
-            "distance": (
-                self.config.embedding
-                .index
-                .distance
-            ),
+            "distance": (self.config.embedding.index.distance),
         }
 
     @staticmethod
@@ -618,20 +400,19 @@ class EmbeddingIndex:
         model: str,
         index_hash: str,
     ) -> str:
-        model_name = (
-            model.rsplit("/", 1)[-1]
+        model_name = model.rsplit("/", 1)[-1]
+
+        slug = (
+            re.sub(
+                r"[^a-zA-Z0-9_-]+",
+                "-",
+                model_name,
+            )
+            .strip("-")
+            .lower()
         )
 
-        slug = re.sub(
-            r"[^a-zA-Z0-9_-]+",
-            "-",
-            model_name,
-        ).strip("-").lower()
-
-        return (
-            f"idx_{slug}_"
-            f"{index_hash[:12]}"
-        )
+        return f"idx_{slug}_" f"{index_hash[:12]}"
 
     @staticmethod
     def _validate_embedder_info(
@@ -639,36 +420,17 @@ class EmbeddingIndex:
         model_config: EmbeddingModelConfig,
     ) -> None:
         if info.dimension <= 0:
+            raise ValueError("Embedder informou " "dimensão inválida.")
+
+        if info.output_dtype != "float32":
+            raise ValueError("Contrato do Embedder " "exige " "output_dtype=float32.")
+
+        if info.configured_revision != model_config.revision:
             raise ValueError(
-                "Embedder informou "
-                "dimensão inválida."
+                "Revision reportada pelo " "Embedder não corresponde " "à configuração."
             )
 
-        if (
-            info.output_dtype
-            != "float32"
-        ):
-            raise ValueError(
-                "Contrato do Embedder "
-                "exige "
-                "output_dtype=float32."
-            )
-
-        if (
-            info.configured_revision
-            != model_config.revision
-        ):
-            raise ValueError(
-                "Revision reportada pelo "
-                "Embedder não corresponde "
-                "à configuração."
-            )
-
-        if (
-            info.inference_dtype
-            != model_config
-            .inference_dtype
-        ):
+        if info.inference_dtype != model_config.inference_dtype:
             raise ValueError(
                 "inference_dtype "
                 "reportado pelo Embedder "
@@ -676,14 +438,9 @@ class EmbeddingIndex:
                 "configuração."
             )
 
-        if (
-            info.pooling
-            != model_config.pooling
-        ):
+        if info.pooling != model_config.pooling:
             raise ValueError(
-                "pooling reportado pelo "
-                "Embedder não corresponde "
-                "à configuração."
+                "pooling reportado pelo " "Embedder não corresponde " "à configuração."
             )
 
     @staticmethod
@@ -696,20 +453,14 @@ class EmbeddingIndex:
             vectors,
             np.ndarray,
         ):
-            raise TypeError(
-                "Embedder deve retornar "
-                "np.ndarray."
-            )
+            raise TypeError("Embedder deve retornar " "np.ndarray.")
 
         expected_shape = (
             expected_rows,
             expected_dimension,
         )
 
-        if (
-            vectors.shape
-            != expected_shape
-        ):
+        if vectors.shape != expected_shape:
             raise ValueError(
                 "Shape inválido retornado "
                 "pelo Embedder. "
@@ -717,23 +468,11 @@ class EmbeddingIndex:
                 f"recebido={vectors.shape}."
             )
 
-        if (
-            vectors.dtype
-            != np.float32
-        ):
-            raise TypeError(
-                "Embedder deve retornar "
-                "np.ndarray "
-                "dtype=float32."
-            )
+        if vectors.dtype != np.float32:
+            raise TypeError("Embedder deve retornar " "np.ndarray " "dtype=float32.")
 
-        if not np.isfinite(
-            vectors
-        ).all():
-            raise ValueError(
-                "Embedder retornou "
-                "NaN ou infinito."
-            )
+        if not np.isfinite(vectors).all():
+            raise ValueError("Embedder retornou " "NaN ou infinito.")
 
     @staticmethod
     def _build_payload(
@@ -752,9 +491,7 @@ class EmbeddingIndex:
                 value,
                 np.generic,
             ):
-                payload[key] = (
-                    value.item()
-                )
+                payload[key] = value.item()
 
             else:
                 payload[key] = value

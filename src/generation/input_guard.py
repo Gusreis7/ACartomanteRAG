@@ -1,4 +1,5 @@
 """Triagem do chat sem ferramentas, antes de consultar o acervo."""
+
 from __future__ import annotations
 
 import json
@@ -9,7 +10,6 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.generation.provider import GenerationServiceError
-
 
 REFUSAL = "Posso ajudar com literatura e com as obras de Machado de Assis. Não posso atender a esse pedido. Experimente perguntar sobre uma obra, personagem, passagem ou recurso literário."
 _OVERRIDE = re.compile(
@@ -48,7 +48,10 @@ class LiteraryInputGuard:
     def review(self, message: str, previous_questions=()) -> GuardDecision:
         if _OVERRIDE.search(message):
             return GuardDecision("unsafe")
-        payload = json.dumps({"previous_questions": list(previous_questions)[-2:], "message": message}, ensure_ascii=False)
+        payload = json.dumps(
+            {"previous_questions": list(previous_questions)[-2:], "message": message},
+            ensure_ascii=False,
+        )
         try:
             result = self.provider.invoke_structured(
                 [("system", _INSTRUCTION), ("human", payload)],
@@ -57,9 +60,18 @@ class LiteraryInputGuard:
                 max_tokens=self.max_tokens,
             )
         except (ValueError, TypeError, NotImplementedError):
-            raise GenerationServiceError("Não foi possível validar o assunto da pergunta. Tente novamente.") from None
-        if not isinstance(result, dict) or result.get("parsing_error") is not None or not isinstance(result.get("parsed"), InputGuardResult) or result.get("raw") is None:
-            raise GenerationServiceError("Não foi possível validar o assunto da pergunta. Tente novamente.")
+            raise GenerationServiceError(
+                "Não foi possível validar o assunto da pergunta. Tente novamente."
+            ) from None
+        if (
+            not isinstance(result, dict)
+            or result.get("parsing_error") is not None
+            or not isinstance(result.get("parsed"), InputGuardResult)
+            or result.get("raw") is None
+        ):
+            raise GenerationServiceError(
+                "Não foi possível validar o assunto da pergunta. Tente novamente."
+            )
         response = result["raw"]
         metadata = getattr(response, "response_metadata", {}) or {}
         usage = dict(getattr(response, "usage_metadata", {}) or {})

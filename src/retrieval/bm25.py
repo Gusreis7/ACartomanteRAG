@@ -67,9 +67,7 @@ class BM25Retriever:
                     denominator = tf + self.k1 * (
                         1.0 - self.b + self.b * dl / self._avgdl
                     )
-                    scores[doc_idx] += (
-                        idf * tf * (self.k1 + 1.0) / denominator
-                    )
+                    scores[doc_idx] += idf * tf * (self.k1 + 1.0) / denominator
 
         k = min(max(int(top_k), 0), self._n_docs)
         if k == 0:
@@ -84,9 +82,7 @@ class BM25Retriever:
         for rank, doc_idx in enumerate(ordered, start=1):
             row = self.chunks.iloc[doc_idx]
             metadata = {
-                key: _json_value(value)
-                for key, value in row.items()
-                if key != "text"
+                key: _json_value(value) for key, value in row.items() if key != "text"
             }
             hits.append(
                 RetrievalHit(

@@ -12,7 +12,6 @@ import pandas as pd
 from src.config.config_manager import ConfigManager
 from src.storage.rustfs_manager import RustFSManager
 
-
 RUNS_PREFIX = "retrieval/v1/runs"
 
 METHOD_LABELS = {
@@ -44,10 +43,7 @@ def parse_args() -> argparse.Namespace:
         "--output",
         type=Path,
         default=None,
-        help=(
-            "Arquivo HTML local. Padrão: "
-            "reports/retrieval/<run_id>.html"
-        ),
+        help=("Arquivo HTML local. Padrão: " "reports/retrieval/<run_id>.html"),
     )
 
     parser.add_argument(
@@ -80,16 +76,11 @@ def resolve_latest_run(
         prefix=f"{RUNS_PREFIX}/",
     )
 
-    manifests = sorted(
-        key
-        for key in keys
-        if key.endswith("/manifest.json")
-    )
+    manifests = sorted(key for key in keys if key.endswith("/manifest.json"))
 
     if not manifests:
         raise FileNotFoundError(
-            "Nenhum benchmark encontrado em "
-            f"s3://{bucket}/{RUNS_PREFIX}/"
+            "Nenhum benchmark encontrado em " f"s3://{bucket}/{RUNS_PREFIX}/"
         )
 
     return manifests[-1].rsplit(
@@ -112,19 +103,12 @@ def load_run(
         "evidence": f"{prefix}/evidence_matches.csv",
     }
 
-    missing = [
-        key
-        for key in keys.values()
-        if not rustfs.object_exists(bucket, key)
-    ]
+    missing = [key for key in keys.values() if not rustfs.object_exists(bucket, key)]
 
     if missing:
         raise FileNotFoundError(
             "Run incompleto. Objetos ausentes: "
-            + ", ".join(
-                f"s3://{bucket}/{key}"
-                for key in missing
-            )
+            + ", ".join(f"s3://{bucket}/{key}" for key in missing)
         )
 
     manifest = json.loads(
@@ -252,12 +236,9 @@ def quality_cards(
     cards = []
 
     for _, row in summary.iterrows():
-        method = method_label(
-            row.get("method")
-        )
+        method = method_label(row.get("method"))
 
-        cards.append(
-            f"""
+        cards.append(f"""
             <article class="method-card">
               <div class="method-title">{esc(method)}</div>
               <div class="metric-grid">
@@ -267,8 +248,7 @@ def quality_cards(
                 {metric_cell("MRR@10", metric_value(row, "mrr_at_10"))}
               </div>
             </article>
-            """
-        )
+            """)
 
     return "".join(cards)
 
@@ -306,24 +286,13 @@ def evidence_stats(
         }
 
     working = evidence.copy()
-    working["query_id"] = (
-        working["query_id"]
-        .astype(str)
-    )
+    working["query_id"] = working["query_id"].astype(str)
 
-    matched = working[
-        working["chunk_id"].notna()
-    ]
+    matched = working[working["chunk_id"].notna()]
 
-    all_queries = (
-        working["query_id"]
-        .nunique()
-    )
+    all_queries = working["query_id"].nunique()
 
-    matched_queries = (
-        matched["query_id"]
-        .nunique()
-    )
+    matched_queries = matched["query_id"].nunique()
 
     coverage = pd.to_numeric(
         matched.get(
@@ -345,17 +314,9 @@ def evidence_stats(
     )
 
     return {
-        "matched_queries": int(
-            matched_queries
-        ),
-        "unmatched_queries": int(
-            all_queries - matched_queries
-        ),
-        "avg_coverage": float(
-            coverage.mean()
-            if not coverage.empty
-            else 0.0
-        ),
+        "matched_queries": int(matched_queries),
+        "unmatched_queries": int(all_queries - matched_queries),
+        "avg_coverage": float(coverage.mean() if not coverage.empty else 0.0),
         "modes": modes,
     }
 
@@ -365,10 +326,7 @@ def failure_rows(
     limit: int = 40,
 ) -> str:
     if results.empty:
-        return (
-            '<tr><td colspan="7">'
-            "Sem resultados.</td></tr>"
-        )
+        return '<tr><td colspan="7">' "Sem resultados.</td></tr>"
 
     working = results.copy()
 
@@ -384,9 +342,7 @@ def failure_rows(
     ).fillna(0)
 
     working = (
-        working[
-            mrr.eq(0)
-        ]
+        working[mrr.eq(0)]
         .sort_values(
             by=[
                 "query_id",
@@ -397,10 +353,7 @@ def failure_rows(
     )
 
     if working.empty:
-        return (
-            '<tr><td colspan="7">'
-            "Nenhuma falha em MRR@10.</td></tr>"
-        )
+        return '<tr><td colspan="7">' "Nenhuma falha em MRR@10.</td></tr>"
 
     rows = []
 
@@ -423,9 +376,7 @@ def failure_rows(
 def compact_run_name(
     prefix: str,
 ) -> str:
-    return prefix.rstrip(
-        "/"
-    ).split("/")[-1]
+    return prefix.rstrip("/").split("/")[-1]
 
 
 def build_html(
@@ -437,9 +388,7 @@ def build_html(
     results = data["results"]
     evidence = data["evidence"]
 
-    ev = evidence_stats(
-        evidence
-    )
+    ev = evidence_stats(evidence)
 
     benchmark_rows = int(
         manifest.get(
@@ -457,36 +406,20 @@ def build_html(
         or 0
     )
 
-    evidence_pct = (
-        scored_queries
-        / benchmark_rows
-        * 100.0
-        if benchmark_rows
-        else 0.0
-    )
+    evidence_pct = scored_queries / benchmark_rows * 100.0 if benchmark_rows else 0.0
 
     run_id = manifest.get(
         "run_id",
-        compact_run_name(
-            run_prefix
-        ),
+        compact_run_name(run_prefix),
     )
 
-    warmup = (
-        manifest.get("warmup")
-        or {}
-    )
+    warmup = manifest.get("warmup") or {}
 
-    reranker = (
-        manifest.get("reranker")
-        or {}
-    )
+    reranker = manifest.get("reranker") or {}
 
-    match_modes = ", ".join(
-        f"{key}: {value}"
-        for key, value
-        in ev["modes"].items()
-    ) or "—"
+    match_modes = (
+        ", ".join(f"{key}: {value}" for key, value in ev["modes"].items()) or "—"
+    )
 
     css = """
     :root {
@@ -967,26 +900,16 @@ def main() -> None:
     args = parse_args()
     config = load_config(args)
 
-    rustfs = RustFSManager.from_config(
-        config.environment.rustfs
+    rustfs = RustFSManager.from_config(config.environment.rustfs)
+
+    bucket = config.storage.benchmarks_bucket
+
+    run_prefix = args.run_prefix or resolve_latest_run(
+        rustfs,
+        bucket,
     )
 
-    bucket = (
-        config.storage.benchmarks_bucket
-    )
-
-    run_prefix = (
-        args.run_prefix
-        or resolve_latest_run(
-            rustfs,
-            bucket,
-        )
-    )
-
-    print(
-        "[+] Run: "
-        f"s3://{bucket}/{run_prefix}/"
-    )
+    print("[+] Run: " f"s3://{bucket}/{run_prefix}/")
 
     data = load_run(
         rustfs,
@@ -999,23 +922,9 @@ def main() -> None:
         data,
     )
 
-    run_id = (
-        data["manifest"].get(
-            "run_id"
-        )
-        or compact_run_name(
-            run_prefix
-        )
-    )
+    run_id = data["manifest"].get("run_id") or compact_run_name(run_prefix)
 
-    output = (
-        args.output
-        or (
-            Path("reports")
-            / "retrieval"
-            / f"{run_id}.html"
-        )
-    )
+    output = args.output or (Path("reports") / "retrieval" / f"{run_id}.html")
 
     output.parent.mkdir(
         parents=True,
@@ -1027,32 +936,19 @@ def main() -> None:
         encoding="utf-8",
     )
 
-    print(
-        "[OK] HTML: "
-        f"{output.resolve()}"
-    )
+    print("[OK] HTML: " f"{output.resolve()}")
 
     if args.upload:
-        key = (
-            f"{run_prefix.rstrip('/')}/"
-            "report.html"
-        )
+        key = f"{run_prefix.rstrip('/')}/" "report.html"
 
         rustfs.upload_bytes(
             bucket=bucket,
             key=key,
-            data=report.encode(
-                "utf-8"
-            ),
-            content_type=(
-                "text/html; charset=utf-8"
-            ),
+            data=report.encode("utf-8"),
+            content_type=("text/html; charset=utf-8"),
         )
 
-        print(
-            "[OK] Upload: "
-            f"s3://{bucket}/{key}"
-        )
+        print("[OK] Upload: " f"s3://{bucket}/{key}")
 
 
 if __name__ == "__main__":

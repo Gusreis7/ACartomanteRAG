@@ -9,7 +9,6 @@ from urllib.parse import urlparse
 
 import pandas as pd
 
-
 BRONZE_CURRENT_KEY = "current.json"
 ALLOWED_DOMAIN_SUFFIX = "dominiopublico.mec.gov.br"
 
@@ -33,7 +32,9 @@ class WorkRecommendationService:
     processo. Ele não guarda estado de usuário.
     """
 
-    def __init__(self, *, storage, bucket: str, current_key: str = BRONZE_CURRENT_KEY) -> None:
+    def __init__(
+        self, *, storage, bucket: str, current_key: str = BRONZE_CURRENT_KEY
+    ) -> None:
         self.storage = storage
         self.bucket = bucket
         self.current_key = current_key
@@ -73,12 +74,9 @@ class WorkRecommendationService:
             parsed = urlparse(value)
             hostname = (parsed.hostname or "").lower()
 
-            if (
-                parsed.scheme in {"http", "https"}
-                and (
-                    hostname == ALLOWED_DOMAIN_SUFFIX
-                    or hostname.endswith("." + ALLOWED_DOMAIN_SUFFIX)
-                )
+            if parsed.scheme in {"http", "https"} and (
+                hostname == ALLOWED_DOMAIN_SUFFIX
+                or hostname.endswith("." + ALLOWED_DOMAIN_SUFFIX)
             ):
                 return value
 
@@ -99,9 +97,7 @@ class WorkRecommendationService:
                 self.bucket,
                 self.current_key,
             )
-            current = json.loads(
-                current_payload.decode("utf-8")
-            )
+            current = json.loads(current_payload.decode("utf-8"))
         except Exception as exc:
             raise RecommendationUnavailableError(
                 "Não foi possível ler o current.json da camada Bronze."
@@ -112,12 +108,8 @@ class WorkRecommendationService:
                 "current.json da camada Bronze possui formato inválido."
             )
 
-        artifact_id = self._text(
-            current.get("bronze_artifact_id")
-        )
-        manifest_key = self._text(
-            current.get("manifest_key")
-        )
+        artifact_id = self._text(current.get("bronze_artifact_id"))
+        manifest_key = self._text(current.get("manifest_key"))
 
         if not artifact_id:
             raise RecommendationUnavailableError(
@@ -154,9 +146,7 @@ class WorkRecommendationService:
                 self.bucket,
                 manifest_key,
             )
-            frame = pd.read_parquet(
-                io.BytesIO(payload)
-            )
+            frame = pd.read_parquet(io.BytesIO(payload))
         except Exception as exc:
             raise RecommendationUnavailableError(
                 "Não foi possível ler o manifest da Bronze atual."
@@ -171,48 +161,26 @@ class WorkRecommendationService:
             )
 
         if "status_bronze" in frame.columns:
-            frame = frame[
-                frame["status_bronze"]
-                .astype(str)
-                .eq("success")
-            ].copy()
+            frame = frame[frame["status_bronze"].astype(str).eq("success")].copy()
 
         catalog: list[dict[str, str | None]] = []
         seen_titles: set[str] = set()
 
         for _, row in frame.iterrows():
-            title = self._text(
-                row.get("titulo")
-            )
-            source_url = self._official_url(
-                row
-            )
-            normalized = " ".join(
-                title.casefold().split()
-            )
+            title = self._text(row.get("titulo"))
+            source_url = self._official_url(row)
+            normalized = " ".join(title.casefold().split())
 
-            if (
-                not title
-                or not source_url
-                or normalized in seen_titles
-            ):
+            if not title or not source_url or normalized in seen_titles:
                 continue
 
-            seen_titles.add(
-                normalized
-            )
+            seen_titles.add(normalized)
 
             catalog.append(
                 {
                     "title": title,
-                    "author": (
-                        self._text(row.get("autor"))
-                        or "Machado de Assis"
-                    ),
-                    "category": (
-                        self._text(row.get("categoria"))
-                        or None
-                    ),
+                    "author": (self._text(row.get("autor")) or "Machado de Assis"),
+                    "category": (self._text(row.get("categoria")) or None),
                     "source_url": source_url,
                 }
             )
@@ -242,15 +210,12 @@ class WorkRecommendationService:
         with self._catalog_lock:
             if self._catalog is None:
                 try:
-                    self._catalog = (
-                        self._load_catalog()
-                    )
+                    self._catalog = self._load_catalog()
                 except RecommendationUnavailableError:
                     raise
                 except Exception as exc:
                     logger.exception(
-                        "recommendation_catalog_load_failed "
-                        "bucket=%s current=%s",
+                        "recommendation_catalog_load_failed " "bucket=%s current=%s",
                         self.bucket,
                         self.current_key,
                     )
@@ -273,35 +238,20 @@ class WorkRecommendationService:
         )
 
         excluded = {
-            " ".join(
-                str(title)
-                .casefold()
-                .split()
-            )
-            for title in (
-                exclude_titles or []
-            )
+            " ".join(str(title).casefold().split())
+            for title in (exclude_titles or [])
             if str(title).strip()
         }
 
         available = [
             item
             for item in catalog
-            if " ".join(
-                str(item["title"])
-                .casefold()
-                .split()
-            )
-            not in excluded
+            if " ".join(str(item["title"]).casefold().split()) not in excluded
         ]
 
         # Em um acervo muito pequeno, é preferível repetir uma obra a
         # impedir uma nova leitura.
-        pool = (
-            available
-            if len(available) >= count
-            else catalog
-        )
+        pool = available if len(available) >= count else catalog
 
         return [
             dict(item)

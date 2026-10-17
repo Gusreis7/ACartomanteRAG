@@ -54,8 +54,7 @@ def main() -> None:
         if evidence.get("secao"):
             location += f" · {evidence['secao']}"
         print(
-            f"[{evidence['evidence_id']}] {location} | "
-            f"chunk={evidence['chunk_id']}"
+            f"[{evidence['evidence_id']}] {location} | " f"chunk={evidence['chunk_id']}"
         )
 
     print()

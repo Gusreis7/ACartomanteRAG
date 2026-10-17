@@ -39,8 +39,7 @@ class EmbedderInfo:
 class Embedder(ABC):
     @property
     @abstractmethod
-    def info(self) -> EmbedderInfo:
-        ...
+    def info(self) -> EmbedderInfo: ...
 
     @abstractmethod
     def embed_documents(

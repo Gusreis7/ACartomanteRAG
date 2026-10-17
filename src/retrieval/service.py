@@ -17,9 +17,7 @@ class RetrievalService:
         started = perf_counter()
         self.config = config
         self.rustfs = RustFSManager.from_config(config.environment.rustfs)
-        self.resolved = IndexResolver(config, self.rustfs).resolve(
-            index_id=index_id
-        )
+        self.resolved = IndexResolver(config, self.rustfs).resolve(index_id=index_id)
         self.chunks = load_resolved_silver_chunks(
             config,
             self.rustfs,

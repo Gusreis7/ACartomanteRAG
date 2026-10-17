@@ -21,9 +21,7 @@ def evaluate_response(
     a métrica.
     """
     relevant = {
-        str(value)
-        for value in relevant_chunk_ids
-        if value is not None and str(value)
+        str(value) for value in relevant_chunk_ids if value is not None and str(value)
     }
     ranked = [hit.chunk_id for hit in response.hits]
     metrics = {}
@@ -63,11 +61,7 @@ def aggregate_metrics(results: pd.DataFrame) -> pd.DataFrame:
         )
     ]
 
-    timing_columns = [
-        column
-        for column in results.columns
-        if column.endswith("_ms")
-    ]
+    timing_columns = [column for column in results.columns if column.endswith("_ms")]
 
     rows = []
 
@@ -80,13 +74,10 @@ def aggregate_metrics(results: pd.DataFrame) -> pd.DataFrame:
         }
 
         for column in quality_columns:
-            row[column] = (
-                pd.to_numeric(
-                    group[column],
-                    errors="coerce",
-                )
-                .mean()
-            )
+            row[column] = pd.to_numeric(
+                group[column],
+                errors="coerce",
+            ).mean()
 
         for column in timing_columns:
             values = pd.to_numeric(
@@ -97,15 +88,9 @@ def aggregate_metrics(results: pd.DataFrame) -> pd.DataFrame:
             if values.empty:
                 continue
 
-            row[f"{column}_mean"] = float(
-                values.mean()
-            )
-            row[f"{column}_p50"] = float(
-                values.quantile(0.50)
-            )
-            row[f"{column}_p95"] = float(
-                values.quantile(0.95)
-            )
+            row[f"{column}_mean"] = float(values.mean())
+            row[f"{column}_p50"] = float(values.quantile(0.50))
+            row[f"{column}_p95"] = float(values.quantile(0.95))
 
         rows.append(row)
 

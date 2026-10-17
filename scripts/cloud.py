@@ -41,29 +41,52 @@ def emergency_state(s3, bucket):
 
 def require_operations_enabled(s3, bucket):
     if emergency_state(s3, bucket)["active"]:
-        raise RuntimeError("Parada de emergência ativa. Use AWS emergency → resume antes de publicar ou iniciar ETL.")
+        raise RuntimeError(
+            "Parada de emergência ativa. Use AWS emergency → resume antes de publicar ou iniciar ETL."
+        )
 
 
 def active_glue_runs(glue, job):
-    return [run for page in glue.get_paginator("get_job_runs").paginate(JobName=job)
-            for run in page.get("JobRuns", []) if run["JobRunState"] in ACTIVE_GLUE_STATES]
+    return [
+        run
+        for page in glue.get_paginator("get_job_runs").paginate(JobName=job)
+        for run in page.get("JobRuns", [])
+        if run["JobRunState"] in ACTIVE_GLUE_STATES
+    ]
 
 
 def emergency_operation(s3, ec2, glue, out, operation):
     bucket, instance, job = out["ops_bucket"], out["instance_id"], out["glue_job"]
     if not re.fullmatch(r"i-[0-9a-f]{8,17}", instance):
         raise ValueError("ID da instância inválido no contexto de deploy.")
+
     def save(active):
-        s3.put_object(Bucket=bucket, Key=EMERGENCY_KEY, ContentType="application/json",
-                      Body=json.dumps({"active": active, "updated_at": datetime.now(timezone.utc).isoformat(),
-                                       "github_run_id": os.getenv("GITHUB_RUN_ID", "local")}).encode())
+        s3.put_object(
+            Bucket=bucket,
+            Key=EMERGENCY_KEY,
+            ContentType="application/json",
+            Body=json.dumps(
+                {
+                    "active": active,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "github_run_id": os.getenv("GITHUB_RUN_ID", "local"),
+                }
+            ).encode(),
+        )
+
     if operation == "stop":
         save(True)
         errors = []
         try:
-            runs = [run["Id"] for run in active_glue_runs(glue, job) if run["JobRunState"] != "STOPPING"]
+            runs = [
+                run["Id"]
+                for run in active_glue_runs(glue, job)
+                if run["JobRunState"] != "STOPPING"
+            ]
             for offset in range(0, len(runs), 25):
-                result = glue.batch_stop_job_run(JobName=job, JobRunIds=runs[offset:offset + 25])
+                result = glue.batch_stop_job_run(
+                    JobName=job, JobRunIds=runs[offset : offset + 25]
+                )
                 if result.get("Errors"):
                     errors.append("Glue recusou parte das solicitações")
         except Exception as exc:
@@ -73,34 +96,55 @@ def emergency_operation(s3, ec2, glue, out, operation):
         except Exception as exc:
             errors.append(f"EC2: {type(exc).__name__}")
         if errors:
-            raise RuntimeError("Parada parcial; trava mantida. Confira os serviços: " + "; ".join(errors))
+            raise RuntimeError(
+                "Parada parcial; trava mantida. Confira os serviços: "
+                + "; ".join(errors)
+            )
         deadline = time.monotonic() + 600
         while time.monotonic() < deadline:
-            state = ec2.describe_instances(InstanceIds=[instance])["Reservations"][0]["Instances"][0]["State"]["Name"]
+            state = ec2.describe_instances(InstanceIds=[instance])["Reservations"][0][
+                "Instances"
+            ][0]["State"]["Name"]
             remaining = active_glue_runs(glue, job)
-            new_runs = [run["Id"] for run in remaining if run["JobRunState"] != "STOPPING"]
+            new_runs = [
+                run["Id"] for run in remaining if run["JobRunState"] != "STOPPING"
+            ]
             for offset in range(0, len(new_runs), 25):
-                result = glue.batch_stop_job_run(JobName=job, JobRunIds=new_runs[offset:offset + 25])
+                result = glue.batch_stop_job_run(
+                    JobName=job, JobRunIds=new_runs[offset : offset + 25]
+                )
                 if result.get("Errors"):
-                    raise RuntimeError("Glue recusou uma parada; trava mantida. Confira o job.")
+                    raise RuntimeError(
+                        "Glue recusou uma parada; trava mantida. Confira o job."
+                    )
             if state == "stopped" and not remaining:
-                print("Emergência ativa: EC2 parada e nenhum Glue ativo. Dados e volumes preservados.")
+                print(
+                    "Emergência ativa: EC2 parada e nenhum Glue ativo. Dados e volumes preservados."
+                )
                 return
             time.sleep(5)
-        raise RuntimeError("Prazo de parada excedido; trava mantida. Confira EC2 e Glue antes de retomar.")
+        raise RuntimeError(
+            "Prazo de parada excedido; trava mantida. Confira EC2 e Glue antes de retomar."
+        )
     elif operation == "resume":
         # A trava só é liberada depois de o início da instância ser confirmado.
-        state = ec2.describe_instances(InstanceIds=[instance])["Reservations"][0]["Instances"][0]["State"]["Name"]
+        state = ec2.describe_instances(InstanceIds=[instance])["Reservations"][0][
+            "Instances"
+        ][0]["State"]["Name"]
         if state == "stopping":
             ec2.get_waiter("instance_stopped").wait(InstanceIds=[instance])
             state = "stopped"
         if state == "stopped":
             ec2.start_instances(InstanceIds=[instance])
         elif state not in {"running", "pending"}:
-            raise RuntimeError("Instância fora de um estado retomável; trava preservada.")
+            raise RuntimeError(
+                "Instância fora de um estado retomável; trava preservada."
+            )
         ec2.get_waiter("instance_running").wait(InstanceIds=[instance])
         save(False)
-        print("Instância iniciada e trava liberada. Aguarde a aplicação aquecer; ETL não é reiniciado automaticamente.")
+        print(
+            "Instância iniciada e trava liberada. Aguarde a aplicação aquecer; ETL não é reiniciado automaticamente."
+        )
     else:
         raise ValueError("Operação de emergência inválida.")
 
@@ -393,7 +437,10 @@ def wait_job(client, job, run_id, wait_seconds=None):
         now = time.monotonic()
         elapsed = int(now - started)
         if status != previous or now >= next_report:
-            print(f"Glue: {status}; execução: {run_id}; acompanhamento: {elapsed}s", flush=True)
+            print(
+                f"Glue: {status}; execução: {run_id}; acompanhamento: {elapsed}s",
+                flush=True,
+            )
             previous = status
             next_report = now + 300
         if status == "SUCCEEDED":
@@ -403,7 +450,10 @@ def wait_job(client, job, run_id, wait_seconds=None):
                 f'Glue {status}: {run.get("ErrorMessage", "Consulte CloudWatch")[:500]}'
             )
         if wait_seconds is not None and now - started >= wait_seconds:
-            print("Janela de acompanhamento encerrada; o Glue continua ativo. Nenhum job foi iniciado ou cancelado.", flush=True)
+            print(
+                "Janela de acompanhamento encerrada; o Glue continua ativo. Nenhum job foi iniciado ou cancelado.",
+                flush=True,
+            )
             return False
         remaining = wait_seconds - (now - started) if wait_seconds is not None else 15
         time.sleep(min(15, remaining))
@@ -435,9 +485,20 @@ def main():
     g.add_argument("--promote", action="store_true")
     g.add_argument("--smoke", action="store_true")
     g.add_argument("--wait", action="store_true")
-    g.add_argument("--run-id-file", type=Path, help="Arquivo novo para salvar o identificador jr_ criado pelo Glue")
-    g.add_argument("--expected-timeout-minutes", type=int, help="Confere o timeout provisionado antes de iniciar o Glue")
-    monitor = commands.add_parser("wait-glue", help="Acompanha um jr_ existente; retorna 3 se a janela terminar com o job ativo")
+    g.add_argument(
+        "--run-id-file",
+        type=Path,
+        help="Arquivo novo para salvar o identificador jr_ criado pelo Glue",
+    )
+    g.add_argument(
+        "--expected-timeout-minutes",
+        type=int,
+        help="Confere o timeout provisionado antes de iniciar o Glue",
+    )
+    monitor = commands.add_parser(
+        "wait-glue",
+        help="Acompanha um jr_ existente; retorna 3 se a janela terminar com o job ativo",
+    )
     monitor.add_argument("--job-run-id", required=True)
     monitor.add_argument("--wait-seconds", type=int, default=8100)
     u = commands.add_parser("upload-glue")
@@ -450,7 +511,9 @@ def main():
     reload.add_argument("--document")
     commands.add_parser("redis-tunnel")
     commands.add_parser("redis-password")
-    usage = commands.add_parser("usage", help="Resumo privado; exige redis-tunnel aberto em outro terminal")
+    usage = commands.add_parser(
+        "usage", help="Resumo privado; exige redis-tunnel aberto em outro terminal"
+    )
     usage.add_argument("--day", default=datetime.now(timezone.utc).strftime("%Y%m%d"))
     control = commands.add_parser("check-emergency")
     control.add_argument("--bucket", required=True)
@@ -463,7 +526,12 @@ def main():
     r.add_argument("--run-id", required=True)
     args = p.parse_args()
     if args.command == "glue" and args.resume_from_revision:
-        if args.smoke or not args.raw_id or args.resume_from_revision == args.revision or not re.fullmatch(r"[0-9a-f]{40}", args.resume_from_revision):
+        if (
+            args.smoke
+            or not args.raw_id
+            or args.resume_from_revision == args.revision
+            or not re.fullmatch(r"[0-9a-f]{40}", args.resume_from_revision)
+        ):
             p.error("resume-from-revision exige Raw, SHA completo e execução sem smoke")
     if args.command == "glue" and args.expected_timeout_minutes is not None:
         if not 1 <= args.expected_timeout_minutes < 10080:
@@ -515,22 +583,45 @@ def main():
         return
     out = outputs(args.outputs)
     if args.command == "emergency":
-        emergency_operation(s3, boto3.client("ec2", region_name=region), boto3.client("glue", region_name=region), out, args.operation)
+        emergency_operation(
+            s3,
+            boto3.client("ec2", region_name=region),
+            boto3.client("glue", region_name=region),
+            out,
+            args.operation,
+        )
     elif args.command == "usage":
         import sys
+
         sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
         from redis import Redis
         from src.services.usage import UsageStats
+
         try:
             datetime.strptime(args.day, "%Y%m%d")
         except ValueError:
             raise ValueError("Use --day AAAAMMDD em UTC.")
         if not re.fullmatch(r"[0-9]{8}", args.day):
             raise ValueError("Use --day AAAAMMDD em UTC.")
-        settings = json.loads(ssm.get_parameter(Name=out["app_settings_parameter"], WithDecryption=True)["Parameter"]["Value"])
-        with Redis(host="127.0.0.1", port=16379, username="inspector", password=settings["REDIS_INSPECT_PASSWORD"],
-                   decode_responses=True, socket_timeout=5, socket_connect_timeout=5) as redis:
-            print(json.dumps(UsageStats(redis).summary(args.day), ensure_ascii=False, indent=2))
+        settings = json.loads(
+            ssm.get_parameter(Name=out["app_settings_parameter"], WithDecryption=True)[
+                "Parameter"
+            ]["Value"]
+        )
+        with Redis(
+            host="127.0.0.1",
+            port=16379,
+            username="inspector",
+            password=settings["REDIS_INSPECT_PASSWORD"],
+            decode_responses=True,
+            socket_timeout=5,
+            socket_connect_timeout=5,
+        ) as redis:
+            print(
+                json.dumps(
+                    UsageStats(redis).summary(args.day), ensure_ascii=False, indent=2
+                )
+            )
     elif args.command == "secrets":
         values = (
             read_secret_file(args.env_file)
@@ -561,7 +652,9 @@ def main():
         print("Bundle Glue íntegro e pronto.")
     elif args.command == "glue":
         require_operations_enabled(s3, out["ops_bucket"])
-        if args.run_id_file and (args.run_id_file.exists() or not args.run_id_file.parent.is_dir()):
+        if args.run_id_file and (
+            args.run_id_file.exists() or not args.run_id_file.parent.is_dir()
+        ):
             p.error("--run-id-file exige um arquivo novo em um diretório existente")
         arguments = glue_arguments(
             args.revision,
@@ -580,7 +673,9 @@ def main():
             raise ValueError("Publique o bundle Glue completo antes de iniciar o job.")
         client = boto3.client("glue", region_name=region)
         if args.expected_timeout_minutes is not None:
-            actual_timeout = client.get_job(JobName=out["glue_job"])["Job"].get("Timeout")
+            actual_timeout = client.get_job(JobName=out["glue_job"])["Job"].get(
+                "Timeout"
+            )
             if actual_timeout != args.expected_timeout_minutes:
                 raise ValueError(
                     f"Timeout Glue atual: {actual_timeout} min; esperado: {args.expected_timeout_minutes} min. "

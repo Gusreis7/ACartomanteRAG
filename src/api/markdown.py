@@ -1,6 +1,6 @@
 """Markdown da resposta: HTML e imagens externos não são interpretados."""
-from markdown_it import MarkdownIt
 
+from markdown_it import MarkdownIt
 
 _renderer = MarkdownIt("js-default", {"html": False, "linkify": False}).disable("image")
 

@@ -475,7 +475,9 @@ def validate_mcq_rows(frame: pd.DataFrame) -> None:
         raise RuntimeError(f"Benchmark MCQ inválido:\n{preview}")
 
 
-def selected_config_ids(selection: dict[str, Any]) -> tuple[list[str], dict[str, dict[str, Any]]]:
+def selected_config_ids(
+    selection: dict[str, Any],
+) -> tuple[list[str], dict[str, dict[str, Any]]]:
     rows = selection.get("selected") or []
     if len(rows) != 10:
         raise RuntimeError(
@@ -503,7 +505,6 @@ def safe_float(value: Any, default: float = 0.0) -> float:
         return number if math.isfinite(number) else default
     except Exception:
         return default
-
 
 
 def load_prepared_query_vectors(
@@ -597,11 +598,15 @@ def format_enrichment_context(
         part_index = hit.get("part_index")
         part_count = hit.get("part_count")
         text = str(hit.get("text") or "").strip()
-        events = [str(item).strip() for item in (hit.get("events") or []) if str(item).strip()]
+        events = [
+            str(item).strip() for item in (hit.get("events") or []) if str(item).strip()
+        ]
 
         header = [f"[R{rank}]", f"Obra: {title}"]
         header.append(
-            "Tipo: resumo da obra" if document_type == "work_summary" else "Tipo: resumo de seção"
+            "Tipo: resumo da obra"
+            if document_type == "work_summary"
+            else "Tipo: resumo de seção"
         )
         if section:
             header.append(f"Seção: {section}")
@@ -687,20 +692,26 @@ def build_enrichment_context_lookup(
             alias=alias,
         )
         index_meta = indexes[alias]
-        index_manifest = read_json(storage, indexes_bucket, str(index_meta["manifest_key"]))
+        index_manifest = read_json(
+            storage, indexes_bucket, str(index_meta["manifest_key"])
+        )
         emb = index_manifest.get("embedding") or {}
         identity_pairs = {
             "model": (query_manifest.get("model"), emb.get("model")),
             "resolved_revision": (
-                query_manifest.get("resolved_revision"), emb.get("resolved_revision")
+                query_manifest.get("resolved_revision"),
+                emb.get("resolved_revision"),
             ),
             "dimension": (query_manifest.get("dimension"), emb.get("dimension")),
             "query_prompt_name": (
-                query_manifest.get("query_prompt_name"), emb.get("query_prompt_name")
+                query_manifest.get("query_prompt_name"),
+                emb.get("query_prompt_name"),
             ),
         }
         mismatches = {
-            key: values for key, values in identity_pairs.items() if values[0] != values[1]
+            key: values
+            for key, values in identity_pairs.items()
+            if values[0] != values[1]
         }
         if mismatches:
             raise RuntimeError(
@@ -761,8 +772,11 @@ def build_enrichment_context_lookup(
             "source_enrichment_manifest_sha256"
         ),
         "aliases": alias_by_config,
-        "indexes": {alias: indexes[alias] for alias in sorted(set(alias_by_config.values()))},
+        "indexes": {
+            alias: indexes[alias] for alias in sorted(set(alias_by_config.values()))
+        },
     }
+
 
 def build_frozen_contexts(
     *,
@@ -774,9 +788,7 @@ def build_frozen_contexts(
     source_retrieval_run_id: str,
     enrichment_lookup: dict[tuple[str, str], dict[str, Any]] | None = None,
 ) -> pd.DataFrame:
-    selected_query_ids = set(
-        questions_df["query_id"].astype(str).tolist()
-    )
+    selected_query_ids = set(questions_df["query_id"].astype(str).tolist())
     frame = results_df[
         results_df["query_variant"].astype(str).eq("rewritten")
         & results_df["config_id"].astype(str).isin(config_ids)
@@ -792,8 +804,7 @@ def build_frozen_contexts(
         )
 
     question_lookup = {
-        str(row.query_id): row
-        for row in questions_df.itertuples(index=False)
+        str(row.query_id): row for row in questions_df.itertuples(index=False)
     }
     rows: list[dict[str, Any]] = []
 
@@ -892,18 +903,18 @@ def build_frozen_contexts(
                 "retrieved_chunk_ids_json": json.dumps(
                     retrieved_chunk_ids, ensure_ascii=False
                 ),
-                "used_chunk_ids_json": json.dumps(
-                    used_chunk_ids, ensure_ascii=False
-                ),
+                "used_chunk_ids_json": json.dumps(used_chunk_ids, ensure_ascii=False),
                 "evidences_json": json.dumps(
                     evidences, ensure_ascii=False, default=json_default
                 ),
             }
         )
 
-    contexts = pd.DataFrame(rows).sort_values(
-        ["selection_rank", "query_id"], kind="stable"
-    ).reset_index(drop=True)
+    contexts = (
+        pd.DataFrame(rows)
+        .sort_values(["selection_rank", "query_id"], kind="stable")
+        .reset_index(drop=True)
+    )
     if len(contexts) != expected_pairs:
         raise RuntimeError(
             f"Contextos congelados: esperado={expected_pairs}; obtido={len(contexts)}."
@@ -980,9 +991,7 @@ def extract_usage(raw_message: Any, latency_ms: float) -> dict[str, Any]:
         "tokens_per_second": tokens_per_second,
         "ollama_total_duration_ns": response_meta.get("total_duration"),
         "ollama_load_duration_ns": response_meta.get("load_duration"),
-        "ollama_prompt_eval_duration_ns": response_meta.get(
-            "prompt_eval_duration"
-        ),
+        "ollama_prompt_eval_duration_ns": response_meta.get("prompt_eval_duration"),
         "ollama_eval_duration_ns": eval_duration_ns,
     }
 
@@ -990,9 +999,7 @@ def extract_usage(raw_message: Any, latency_ms: float) -> dict[str, Any]:
 def classify_selected_option(row: Any, selected_option: str | None) -> str:
     if selected_option not in OPTION_KEYS:
         return "invalid"
-    value = str(
-        getattr(row, f"option_{selected_option}_class")
-    ).strip().lower()
+    value = str(getattr(row, f"option_{selected_option}_class")).strip().lower()
     return value if value in VALID_OPTION_CLASSES else "invalid"
 
 
@@ -1277,9 +1284,7 @@ def main() -> None:
     if args.smoke:
         config_ids = config_ids[:1]
 
-    questions = pd.read_csv(
-        io.BytesIO(storage.download_bytes(bucket, SPLIT_KEY))
-    )
+    questions = pd.read_csv(io.BytesIO(storage.download_bytes(bucket, SPLIT_KEY)))
     questions = questions[questions["split"].astype(str).eq("dev")].copy()
     validate_mcq_rows(questions)
     questions = questions.sort_values("query_id", kind="stable").reset_index(drop=True)
@@ -1414,8 +1419,10 @@ def main() -> None:
             "top_k": args.enrichment_top_k if args.enrichment else 0,
             "max_chars": args.enrichment_max_chars if args.enrichment else 0,
             "default_embedder": (
-                args.enrichment_default_embedder or config.embedding.selected_model
-            ) if args.enrichment else None,
+                (args.enrichment_default_embedder or config.embedding.selected_model)
+                if args.enrichment
+                else None
+            ),
             "index_set": enrichment_metadata,
             "retrieval_uses_canonical_work_filter": False,
             "baseline_text_context_evicted": False,
@@ -1444,8 +1451,7 @@ def main() -> None:
     upload_json(storage, bucket, manifest_key, run_manifest)
 
     question_lookup = {
-        str(row.query_id): row
-        for row in questions.itertuples(index=False)
+        str(row.query_id): row for row in questions.itertuples(index=False)
     }
     context_lookup = {
         (str(row.config_id), str(row.query_id)): row
@@ -1463,9 +1469,7 @@ def main() -> None:
                 deep=True,
             )
 
-            print(
-                f"\n=== MODEL {model_number}/{len(model_names)}: {model_name} ==="
-            )
+            print(f"\n=== MODEL {model_number}/{len(model_names)}: {model_name} ===")
             print(
                 f"[model-id] esperado={meta['expected_ollama_id']} "
                 f"digest={str(meta.get('actual_digest') or '')[:24]}..."
@@ -1484,9 +1488,7 @@ def main() -> None:
                 consecutive_errors = 0
                 for config_number, config_id in enumerate(config_ids, start=1):
                     shard_id = f"{model_name}|{config_id}"
-                    shard_key = (
-                        f"{mcq_prefix}/shards/{model_slug}/{config_id}.parquet"
-                    )
+                    shard_key = f"{mcq_prefix}/shards/{model_slug}/{config_id}.parquet"
                     exists = storage.object_exists(bucket, shard_key)
                     if exists and args.resume and not args.force:
                         print(
@@ -1547,7 +1549,9 @@ def main() -> None:
                                 "repetir falha sistêmica."
                             )
 
-                        if question_number % 10 == 0 or question_number == len(questions):
+                        if question_number % 10 == 0 or question_number == len(
+                            questions
+                        ):
                             correct = sum(bool(item["is_correct"]) for item in rows)
                             invalid = sum(bool(item["is_invalid"]) for item in rows)
                             print(

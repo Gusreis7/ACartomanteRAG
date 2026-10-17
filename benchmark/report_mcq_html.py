@@ -20,26 +20,64 @@ REPORT_KEY_NAME = "mcq_dashboard.html"
 OPTION_KEYS = ("A", "B", "C", "D", "E")
 
 RESULT_COLUMNS = [
-    "query_id", "config_id", "selection_rank", "consensus_score", "context_id",
-    "model", "canonical_work", "difficulty", "query_type", "query", "answer_text",
-    "selected_option", "selected_class", "correct_option", "is_correct", "is_ambiguous",
-    "is_wrong", "is_invalid", "generation_latency_ms", "input_tokens", "output_tokens",
-    "total_tokens", "tokens_per_second", "generation_attempts", "context_chars",
-    "used_evidence_count", "generation_error_type", "generation_error_message",
-    "structured_parsing_error", "actual_digest", "expected_ollama_id",
+    "query_id",
+    "config_id",
+    "selection_rank",
+    "consensus_score",
+    "context_id",
+    "model",
+    "canonical_work",
+    "difficulty",
+    "query_type",
+    "query",
+    "answer_text",
+    "selected_option",
+    "selected_class",
+    "correct_option",
+    "is_correct",
+    "is_ambiguous",
+    "is_wrong",
+    "is_invalid",
+    "generation_latency_ms",
+    "input_tokens",
+    "output_tokens",
+    "total_tokens",
+    "tokens_per_second",
+    "generation_attempts",
+    "context_chars",
+    "used_evidence_count",
+    "generation_error_type",
+    "generation_error_message",
+    "structured_parsing_error",
+    "actual_digest",
+    "expected_ollama_id",
 ]
 
 QUESTION_COLUMNS = [
-    "query_id", "canonical_work", "query_type", "difficulty", "query_rewritten",
-    "correct_option", "gold_answer", "mcq_answer",
-] + [item for option in OPTION_KEYS for item in (f"option_{option}", f"option_{option}_class")]
+    "query_id",
+    "canonical_work",
+    "query_type",
+    "difficulty",
+    "query_rewritten",
+    "correct_option",
+    "gold_answer",
+    "mcq_answer",
+] + [
+    item
+    for option in OPTION_KEYS
+    for item in (f"option_{option}", f"option_{option}_class")
+]
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Gera dashboard HTML self-contained para um run MCQ do ACartomante."
     )
-    parser.add_argument("--run-id", required=True, help="Run principal, normalmente o DEV. Ex.: mcq_dev_20261001T212056Z")
+    parser.add_argument(
+        "--run-id",
+        required=True,
+        help="Run principal, normalmente o DEV. Ex.: mcq_dev_20261001T212056Z",
+    )
     parser.add_argument(
         "--holdout-run-id",
         default=None,
@@ -54,7 +92,9 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="HTML local. Padrão: reports/mcq_<run-id>.html",
     )
-    parser.add_argument("--no-upload", action="store_true", help="Não envia o HTML ao RustFS.")
+    parser.add_argument(
+        "--no-upload", action="store_true", help="Não envia o HTML ao RustFS."
+    )
     parser.add_argument("--open", action="store_true", dest="open_browser")
     return parser.parse_args()
 
@@ -115,7 +155,9 @@ def config_label(row: dict[str, Any]) -> str:
     return " · ".join(parts) if parts else str(row.get("config_id") or "config")
 
 
-def build_config_rows(selection: dict[str, Any], results: pd.DataFrame) -> list[dict[str, Any]]:
+def build_config_rows(
+    selection: dict[str, Any], results: pd.DataFrame
+) -> list[dict[str, Any]]:
     selected = selection.get("selected") or []
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -133,13 +175,22 @@ def build_config_rows(selection: dict[str, Any], results: pd.DataFrame) -> list[
         if config_id in seen:
             continue
         rank_values = pd.to_numeric(
-            results.loc[results["config_id"].astype(str).eq(config_id), "selection_rank"],
+            results.loc[
+                results["config_id"].astype(str).eq(config_id), "selection_rank"
+            ],
             errors="coerce",
         ).dropna()
         rank = int(rank_values.iloc[0]) if len(rank_values) else len(rows) + 1
-        rows.append({"config_id": config_id, "selection_rank": rank, "label": config_id})
+        rows.append(
+            {"config_id": config_id, "selection_rank": rank, "label": config_id}
+        )
 
-    rows.sort(key=lambda row: (int(row.get("selection_rank") or 999), str(row.get("config_id"))))
+    rows.sort(
+        key=lambda row: (
+            int(row.get("selection_rank") or 999),
+            str(row.get("config_id")),
+        )
+    )
     return rows
 
 
@@ -185,8 +236,10 @@ def render_html(
     meta = {
         "run_id": run_id,
         "split": run_config.get("split") or run_manifest.get("split"),
-        "source_retrieval_run_id": run_config.get("source_retrieval_run_id") or run_manifest.get("source_retrieval_run_id"),
-        "benchmark_sha256": run_config.get("benchmark_sha256") or run_manifest.get("benchmark_sha256"),
+        "source_retrieval_run_id": run_config.get("source_retrieval_run_id")
+        or run_manifest.get("source_retrieval_run_id"),
+        "benchmark_sha256": run_config.get("benchmark_sha256")
+        or run_manifest.get("benchmark_sha256"),
         "prompt_version": (run_config.get("prompt") or {}).get("version"),
         "generation_overrides": run_config.get("generation_overrides") or {},
         "models": model_order,
@@ -194,7 +247,7 @@ def render_html(
         "overall": overall_payload(results),
     }
 
-    html = r'''<!doctype html>
+    html = r"""<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8" />
@@ -315,7 +368,7 @@ function renderModelContents(model,index){const panel=modelPanelIndex(index),sta
 function answerCard(r){const q=qmap.get(String(r.query_id))||{};return `<article class="answer-card"><div class="answer-head"><div><b>${esc(q.canonical_work||r.canonical_work)}</b> · ${esc(r.difficulty)} · ${esc(r.query_type)}<div class="muted">${esc(configLabel(r.config_id))} · <span class="mono">${esc(r.query_id)}</span></div></div><span class="badge ${esc(r.selected_class)}">${esc(clsLabel(r.selected_class))}</span></div><div class="answer-body"><div class="question-text">${esc(q.query_rewritten||r.query)}</div><div class="compact-options">${['A','B','C','D','E'].map(o=>`<div class="compact-option ${r.selected_option===o?'sel':''} ${q[`option_${o}_class`]==='correct'?'ok':''}"><b>${o}</b> ${esc(q[`option_${o}`]||'')} ${r.selected_option===o?'<div><b>← escolhida</b></div>':''}${q[`option_${o}_class`]==='correct'?'<div>✓ gabarito</div>':''}</div>`).join('')}</div><div class="answer"><b>Resposta salva:</b> ${esc(r.answer_text||'(vazia)')}</div><div class="meta-line">escolhida ${esc(r.selected_option||'—')} · gabarito ${esc(r.correct_option||q.correct_option||'—')} · ${ms(r.generation_latency_ms)} · ${Number(r.input_tokens||0)} in / ${Number(r.output_tokens||0)} out · ${Number(r.tokens_per_second||0).toFixed(1)} tok/s · contexto ${Number(r.context_chars||0).toLocaleString('pt-BR')} chars / ${Number(r.used_evidence_count||0)} evidências · tentativas ${Number(r.generation_attempts||0)}</div>${r.generation_error_message?`<div class="note" style="margin-top:9px"><b>${esc(r.generation_error_type||'erro')}</b>: ${esc(r.generation_error_message)}</div>`:''}</div></article>`}
 function init(){setupTabs();const uniqueQuestions=[...new Map(QUESTIONS.map(q=>[String(q.query_id),q])).values()];const counts=Object.fromEntries(difficultyOrder.map(d=>[d,uniqueQuestions.filter(q=>q.difficulty===d).length]));$('#subtitle').textContent=`run ${META.run_id} · split=${META.split} · ${META.overall.generations.toLocaleString('pt-BR')} gerações · retrieval ${META.source_retrieval_run_id}`;$('#datasetPill').textContent=`dataset: ${uniqueQuestions.length} questões · ${counts.easy||0} easy · ${counts.medium||0} medium · ${counts.hard||0} hard`;$('#protocolPill').textContent=`${META.models.length} modelos × ${CONFIGS.length} retrievals`;renderGeneral();}
 init();
-</script></body></html>'''
+</script></body></html>"""
     return (
         html.replace("__META__", safe_json(meta))
         .replace("__ROWS__", safe_json(result_rows))
@@ -324,13 +377,18 @@ init();
     )
 
 
-
 def _classification_metrics(frame: pd.DataFrame) -> dict[str, float | int]:
     if frame.empty:
         return {
-            "n": 0, "accuracy": 0.0, "weighted_accuracy": 0.0,
-            "precision": 0.0, "recall": 0.0, "ambiguous": 0.0,
-            "wrong": 0.0, "invalid": 0.0, "latency_p95_ms": 0.0,
+            "n": 0,
+            "accuracy": 0.0,
+            "weighted_accuracy": 0.0,
+            "precision": 0.0,
+            "recall": 0.0,
+            "ambiguous": 0.0,
+            "wrong": 0.0,
+            "invalid": 0.0,
+            "latency_p95_ms": 0.0,
         }
 
     def rate(column: str) -> float:
@@ -401,14 +459,18 @@ def load_mcq_run(storage: RustFSManager, bucket: str, run_id: str) -> dict[str, 
     run_manifest = read_json(storage, bucket, manifest_key)
     run_config = read_json(storage, bucket, config_key)
     if str(run_manifest.get("status")) != "success":
-        raise RuntimeError(f"Run MCQ {run_id} não está com status=success: {run_manifest.get('status')}")
+        raise RuntimeError(
+            f"Run MCQ {run_id} não está com status=success: {run_manifest.get('status')}"
+        )
     if str(run_config.get("phase")) != "mcq":
         raise RuntimeError(f"{run_id}: config.json não pertence à fase MCQ.")
 
     results = read_parquet(storage, bucket, results_key)
     missing = sorted(set(RESULT_COLUMNS[:18]) - set(results.columns))
     if missing:
-        raise RuntimeError(f"{run_id}: results.parquet sem colunas obrigatórias: {missing}")
+        raise RuntimeError(
+            f"{run_id}: results.parquet sem colunas obrigatórias: {missing}"
+        )
 
     split = str(run_config.get("split") or run_manifest.get("split") or "").strip()
     questions = pd.read_csv(io.BytesIO(storage.download_bytes(bucket, SPLIT_KEY)))
@@ -417,12 +479,28 @@ def load_mcq_run(storage: RustFSManager, bucket: str, run_id: str) -> dict[str, 
     if "split" in questions.columns and split:
         questions = questions[questions["split"].astype(str).eq(split)].copy()
     if questions["query_id"].astype(str).duplicated().any():
-        raise RuntimeError(f"{run_id}: benchmark_with_split.csv contém query_id duplicado no escopo do report.")
+        raise RuntimeError(
+            f"{run_id}: benchmark_with_split.csv contém query_id duplicado no escopo do report."
+        )
 
-    source_retrieval = str(run_config.get("source_retrieval_run_id") or run_manifest.get("source_retrieval_run_id") or "")
-    selection_source = str(run_config.get("selection_run_id") or run_manifest.get("selection_run_id") or source_retrieval)
-    selection_key = f"{BENCHMARK_PREFIX}/runs/{selection_source}/retrieval/final_selection_10.json"
-    selection = read_json(storage, bucket, selection_key) if storage.object_exists(bucket, selection_key) else {"selected": []}
+    source_retrieval = str(
+        run_config.get("source_retrieval_run_id")
+        or run_manifest.get("source_retrieval_run_id")
+        or ""
+    )
+    selection_source = str(
+        run_config.get("selection_run_id")
+        or run_manifest.get("selection_run_id")
+        or source_retrieval
+    )
+    selection_key = (
+        f"{BENCHMARK_PREFIX}/runs/{selection_source}/retrieval/final_selection_10.json"
+    )
+    selection = (
+        read_json(storage, bucket, selection_key)
+        if storage.object_exists(bucket, selection_key)
+        else {"selected": []}
+    )
     configs = build_config_rows(selection, results)
 
     html = render_html(
@@ -434,10 +512,17 @@ def load_mcq_run(storage: RustFSManager, bucket: str, run_id: str) -> dict[str, 
         configs=configs,
     )
     return {
-        "run_id": run_id, "run_prefix": run_prefix, "manifest": run_manifest,
-        "config": run_config, "split": split, "results": results,
-        "questions": questions, "configs": configs, "html": html,
-        "benchmark_sha256": run_config.get("benchmark_sha256") or run_manifest.get("benchmark_sha256"),
+        "run_id": run_id,
+        "run_prefix": run_prefix,
+        "manifest": run_manifest,
+        "config": run_config,
+        "split": split,
+        "results": results,
+        "questions": questions,
+        "configs": configs,
+        "html": html,
+        "benchmark_sha256": run_config.get("benchmark_sha256")
+        or run_manifest.get("benchmark_sha256"),
         "models": sorted(results["model"].astype(str).unique().tolist()),
         "config_ids": sorted(results["config_id"].astype(str).unique().tolist()),
     }
@@ -445,36 +530,57 @@ def load_mcq_run(storage: RustFSManager, bucket: str, run_id: str) -> dict[str, 
 
 def _validate_pair(dev: dict[str, Any], holdout: dict[str, Any]) -> None:
     if dev["split"] != "dev":
-        raise RuntimeError(f"--run-id deve apontar para DEV quando --holdout-run-id é usado; split={dev['split']}")
+        raise RuntimeError(
+            f"--run-id deve apontar para DEV quando --holdout-run-id é usado; split={dev['split']}"
+        )
     if holdout["split"] != "holdout":
-        raise RuntimeError(f"--holdout-run-id deve apontar para HOLDOUT; split={holdout['split']}")
+        raise RuntimeError(
+            f"--holdout-run-id deve apontar para HOLDOUT; split={holdout['split']}"
+        )
     if dev.get("benchmark_sha256") != holdout.get("benchmark_sha256"):
         raise RuntimeError("DEV e HOLDOUT usam benchmark_sha256 diferentes.")
     if set(dev["models"]) != set(holdout["models"]):
         raise RuntimeError("DEV e HOLDOUT não possuem o mesmo conjunto de modelos.")
     if set(dev["config_ids"]) != set(holdout["config_ids"]):
-        raise RuntimeError("DEV e HOLDOUT não possuem exatamente as mesmas configs de retrieval.")
+        raise RuntimeError(
+            "DEV e HOLDOUT não possuem exatamente as mesmas configs de retrieval."
+        )
 
 
-def _comparison_payload(dev: dict[str, Any], holdout: dict[str, Any] | None) -> dict[str, Any]:
+def _comparison_payload(
+    dev: dict[str, Any], holdout: dict[str, Any] | None
+) -> dict[str, Any]:
     def split_payload(bundle: dict[str, Any]) -> dict[str, Any]:
         overall = _classification_metrics(bundle["results"])
         model_rows = [
             {"model": str(model), **_classification_metrics(group)}
             for model, group in bundle["results"].groupby("model", sort=False)
         ]
-        labels = {str(item["config_id"]): str(item.get("label") or item["config_id"]) for item in bundle["configs"]}
+        labels = {
+            str(item["config_id"]): str(item.get("label") or item["config_id"])
+            for item in bundle["configs"]
+        }
         config_rows = [
-            {"config_id": str(config_id), "label": labels.get(str(config_id), str(config_id)), **_classification_metrics(group)}
+            {
+                "config_id": str(config_id),
+                "label": labels.get(str(config_id), str(config_id)),
+                **_classification_metrics(group),
+            }
             for config_id, group in bundle["results"].groupby("config_id", sort=False)
         ]
         return {
-            "run_id": bundle["run_id"], "split": bundle["split"], "overall": overall,
+            "run_id": bundle["run_id"],
+            "split": bundle["split"],
+            "overall": overall,
             "question_counts": _question_counts(bundle["questions"]),
-            "models": model_rows, "configs": config_rows,
+            "models": model_rows,
+            "configs": config_rows,
         }
 
-    return {"dev": split_payload(dev), "holdout": split_payload(holdout) if holdout is not None else None}
+    return {
+        "dev": split_payload(dev),
+        "holdout": split_payload(holdout) if holdout is not None else None,
+    }
 
 
 def render_dual_html(*, dev: dict[str, Any], holdout: dict[str, Any] | None) -> str:
@@ -482,9 +588,13 @@ def render_dual_html(*, dev: dict[str, Any], holdout: dict[str, Any] | None) -> 
 
     comparison = _comparison_payload(dev, holdout)
     dev_b64 = base64.b64encode(dev["html"].encode("utf-8")).decode("ascii")
-    holdout_b64 = base64.b64encode(holdout["html"].encode("utf-8")).decode("ascii") if holdout is not None else ""
+    holdout_b64 = (
+        base64.b64encode(holdout["html"].encode("utf-8")).decode("ascii")
+        if holdout is not None
+        else ""
+    )
 
-    template = r'''<!doctype html>
+    template = r"""<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>ACartomante · MCQ DEV × HOLDOUT</title>
 <style>
@@ -501,8 +611,13 @@ function stackedOutcomeChart(id,d,hout){const svg=chartSvg(id,900,260),w=900,l=1
 function horizontalPctChart(id,rows,valueKey){const h=Math.max(320,rows.length*34+45),svg=chartSvg(id,900,h),w=900,l=315,r=25,t=18,b=25,iw=w-l-r,gap=(h-t-b)/rows.length,bh=Math.min(10,gap*.32);for(let i=0;i<=4;i++){const x=l+iw*i/4;svg.appendChild(svgEl('line',{x1:x,y1:t,x2:x,y2:h-b,class:'gridline'}));svgText(svg,x,h-5,pct(i/4));}rows.forEach((row,i)=>{const cy=t+gap*(i+.5),label=String(row.label).length>43?String(row.label).slice(0,40)+'…':String(row.label);svgText(svg,l-10,cy+4,label,'end');[['dev','bar-dev',-bh*.7,'DEV'],['holdout','bar-holdout',bh*.7,'HOLDOUT']].forEach(([side,cls,off,sideLabel])=>{const v=Number(row[side]?.[valueKey]||0),rect=svgEl('rect',{x:l,y:cy+off-bh/2,width:iw*v,height:bh,rx:3,class:cls});const title=svgEl('title');title.textContent=`${row.label} · ${sideLabel}: ${pct(v)}`;rect.appendChild(title);svg.appendChild(rect);});});}
 function renderGeneral(){if(!hasHoldout){$('generalContent').innerHTML='<div class="card empty">O comparativo GERAL é habilitado quando um run HOLDOUT é informado.</div>';return}const d=DATA.dev,h=DATA.holdout,dm=modelMap(d.models),hm=modelMap(h.models),dc=configMap(d.configs),hc=configMap(h.configs),modelChart=[...dm.keys()].map(k=>({label:k,dev:dm.get(k),holdout:hm.get(k)})),configChart=[...dc.keys()].map(k=>({label:dc.get(k).label,dev:dc.get(k),holdout:hc.get(k)})).filter(x=>x.holdout);$('generalContent').innerHTML=`<div class="grid"><div class="card span-6"><h2>DEV</h2><div class="sub">${d.question_counts.total} questões · ${d.question_counts.easy} easy · ${d.question_counts.medium} medium · ${d.question_counts.hard} hard</div><div class="kpis"><div class="kpi"><div class="v">${pct(d.overall.accuracy)}</div><div class="l">Accuracy</div></div><div class="kpi"><div class="v">${pct(d.overall.weighted_accuracy)}</div><div class="l">Acc. ponderada</div></div><div class="kpi"><div class="v">${pct(d.overall.precision)}</div><div class="l">Precisão</div></div><div class="kpi"><div class="v">${pct(d.overall.recall)}</div><div class="l">Recall</div></div></div></div><div class="card span-6"><h2>HOLDOUT</h2><div class="sub">${h.question_counts.total} questões · ${h.question_counts.easy} easy · ${h.question_counts.medium} medium · ${h.question_counts.hard} hard</div><div class="kpis"><div class="kpi"><div class="v">${pct(h.overall.accuracy)}</div><div class="l">Accuracy</div></div><div class="kpi"><div class="v">${pct(h.overall.weighted_accuracy)}</div><div class="l">Acc. ponderada</div></div><div class="kpi"><div class="v">${pct(h.overall.precision)}</div><div class="l">Precisão</div></div><div class="kpi"><div class="v">${pct(h.overall.recall)}</div><div class="l">Recall</div></div></div></div><div class="card span-6"><h2>Accuracy por modelo</h2><div class="sub">Comparação direta dos mesmos quatro geradores no DEV e HOLDOUT.</div><div class="chart" id="modelAccuracyChart"></div><div class="chart-legend"><span>DEV</span><span class="holdout">HOLDOUT</span></div></div><div class="card span-6"><h2>Distribuição das respostas</h2><div class="sub">Corretas, ambíguas, erradas e inválidas em cada split.</div><div class="chart" id="outcomeChart"></div><div class="chart-legend"><span class="correct">correta</span><span class="ambiguous">ambígua</span><span class="wrong">errada</span><span class="invalid">inválida</span></div></div><div class="card span-12"><h2>Retrievals · accuracy ponderada DEV × HOLDOUT</h2><div class="sub">Cada barra agrega os quatro LLMs; facilita ver estabilidade downstream das 10 configurações congeladas.</div><div class="chart" id="retrievalWeightedChart" style="height:390px"></div><div class="chart-legend"><span>DEV</span><span class="holdout">HOLDOUT</span></div></div><div class="card span-12"><h2>Modelos · DEV × HOLDOUT</h2><div class="sub">Mesmos geradores e mesmas 10 configurações; delta = HOLDOUT − DEV.</div><div class="table-wrap"><table><thead><tr><th>Modelo</th><th>DEV Acc.</th><th>HOLDOUT Acc.</th><th>Δ Acc.</th><th>DEV pond.</th><th>HOLDOUT pond.</th><th>Δ pond.</th><th>DEV Prec.</th><th>HOLDOUT Prec.</th><th>DEV Recall</th><th>HOLDOUT Recall</th></tr></thead><tbody>${[...dm.keys()].map(k=>{const a=dm.get(k),b=hm.get(k),da=delta(a.accuracy,b.accuracy),dw=delta(a.weighted_accuracy,b.weighted_accuracy);return `<tr><td><b>${esc(k)}</b></td><td>${pct(a.accuracy)}</td><td>${pct(b.accuracy)}</td><td class="${dclass(da)}">${dPct(da)}</td><td>${pct(a.weighted_accuracy)}</td><td>${pct(b.weighted_accuracy)}</td><td class="${dclass(dw)}">${dPct(dw)}</td><td>${pct(a.precision)}</td><td>${pct(b.precision)}</td><td>${pct(a.recall)}</td><td>${pct(b.recall)}</td></tr>`}).join('')}</tbody></table></div></div><div class="card span-12"><h2>Retrievals · impacto downstream</h2><div class="sub">Cada linha agrega os quatro LLMs. Comparação de estabilidade; não há nova seleção no HOLDOUT.</div><div class="table-wrap"><table><thead><tr><th>Configuração</th><th>DEV Acc.</th><th>HOLDOUT Acc.</th><th>Δ Acc.</th><th>DEV pond.</th><th>HOLDOUT pond.</th><th>Δ pond.</th></tr></thead><tbody>${[...dc.keys()].map(k=>{const a=dc.get(k),b=hc.get(k);if(!b)return '';const da=delta(a.accuracy,b.accuracy),dw=delta(a.weighted_accuracy,b.weighted_accuracy);return `<tr><td>${esc(a.label)}</td><td>${pct(a.accuracy)}</td><td>${pct(b.accuracy)}</td><td class="${dclass(da)}">${dPct(da)}</td><td>${pct(a.weighted_accuracy)}</td><td>${pct(b.weighted_accuracy)}</td><td class="${dclass(dw)}">${dPct(dw)}</td></tr>`}).join('')}</tbody></table></div></div></div>`;groupedPctChart('modelAccuracyChart',modelChart,'accuracy');stackedOutcomeChart('outcomeChart',d.overall,h.overall);horizontalPctChart('retrievalWeightedChart',configChart,'weighted_accuracy');}
 $('btn-dev').onclick=()=>setView('dev');$('btn-holdout').onclick=()=>hasHoldout&&setView('holdout');$('btn-general').onclick=()=>hasHoldout&&setView('general');$('btn-holdout').disabled=!hasHoldout;$('btn-general').disabled=!hasHoldout;$('headerMeta').textContent=hasHoldout?`${DATA.dev.run_id} × ${DATA.holdout.run_id}`:`${DATA.dev.run_id} · HOLDOUT ainda não informado`;renderGeneral();setView(hasHoldout?'general':'dev');
-</script></body></html>'''
-    return template.replace("__COMPARISON__", safe_json(comparison)).replace("__DEV_B64__", dev_b64).replace("__HOLDOUT_B64__", holdout_b64)
+</script></body></html>"""
+    return (
+        template.replace("__COMPARISON__", safe_json(comparison))
+        .replace("__DEV_B64__", dev_b64)
+        .replace("__HOLDOUT_B64__", holdout_b64)
+    )
+
 
 def main() -> None:
     args = parse_args()
@@ -528,7 +643,12 @@ def main() -> None:
 
     if not args.no_upload:
         report_key = f"{dev['run_prefix']}/reports/{REPORT_KEY_NAME}"
-        storage.upload_bytes(bucket=bucket, key=report_key, data=html.encode("utf-8"), content_type="text/html; charset=utf-8")
+        storage.upload_bytes(
+            bucket=bucket,
+            key=report_key,
+            data=html.encode("utf-8"),
+            content_type="text/html; charset=utf-8",
+        )
         print(f"rustfs: s3://{bucket}/{report_key}")
 
     print("=== MCQ DASHBOARD OK ===")

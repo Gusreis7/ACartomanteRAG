@@ -61,11 +61,11 @@ def status(row: pd.Series, suffix: str) -> str:
     return "invalid"
 
 
-def bootstrap_query_delta(paired: pd.DataFrame, *, runs: int, seed: int) -> dict[str, float]:
+def bootstrap_query_delta(
+    paired: pd.DataFrame, *, runs: int, seed: int
+) -> dict[str, float]:
     per_query = (
-        paired.groupby("query_id", sort=False)["accuracy_delta"]
-        .mean()
-        .astype(float)
+        paired.groupby("query_id", sort=False)["accuracy_delta"].mean().astype(float)
     )
     observed = float(per_query.mean()) if len(per_query) else 0.0
     if runs <= 0 or len(per_query) <= 1:
@@ -110,7 +110,9 @@ def aggregate(paired: pd.DataFrame, scope: str, **keys: Any) -> dict[str, Any]:
             pd.to_numeric(paired.get("input_tokens_enriched"), errors="coerce").mean()
         ),
         "enrichment_context_chars_mean": float(
-            pd.to_numeric(paired.get("enrichment_context_chars_enriched"), errors="coerce").mean()
+            pd.to_numeric(
+                paired.get("enrichment_context_chars_enriched"), errors="coerce"
+            ).mean()
         ),
     }
 
@@ -124,18 +126,16 @@ def main() -> None:
     storage = RustFSManager.from_config(config.environment.rustfs)
     bucket = config.storage.benchmarks_bucket
 
-    base_cfg, base_manifest, baseline = load_run(
-        storage, bucket, args.baseline_run_id
-    )
-    enr_cfg, enr_manifest, enriched = load_run(
-        storage, bucket, args.enriched_run_id
-    )
+    base_cfg, base_manifest, baseline = load_run(storage, bucket, args.baseline_run_id)
+    enr_cfg, enr_manifest, enriched = load_run(storage, bucket, args.enriched_run_id)
 
     if bool((base_cfg.get("enrichment") or {}).get("enabled", False)):
         raise RuntimeError("O run baseline informado já possui enrichment.")
     if not bool((enr_cfg.get("enrichment") or {}).get("enabled", False)):
         raise RuntimeError("O run enriched informado não possui enrichment.")
-    if base_cfg.get("source_retrieval_run_id") != enr_cfg.get("source_retrieval_run_id"):
+    if base_cfg.get("source_retrieval_run_id") != enr_cfg.get(
+        "source_retrieval_run_id"
+    ):
         raise RuntimeError("Runs usam source_retrieval_run_id diferentes.")
     if base_cfg.get("benchmark_sha256") != enr_cfg.get("benchmark_sha256"):
         raise RuntimeError("Runs usam benchmark_sha256 diferentes.")
@@ -161,10 +161,9 @@ def main() -> None:
             f"baseline={len(baseline)} enriched={len(enriched)} paired={len(paired)}"
         )
 
-    paired["accuracy_delta"] = (
-        paired["is_correct_enriched"].astype(int)
-        - paired["is_correct_baseline"].astype(int)
-    )
+    paired["accuracy_delta"] = paired["is_correct_enriched"].astype(int) - paired[
+        "is_correct_baseline"
+    ].astype(int)
     paired["transition"] = paired.apply(
         lambda row: f"{str(row['selected_class_baseline'])}->{str(row['selected_class_enriched'])}",
         axis=1,
@@ -224,7 +223,10 @@ def main() -> None:
 
     summary = pd.DataFrame(rows)
     transitions = (
-        paired["transition"].value_counts().rename_axis("transition").reset_index(name="n")
+        paired["transition"]
+        .value_counts()
+        .rename_axis("transition")
+        .reset_index(name="n")
     )
     overall = summary[summary["scope"].eq("overall")].iloc[0].to_dict()
 
@@ -248,14 +250,20 @@ def main() -> None:
         f"compare_{args.baseline_run_id}__{args.enriched_run_id}.json"
     )
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    output.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
+    )
 
     if not args.no_upload:
-        prefix = f"{BENCHMARK_PREFIX}/runs/{args.enriched_run_id}/mcq/enrichment_comparison"
+        prefix = (
+            f"{BENCHMARK_PREFIX}/runs/{args.enriched_run_id}/mcq/enrichment_comparison"
+        )
         storage.upload_bytes(
             bucket,
             f"{prefix}/comparison.json",
-            json.dumps(payload, ensure_ascii=False, indent=2, default=str).encode("utf-8"),
+            json.dumps(payload, ensure_ascii=False, indent=2, default=str).encode(
+                "utf-8"
+            ),
             content_type="application/json",
         )
         storage.upload_bytes(

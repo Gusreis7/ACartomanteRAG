@@ -16,7 +16,6 @@ from src.services.usage import UsageStats
 from src.storage.redis_chat_repository import RedisChatRepository
 from src.storage.redis_message_repository import RedisMessageRepository
 
-
 logger = logging.getLogger("acartomante.runtime")
 
 
@@ -42,9 +41,7 @@ async def lifespan(app: FastAPI):
         with RedisSaver.from_conn_string(redis_url) as checkpointer:
             checkpointer.setup()
 
-            generation_provider = create_generation_provider(
-                config.generation
-            )
+            generation_provider = create_generation_provider(config.generation)
 
             rag = MachadoRAG(
                 config,

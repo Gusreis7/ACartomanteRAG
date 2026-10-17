@@ -22,7 +22,7 @@ RASPI_COMPOSE = $(COMPOSE) -f "$(PROJECT_ROOT)/docker-compose.yml" -f "$(PROJECT
 .PHONY: help local local-up local-check local-url local-ready local-logs local-status \
         local-restart local-stop local-down raspi raspi-check raspi-config raspi-up \
         raspi-logs raspi-status raspi-stop raspi-down aws aws-deploy aws-status \
-        aws-watch aws-logs aws-plan aws-apply aws-stop aws-resume deps test check \
+        aws-watch aws-logs aws-plan aws-apply aws-stop aws-resume deps hooks format format-check test check \
         _docker _env _gh _run _raspi-runtime
 
 help: ## Lista os atalhos disponíveis.
@@ -123,6 +123,18 @@ aws-resume: _gh ## Retoma EC2 e libera operações; não reinicia ETL automatica
 
 deps: ## Instala o perfil do pyproject no Python escolhido; PROFILE=ci por padrão.
 	@$(PYTHON) scripts/dependencies.py install "$(PROFILE)"
+
+hooks: ## Instala Black e o hook de commit neste clone; consulte docs/FORMATACAO.md.
+	@$(PYTHON) scripts/dependencies.py install format
+	@$(PYTHON) -m pre_commit install --install-hooks
+
+format: ## Formata todo o Python e os arquivos Terraform versionados.
+	@$(PYTHON) -m black .
+	@git ls-files -z -- '*.tf' '*.tfvars' '*.tftest.hcl' | xargs -0 -r bash scripts/format_terraform.sh
+
+format-check: ## Confere a formatação geral sem escrever; pode apontar código legado.
+	@$(PYTHON) -m black --check .
+	@git ls-files -z -- '*.tf' '*.tfvars' '*.tftest.hcl' | xargs -0 -r bash scripts/format_terraform.sh --check
 
 test: ## Executa os testes no Python escolhido, sem instalar dependências.
 	@$(PYTHON) -m pytest -q

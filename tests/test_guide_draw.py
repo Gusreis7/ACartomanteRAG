@@ -1,4 +1,5 @@
 """Tiragem e persona por conversa, com Redis em memória e sem inferência."""
+
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 from types import SimpleNamespace
@@ -32,8 +33,13 @@ def web(monkeypatch):
         session = UUID(client.cookies.get(SESSION_COOKIE))
         chat_id = UUID(conversation["chat_id"])
         yield SimpleNamespace(
-            client=client, app=app, redis=redis, repository=repository,
-            session=session, chat_id=chat_id, conversation=conversation,
+            client=client,
+            app=app,
+            redis=redis,
+            repository=repository,
+            session=session,
+            chat_id=chat_id,
+            conversation=conversation,
             path=f"/api/v1/conversations/{chat_id}/guide",
             key=repository._chat_key(session_id=session, chat_id=chat_id),
         )
@@ -41,25 +47,34 @@ def web(monkeypatch):
 
 def test_new_chat_hides_deck_until_choice_and_does_not_call_generation(web):
     assert web.client.get(web.path).json() == {
-        "draw_required": True, "persona": "neutral",
-        "drawn_guide": None, "selected_card": None,
+        "draw_required": True,
+        "persona": "neutral",
+        "drawn_guide": None,
+        "selected_card": None,
     }
     assert "guide_first" not in web.conversation
     assert "guide_first" not in web.client.get("/api/v1/conversations").text
     assert web.app.state.chat_service.mock_calls == []
 
 
-@pytest.mark.parametrize("first,card,expected", [
-    ("cosmo", 0, "cosmo"), ("cosmo", 1, "damiao"),
-    ("damiao", 0, "damiao"), ("damiao", 1, "cosmo"),
-])
+@pytest.mark.parametrize(
+    "first,card,expected",
+    [
+        ("cosmo", 0, "cosmo"),
+        ("cosmo", 1, "damiao"),
+        ("damiao", 0, "damiao"),
+        ("damiao", 1, "cosmo"),
+    ],
+)
 def test_either_position_can_reveal_either_guide(web, first, card, expected):
     web.redis.hset(web.key, "guide_first", first)
     response = web.client.post(web.path + "/draw", json={"card": card})
     assert response.status_code == 200
     assert response.json() == {
-        "draw_required": False, "persona": expected,
-        "drawn_guide": expected, "selected_card": card,
+        "draw_required": False,
+        "persona": expected,
+        "drawn_guide": expected,
+        "selected_card": card,
     }
     assert web.client.get(web.path).json() == response.json()
     assert web.app.state.chat_service.mock_calls == []
@@ -77,7 +92,9 @@ def test_each_new_chat_receives_its_own_draw(web, monkeypatch):
     other = web.client.post("/api/v1/conversations", json={}).json()
     path = f'/api/v1/conversations/{other["chat_id"]}/guide'
     assert web.client.get(path).json()["draw_required"] is True
-    assert web.client.post(path + "/draw", json={"card": 0}).json()["persona"] == "damiao"
+    assert (
+        web.client.post(path + "/draw", json={"card": 0}).json()["persona"] == "damiao"
+    )
     assert web.client.get(web.path).json()["persona"] == "cosmo"
 
 
@@ -88,14 +105,19 @@ def test_persona_changes_persist_without_replacing_original_card(web):
         assert response.status_code == 200
         assert response.json() == {**original, "persona": persona}
         assert web.client.get(web.path).json() == response.json()
-        assert web.client.post(web.path + "/draw", json={"card": 1}).json() == response.json()
+        assert (
+            web.client.post(web.path + "/draw", json={"card": 1}).json()
+            == response.json()
+        )
 
 
 def test_skipping_draw_keeps_neutral_on_reload(web):
     state = web.client.patch(web.path, json={"persona": "neutral"}).json()
     assert state == {
-        "draw_required": False, "persona": "neutral",
-        "drawn_guide": None, "selected_card": None,
+        "draw_required": False,
+        "persona": "neutral",
+        "drawn_guide": None,
+        "selected_card": None,
     }
     assert web.client.get(web.path).json() == state
     assert web.client.post(web.path + "/draw", json={"card": 0}).json() == state
@@ -129,20 +151,34 @@ def test_legacy_chat_opens_without_forcing_another_draw(web):
     web.redis.hdel(web.key, "guide_pending", "guide_first", "persona")
     state = web.client.get(web.path).json()
     assert state == {
-        "draw_required": False, "persona": "neutral",
-        "drawn_guide": None, "selected_card": None,
+        "draw_required": False,
+        "persona": "neutral",
+        "drawn_guide": None,
+        "selected_card": None,
     }
     assert web.client.post(web.path + "/draw", json={"card": 0}).json() == state
-    assert web.client.patch(web.path, json={"persona": "cosmo"}).json()["persona"] == "cosmo"
+    assert (
+        web.client.patch(web.path, json={"persona": "cosmo"}).json()["persona"]
+        == "cosmo"
+    )
 
 
-@pytest.mark.parametrize("method,suffix,body,operation", [
-    ("GET", "", None, "guide"),
-    ("POST", "/draw", {"card": 0}, "draw_guide"),
-    ("PATCH", "", {"persona": "neutral"}, "set_persona"),
-])
-def test_storage_errors_are_retryable_and_do_not_expose_connection_details(web, monkeypatch, method, suffix, body, operation):
-    monkeypatch.setattr(web.app.state.conversation_service, operation, Mock(side_effect=RedisError("private redis URL")))
+@pytest.mark.parametrize(
+    "method,suffix,body,operation",
+    [
+        ("GET", "", None, "guide"),
+        ("POST", "/draw", {"card": 0}, "draw_guide"),
+        ("PATCH", "", {"persona": "neutral"}, "set_persona"),
+    ],
+)
+def test_storage_errors_are_retryable_and_do_not_expose_connection_details(
+    web, monkeypatch, method, suffix, body, operation
+):
+    monkeypatch.setattr(
+        web.app.state.conversation_service,
+        operation,
+        Mock(side_effect=RedisError("private redis URL")),
+    )
     response = web.client.request(method, web.path + suffix, json=body)
     assert response.status_code == 503
     assert "private redis URL" not in response.text
@@ -168,12 +204,18 @@ def test_concurrent_choices_return_the_same_saved_card(web, monkeypatch):
 
     monkeypatch.setattr(web.redis, "pipeline", synchronized_pipeline)
     with ThreadPoolExecutor(max_workers=2) as workers:
-        results = list(workers.map(
-            lambda card: web.repository.draw_guide(session_id=web.session, chat_id=web.chat_id, card=card),
-            [0, 1],
-        ))
+        results = list(
+            workers.map(
+                lambda card: web.repository.draw_guide(
+                    session_id=web.session, chat_id=web.chat_id, card=card
+                ),
+                [0, 1],
+            )
+        )
     assert results[0] == results[1]
-    assert results[0] == web.repository.get_guide(session_id=web.session, chat_id=web.chat_id)
+    assert results[0] == web.repository.get_guide(
+        session_id=web.session, chat_id=web.chat_id
+    )
 
 
 def test_repeated_transaction_conflicts_leave_draw_pending(web, monkeypatch):

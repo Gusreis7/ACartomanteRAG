@@ -22,6 +22,17 @@ jobs:
         run: docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:/repo:ro" -w /repo zricethezav/gitleaks:v8.24.3 detect --source=/repo --config=/repo/.gitleaks.toml --redact --no-banner --log-opts=--all
       - name: Install validation dependencies
         run: python scripts/dependencies.py install ci
+      - name: Black on changed Python files
+        env:
+          FORMAT_BASE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          base="${FORMAT_BASE:-}"
+          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+            base="$(git rev-parse --verify HEAD^ 2>/dev/null || git hash-object -t tree /dev/null)"
+          fi
+          git diff --no-ext-diff --name-only --diff-filter=ACMR -z "$base" HEAD -- '*.py' '*.pyi' |
+            xargs -0 -r python -m black --check --diff --
       - name: Tests and syntax
         env:
           AWS_EC2_METADATA_DISABLED: 'true'

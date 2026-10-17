@@ -33,9 +33,7 @@ def load_resolved_silver_chunks(config, rustfs, resolved_index) -> pd.DataFrame:
             "Silver sem colunas obrigatórias: " + ", ".join(sorted(missing))
         )
 
-    internal_ids = set(
-        chunks["silver_dataset_id"].dropna().astype(str).unique()
-    )
+    internal_ids = set(chunks["silver_dataset_id"].dropna().astype(str).unique())
     if internal_ids != {silver_dataset_id}:
         raise ValueError(
             "Silver carregada não corresponde ao índice resolvido. "
