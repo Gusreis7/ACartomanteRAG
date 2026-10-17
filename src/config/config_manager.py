@@ -414,6 +414,14 @@ class ApiConfig(BaseModel):
         gt=0,
         le=65535,
     )
+    max_body_bytes: int = Field(default=32768, ge=1024, le=65536)
+    body_timeout_seconds: float = Field(default=10, gt=0, le=60)
+    requests_per_minute: int = Field(default=60, ge=1, le=10000)
+    global_requests_per_minute: int = Field(default=600, ge=1, le=100000)
+    messages_per_minute: int = Field(default=6, ge=1, le=1000)
+    conversations_per_minute: int = Field(default=5, ge=1, le=1000)
+    conversations_per_day: int = Field(default=30, ge=1, le=10000)
+    global_conversations_per_day: int = Field(default=300, ge=1, le=100000)
 
 
 class ChatConfig(BaseModel):

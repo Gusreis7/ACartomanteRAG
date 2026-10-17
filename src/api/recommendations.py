@@ -45,8 +45,12 @@ def _service(request: Request) -> WorkRecommendationService:
 )
 def recommend_works(
     request: Request,
-    exclude: Annotated[list[str] | None, Query()] = None,
+    exclude: Annotated[list[str] | None, Query(max_length=20)] = None,
 ) -> list[WorkRecommendationResponse]:
+    if exclude and any(len(title) > 120 for title in exclude):
+        raise HTTPException(
+            status_code=422, detail="Título excluído excede 120 caracteres."
+        )
     try:
         works = _service(request).recommend(
             count=3,

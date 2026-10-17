@@ -11,12 +11,15 @@ https://{$APP_DOMAIN} {
 	}
 	encode gzip
 	request_body {
-		max_size 64KB
+		max_size 32KiB
 	}
 	header Strict-Transport-Security "max-age=31536000"
+	header -Server
 	@operational path /health /ready
 	respond @operational 404
 	reverse_proxy api:8000 {
+		# Sobrescreve qualquer valor enviado pelo cliente; não usa X-Forwarded-For.
+		header_up X-Acartomante-Client-IP {http.request.remote.host}
 		transport http {
 			dial_timeout 5s
 			response_header_timeout 140s

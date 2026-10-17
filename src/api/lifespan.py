@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from threading import BoundedSemaphore
 
 from fastapi import FastAPI
-from langgraph.checkpoint.redis import RedisSaver
 from redis import Redis
 
+from src.api.security import RedisRateLimiter
 from src.config.config_manager import ConfigManager
-from src.generation.graph import MachadoRAG
 from src.generation.provider import create_generation_provider
 from src.services.chat import ChatService
 from src.services.conversations import ConversationService
@@ -21,6 +21,10 @@ logger = logging.getLogger("acartomante.runtime")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from langgraph.checkpoint.redis import RedisSaver
+
+    from src.generation.graph import MachadoRAG
+
     config = ConfigManager.load()
 
     redis_url = config.environment.redis.url
@@ -30,6 +34,9 @@ async def lifespan(app: FastAPI):
     redis = Redis.from_url(
         redis_url,
         decode_responses=True,
+        socket_connect_timeout=2,
+        socket_timeout=2,
+        max_connections=32,
     )
 
     try:
@@ -62,6 +69,9 @@ async def lifespan(app: FastAPI):
 
             app.state.config = config
             app.state.redis = redis
+            app.state.api_security_config = config.api
+            app.state.api_rate_limiter = RedisRateLimiter(redis)
+            app.state.http_chat_slots = BoundedSemaphore(config.generation.max_parallel)
             app.state.usage = UsageStats(redis)
             app.state.checkpointer = checkpointer
             app.state.generation_provider = generation_provider

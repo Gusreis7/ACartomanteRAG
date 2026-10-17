@@ -6,6 +6,18 @@ const toast = document.querySelector("#toast");
 let readingWorks = [];
 let readingLocked = false;
 
+function officialWorkUrl(value) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    if (["https:", "http:"].includes(url.protocol) && !url.username && !url.password &&
+        (host === "dominiopublico.mec.gov.br" || host.endsWith(".dominiopublico.mec.gov.br"))) {
+      return url.href;
+    }
+  } catch (_) {}
+  return null;
+}
+
 function showToast(message) {
   if (!toast) return;
   toast.textContent = message;
@@ -85,7 +97,9 @@ function readingCardMarkup(work, index) {
 
   const source = document.createElement("a");
   source.className = "reading-card-link";
-  source.href = work.source_url;
+  const sourceUrl = officialWorkUrl(work.source_url);
+  if (sourceUrl) source.href = sourceUrl;
+  else source.setAttribute("aria-disabled", "true");
   source.target = "_blank";
   source.rel = "noopener noreferrer";
   source.innerHTML = '<span>Ler a obra</span><span aria-hidden="true">↗</span>';

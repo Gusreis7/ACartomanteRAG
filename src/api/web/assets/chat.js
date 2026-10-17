@@ -338,6 +338,15 @@ form.addEventListener("submit", (event) => {
 });
 
 input.addEventListener("input", resizeInput);
+for (const eventName of ["paste", "drop"]) {
+  input.addEventListener(eventName, (event) => {
+    const transfer = event.clipboardData || event.dataTransfer;
+    if (transfer?.files?.length || [...(transfer?.items || [])].some((item) => item.kind === "file")) {
+      event.preventDefault();
+      showToast("Envie somente texto. Arquivos e imagens não são aceitos.");
+    }
+  });
+}
 input.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey) {
     event.preventDefault();

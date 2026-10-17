@@ -74,9 +74,14 @@ class WorkRecommendationService:
             parsed = urlparse(value)
             hostname = (parsed.hostname or "").lower()
 
-            if parsed.scheme in {"http", "https"} and (
-                hostname == ALLOWED_DOMAIN_SUFFIX
-                or hostname.endswith("." + ALLOWED_DOMAIN_SUFFIX)
+            if (
+                parsed.scheme in {"http", "https"}
+                and not parsed.username
+                and not parsed.password
+                and (
+                    hostname == ALLOWED_DOMAIN_SUFFIX
+                    or hostname.endswith("." + ALLOWED_DOMAIN_SUFFIX)
+                )
             ):
                 return value
 
