@@ -65,7 +65,7 @@ As responsabilidades no código acompanham essas etapas:
 | `src/etl` e `src/utils/chunking.py` | Preparar as camadas e a divisão dos textos. |
 | `src/indexing` e `src/embeddings` | Construir índices, descrever seus manifests e publicar releases. |
 | `src/retrieval` | Buscar candidatos, reranquear e recuperar os resumos auxiliares. |
-| `src/generation` | Montar o contexto, aplicar a persona e chamar o modelo pelo grafo. |
+| `src/generation` | Classificar o escopo, rotear para recusa ou recuperação, montar contexto, aplicar persona e gerar a resposta pelo grafo. |
 | `src/services` | Organizar conversas, mensagens, vínculo com a sessão e catálogo de obras. |
 | `src/api` | Validar as entradas HTTP, expor os contratos e servir as telas. |
 | `benchmark` | Executar experimentos diretamente sobre os módulos, com configurações próprias. |
@@ -74,12 +74,26 @@ O `ConfigManager` reúne e valida as configurações de comportamento do `config
 
 ## Acompanhando uma pergunta do começo ao fim
 
+O roteamento pertence ao LangGraph. O serviço HTTP valida a sessão e a cota,
+registra mensagens e chama o grafo; não decide se deve executar a recuperação.
+
+```mermaid
+flowchart TD
+    Guard["input_guard"] -->|Literatura| Retrieve["retrieve"]
+    Guard -->|Fora de escopo ou tentativa de exploração| Refuse["refuse"]
+    Retrieve --> Context["build_context"]
+    Context --> Generate["generate"]
+    Generate --> Finish["END"]
+    Refuse --> Finish
+```
+
 1. **Identifico a conversa.** Um cookie anônimo identifica a sessão. Antes de ler ou escrever mensagens, o `ChatService` verifica se a conversa pertence a ela. O thread usado no LangGraph combina sessão e conversa.
 2. **Registro a pergunta.** A mensagem do usuário entra no Redis Stream e segue para o RAG. A busca usa a pergunta atual; o histórico é aproveitado na geração, sem uma etapa de reescrita da query de recuperação.
-3. **Recupero os candidatos textuais.** O Dense traz 25 candidatos e o CrossEncoder os reranqueia para selecionar até 10. Em paralelo ao caminho textual, o enrichment pode trazer até 3 resumos, sem CrossEncoder. Para esse índice auxiliar, uso o embedder textual quando há um índice correspondente publicado e Qwen 0.6B como fallback configurado.
-4. **Monto o contexto.** Os trechos originais recebem identificadores `[E]`; os resumos derivados, `[R]`. O orçamento conjunto é de 20.000 caracteres. O enrichment está limitado a 6.000 caracteres e a 25% do total: com a configuração atual, o teto efetivo é 5.000, incluindo sua formatação. Se usar menos, o espaço restante pode ficar com os trechos originais.
-5. **Gero a resposta.** O provider chama o Ollama com `qwen3.5:4b`, reasoning desativado e temperatura 0,1. Considero os últimos 3 turns da conversa, com `num_ctx=10240` e saída de até 1024 tokens. Esses limites em tokens e o orçamento do contexto em caracteres são controles diferentes.
-6. **Persisto e apresento o resultado.** O serviço grava a resposta e as evidências públicas no Redis. A interface mostra o texto e as cartas com os trechos, para que o leitor consiga inspecionar o material recuperado.
+3. **Classifico o escopo no grafo.** O nó `input_guard` usa o provider configurado e até duas perguntas anteriores do checkpoint, limitadas a 1.000 caracteres cada. `InputGuardResult` define as três decisões por enum e rejeita campos extras. O provider recebe o schema por structured output; o nó consome o resultado Pydantic validado, sem extrair JSON de texto. A aresta condicional segue para `retrieve` quando permitido ou para `refuse → END`, com recusa fixa. Falha de classificação interrompe a geração. Cada pergunta limpa contexto, evidências e metadados transitórios, preservando as mensagens; a recusa não reutiliza dados recuperados anteriormente.
+4. **Recupero os candidatos textuais.** O Dense traz 25 candidatos e o CrossEncoder os reranqueia para selecionar até 10. Em paralelo ao caminho textual, o enrichment pode trazer até 3 resumos, sem CrossEncoder. Para esse índice auxiliar, uso o embedder textual quando há um índice correspondente publicado e Qwen 0.6B como fallback configurado.
+5. **Monto o contexto.** Os trechos originais recebem identificadores `[E]`; os resumos derivados, `[R]`. O orçamento conjunto é de 20.000 caracteres. O enrichment está limitado a 6.000 caracteres e a 25% do total: com a configuração atual, o teto efetivo é 5.000, incluindo sua formatação. Se usar menos, o espaço restante pode ficar com os trechos originais.
+6. **Gero a resposta.** O provider chama o Ollama com `qwen3.5:4b`, reasoning desativado e temperatura 0,1. Considero os últimos 3 turns da conversa, com `num_ctx=10240` e saída de até 1024 tokens. Esses limites em tokens e o orçamento do contexto em caracteres são controles diferentes.
+7. **Persisto e apresento o resultado.** O serviço grava a resposta e as evidências públicas no Redis. A interface renderiza Markdown com HTML e imagens desativados e mostra as cartas com os trechos, para que o leitor consiga inspecionar o material recuperado.
 
 No Redis, mantive três responsabilidades distintas: `RedisChatRepository` para os metadados das conversas, `RedisMessageRepository` para o histórico público e suas evidências, e `RedisSaver` para os checkpoints internos do grafo. Assim, a tela não precisa interpretar o formato interno do checkpointer para reconstruir uma conversa.
 
@@ -89,7 +103,11 @@ O enrichment continua auxiliar. Com `fail_open=true`, uma falha nessa camada dur
 
 Quis que a experiência preservasse a possibilidade de verificar a resposta. Por isso, somente os trechos `[E]` entram como evidências citáveis. Os resumos `[R]` ajudam o contexto interno, mas são texto produzido por outro processamento e não substituem a obra original. Scores e ranking também ficam internos. Recuperar dez candidatos não significa que a resposta precise citar os dez; o prompt favorece uma síntese com as referências essenciais.
 
-As personas entram na geração por mensagem. `Neutro` é o padrão; Cosmo é orientado a defender que Capitu não traiu, e Damião, a interpretação oposta. A troca de persona mantém o mesmo índice. A proposta é explorar como uma orientação interpretativa muda a resposta, mantendo o compromisso com os trechos disponíveis. A interface sinaliza essa opinião induzida.
+Cada nova consulta abre uma tiragem de duas cartas com versos iguais: Cosmo e Damião, embaralhados no servidor. A carta escolhida define a persona inicial; também é possível começar no Neutro ou trocar de guia no cabeçalho. Cosmo defende que Capitu não traiu, e Damião, a interpretação oposta. São orientações de leitura, sem alterar o índice ou transformar uma interpretação em prova.
+
+O tutorial aparece antes da primeira tiragem da sessão. A escolha original e a persona atual ficam nos metadados da conversa no Redis, vinculadas ao mesmo cookie usado no histórico. Reabrir a consulta mantém a escolha; uma nova consulta recebe outra tiragem. A gravação é atômica para que retries ou abas concorrentes não virem cartas diferentes. Conversas anteriores continuam no Neutro, sem exigir tiragem. O endpoint `.../guide` consulta ou altera a persona, e `.../guide/draw` registra a carta; ambos conferem o vínculo com a sessão. `guide-draw.js` cuida somente da interação do diálogo.
+
+As cartas usam o mesmo rosto frontal em preto, marfim e ouro envelhecido, desenhado em SVG inline. Apenas o nome e a pequena base sob ele distinguem os guias: verde para Cosmo e vinho para Damião. Os versos são idênticos; nome e cor aparecem após a escolha, sem antecipar a posição interpretativa. O desenho não exige imagens externas, chamadas ao LLM ou processamento do corpus.
 
 A leitura de cartas tem outro funcionamento: sorteia três obras do catálogo Bronze, permite virar uma carta e oferece a fonte oficial. Esse sorteio não é uma recomendação semântica calculada a partir da conversa. O catálogo é cacheado por processo e aceita somente URLs do Domínio Público/MEC.
 
@@ -102,7 +120,7 @@ Tudo é acessado pela mesma origem: `/`, `/reading`, `/chat/{chat_id}`, os recur
 
 Na AWS, mantive a cadeia de recuperação e substituí as integrações: S3 direto por IAM no lugar do servidor RustFS e `BedrockGenerationProvider` no lugar do Ollama. O provider usa Converse, traduz mensagens e registra tokens. O Qwen3 32B fica como padrão; o perfil US do Llama 4 Scout é uma alternativa configurável para o chat. Os resumos continuam exclusivamente com Qwen, independentemente do gerador escolhido para uma conversa.
 
-Não assumi que o modelo aceitaria o mesmo structured output nativo do Ollama. No Bedrock envio o schema no prompt, valido o JSON com Pydantic e limito a duas tentativas de saída estruturada; o SDK também tem retries limitados. O Qwen recebe o soft switch `/no_think`, e respostas vazias ou truncadas não entram como resumos válidos. Isso ainda precisa ser avaliado com chamadas reais: o teste unitário verifica o contrato, não a qualidade do modelo.
+Ollama vincula `format=InputGuardResult.model_json_schema()` à chamada e usa `PydanticOutputParser` do LangChain. Essa composição preserva resposta bruta, métricas e opções por chamada; evita a perda dessas opções no `RunnableMap` de `with_structured_output(include_raw=True)` da versão instalada. No Bedrock, o schema segue em `response_format` no Mantle ou `outputConfig.textFormat` no Converse; Pydantic valida a resposta recebida. Não há schema injetado no prompt nem fallback para JSON livre. Rejeição do contrato pelo endpoint interrompe a chamada: suporte precisa ser confirmado para o modelo e a região usados. IAM/SigV4, métricas e retries existentes permanecem; o teto explícito de 128 tokens do guard também vale nas repetições. O enrichment mantém sua recuperação de truncamento e os checkpoints. As respostas do chat continuam em Markdown. Contratos foram testados com transportes simulados; inferência real ainda precisa ser verificada. Referências: [Ollama](https://docs.ollama.com/capabilities/structured-outputs) e [Bedrock](https://docs.aws.amazon.com/bedrock/latest/userguide/structured-output.html).
 
 A release de dados referencia Bronze, Silver, índice textual e índice auxiliar em um manifest único. A API lê esse manifest uma vez ao iniciar, enquanto os jobs trabalham em candidatos isolados. O catálogo de leitura usa a Bronze da mesma release. Gerar resumos, construir índices e promover dados são operações explícitas; reiniciar a API não faz nenhuma delas.
 

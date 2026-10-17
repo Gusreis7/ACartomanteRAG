@@ -3,11 +3,14 @@ from __future__ import annotations
 import logging
 import os
 from ipaddress import ip_address
+from time import perf_counter
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.background import BackgroundTasks
+from starlette.concurrency import run_in_threadpool
 
 from src.api.lifespan import lifespan
 from src.api.reading import router as reading_router
@@ -57,10 +60,27 @@ app.add_middleware(
 
 @app.middleware("http")
 async def security_headers(request, call_next):
-    response = await call_next(request)
+    started = perf_counter()
+    usage = getattr(request.app.state, "usage", None)
+    track = usage is not None and not request.url.path.startswith("/assets/") and request.url.path not in {"/health", "/ready"}
+    try:
+        response = await call_next(request)
+    except Exception:
+        if track:
+            route = getattr(request.scope.get("route"), "path", "unmatched")
+            await run_in_threadpool(usage.record_http, request.method, route, 500,
+                                    (perf_counter() - started) * 1000, getattr(request.state, "session_id", None))
+        raise
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "same-origin"
+    if track:
+        tasks = BackgroundTasks()
+        if response.background is not None:
+            tasks.add_task(response.background)
+        route = getattr(request.scope.get("route"), "path", "unmatched")
+        tasks.add_task(usage.record_http, request.method, route, response.status_code, (perf_counter() - started) * 1000, getattr(request.state, "session_id", None))
+        response.background = tasks
     return response
 
 

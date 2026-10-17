@@ -170,6 +170,7 @@ def test_glue_arguments_pin_all_assets_without_changing_job(cloud):
 def test_glue_start_omits_empty_optional_value_and_accepts_glue_argv(cloud, monkeypatch, smoke, reuse_options):
     revision = "d" * 40
     clients = {name: Mock() for name in ("ssm", "s3", "glue")}
+    clients["s3"].list_objects_v2.return_value = {}
     clients["glue"].start_job_run.return_value = {"JobRunId": "jr-test"}
     monkeypatch.setattr(cloud.boto3, "client", lambda name, **kwargs: clients[name])
     monkeypatch.setattr(cloud, "outputs", lambda path: {"ops_bucket": "ops", "glue_job": "etl-job"})
@@ -538,6 +539,7 @@ def test_wait_glue_rejects_invalid_identity_and_window_before_aws(cloud, monkeyp
 @pytest.mark.parametrize("already_exists", [False, True])
 def test_glue_start_exports_only_created_run_id_and_preserves_existing_file(tmp_path, cloud, monkeypatch, already_exists):
     clients = {name: Mock() for name in ("ssm", "s3", "glue")}
+    clients["s3"].list_objects_v2.return_value = {}
     clients["glue"].start_job_run.return_value = {"JobRunId": "jr_created"}
     monkeypatch.setattr(cloud.boto3, "client", lambda name, **kwargs: clients[name])
     monkeypatch.setattr(cloud, "outputs", lambda path: {"ops_bucket": "ops", "glue_job": "etl-job"})
@@ -589,6 +591,7 @@ def test_etl_workflow_keeps_one_glue_run_and_requires_success_after_all_windows(
 @pytest.mark.parametrize("provisioned_timeout", [120, 600, None])
 def test_glue_requires_provisioned_timeout_before_start(cloud, monkeypatch, provisioned_timeout):
     clients = {name: Mock() for name in ("ssm", "s3", "glue")}
+    clients["s3"].list_objects_v2.return_value = {}
     clients["glue"].get_job.return_value = {"Job": {"Timeout": provisioned_timeout}}
     clients["glue"].start_job_run.return_value = {"JobRunId": "jr_created"}
     monkeypatch.setattr(cloud.boto3, "client", lambda name, **kwargs: clients[name])

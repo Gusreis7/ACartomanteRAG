@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Request
 from redis import RedisError
 
 from src.api.dependencies import ChatServiceDep, ConversationServiceDep, SessionId
+from src.api.markdown import render_answer
 from src.api.schemas import (
     ChatResponse,
     ConversationCreateRequest,
@@ -16,6 +17,9 @@ from src.api.schemas import (
     HealthResponse,
     MessageRequest,
     ReadyResponse,
+    GuideDrawRequest,
+    GuideStateResponse,
+    PersonaUpdateRequest,
 )
 from src.storage.qdrant_manager import check_qdrant_collection_ready
 from src.generation.provider import GenerationQuotaError
@@ -29,6 +33,23 @@ from src.services.chat import (
 logger = logging.getLogger("acartomante.runtime")
 
 router = APIRouter()
+
+
+@router.get("/api/v1/session")
+def session_status(session_id: SessionId, service: ConversationServiceDep):
+    try:
+        return {"tutorial_completed": service.tutorial_completed(session_id)}
+    except RedisError as exc:
+        raise HTTPException(status_code=503, detail="Não foi possível consultar o guia. Tente novamente.") from exc
+
+
+@router.post("/api/v1/session/tutorial")
+def complete_tutorial(session_id: SessionId, service: ConversationServiceDep):
+    try:
+        service.complete_tutorial(session_id)
+        return {"tutorial_completed": True}
+    except RedisError as exc:
+        raise HTTPException(status_code=503, detail="Não foi possível salvar o guia. Tente novamente.") from exc
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -109,6 +130,36 @@ def list_conversations(
     ]
 
 
+def guide_response(state) -> GuideStateResponse:
+    if state is None:
+        raise HTTPException(status_code=404, detail="Conversa não encontrada.")
+    return GuideStateResponse(**state)
+
+
+@router.get("/api/v1/conversations/{chat_id}/guide", response_model=GuideStateResponse)
+def conversation_guide(chat_id: UUID, session_id: SessionId, service: ConversationServiceDep):
+    try:
+        return guide_response(service.guide(session_id=session_id, chat_id=chat_id))
+    except RedisError as exc:
+        raise HTTPException(status_code=503, detail="Não foi possível carregar a tiragem. Tente novamente.") from exc
+
+
+@router.post("/api/v1/conversations/{chat_id}/guide/draw", response_model=GuideStateResponse)
+def draw_conversation_guide(chat_id: UUID, body: GuideDrawRequest, session_id: SessionId, service: ConversationServiceDep):
+    try:
+        return guide_response(service.draw_guide(session_id=session_id, chat_id=chat_id, card=body.card))
+    except RedisError as exc:
+        raise HTTPException(status_code=503, detail="Não foi possível salvar a carta. Tente novamente.") from exc
+
+
+@router.patch("/api/v1/conversations/{chat_id}/guide", response_model=GuideStateResponse)
+def change_conversation_persona(chat_id: UUID, body: PersonaUpdateRequest, session_id: SessionId, service: ConversationServiceDep):
+    try:
+        return guide_response(service.set_persona(session_id=session_id, chat_id=chat_id, persona=body.persona))
+    except RedisError as exc:
+        raise HTTPException(status_code=503, detail="Não foi possível salvar o modo de leitura. Tente novamente.") from exc
+
+
 @router.get(
     "/api/v1/conversations/{chat_id}/messages",
     response_model=ConversationHistoryResponse,
@@ -119,12 +170,9 @@ def list_messages(
     service: ChatServiceDep,
 ) -> ConversationHistoryResponse:
     try:
-        return ConversationHistoryResponse(
-            **service.list_messages(
-                session_id=session_id,
-                chat_id=chat_id,
-            )
-        )
+        result = service.list_messages(session_id=session_id, chat_id=chat_id)
+        result["messages"] = [{**item, "content_html": render_answer(item["content"]) if item["role"] == "assistant" else None} for item in result["messages"]]
+        return ConversationHistoryResponse(**result)
     except ChatNotFoundError as exc:
         raise HTTPException(
             status_code=404,
@@ -148,14 +196,8 @@ def send_message(
     service: ChatServiceDep,
 ) -> ChatResponse:
     try:
-        return ChatResponse(
-            **service.send_message(
-                session_id=session_id,
-                chat_id=chat_id,
-                message=body.message,
-                persona=body.persona,
-            )
-        )
+        result = service.send_message(session_id=session_id, chat_id=chat_id, message=body.message, persona=body.persona)
+        return ChatResponse(**result, answer_html=render_answer(result["answer"]))
     except ChatNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except GenerationQuotaError as exc:

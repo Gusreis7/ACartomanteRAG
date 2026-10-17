@@ -17,6 +17,7 @@ from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
 from botocore.exceptions import ClientError, NoCredentialsError
 from langchain_core.messages import AIMessage
+from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import ValidationError
 
 logger = logging.getLogger("acartomante.generation")
@@ -47,7 +48,7 @@ class GenerationQuotaError(GenerationCapacityError):
 
 class GenerationProvider(ABC):
     @abstractmethod
-    def invoke(self, messages: list) -> Any:
+    def invoke(self, messages: list, *, max_tokens=None) -> Any:
         raise NotImplementedError
 
     def invoke_structured(
@@ -56,6 +57,7 @@ class GenerationProvider(ABC):
         schema: Any,
         *,
         include_raw: bool = False,
+        max_tokens: int | None = None,
     ) -> Any:
         """Invoca o provider exigindo uma saída estruturada.
 
@@ -117,10 +119,12 @@ class OllamaGenerationProvider(GenerationProvider):
             client_kwargs={"timeout": config.timeout_seconds},
         )
 
-    def _runtime_kwargs(self) -> dict[str, Any]:
-        if self._runtime_options is None:
-            return {}
-        return {"options": dict(self._runtime_options)}
+    def _runtime_kwargs(self, *, max_tokens=None) -> dict[str, Any]:
+        kwargs = {} if self._runtime_options is None else {"options": dict(self._runtime_options)}
+        if max_tokens is not None:
+            kwargs["options"] = {"num_ctx": self.config.num_ctx, "temperature": self.config.temperature,
+                                 "top_p": self.config.top_p, **kwargs.get("options", {}), "num_predict": int(max_tokens)}
+        return kwargs
 
     def _acquire(self) -> None:
         acquired = self._slots.acquire(
@@ -138,10 +142,10 @@ class OllamaGenerationProvider(GenerationProvider):
             "Serviço de geração indisponível."
         ) from exc
 
-    def invoke(self, messages: list) -> Any:
+    def invoke(self, messages: list, *, max_tokens=None) -> Any:
         self._acquire()
         try:
-            return self.client.invoke(messages, **self._runtime_kwargs())
+            return self.client.invoke(messages, **self._runtime_kwargs(max_tokens=max_tokens))
         except Exception as exc:
             self._translate_error(exc)
         finally:
@@ -153,19 +157,25 @@ class OllamaGenerationProvider(GenerationProvider):
         schema: Any,
         *,
         include_raw: bool = False,
+        max_tokens: int | None = None,
     ) -> Any:
         self._acquire()
         try:
             key = (schema, bool(include_raw))
             structured = self._structured_clients.get(key)
             if structured is None:
-                structured = self.client.with_structured_output(
-                    schema=schema,
-                    method="json_schema",
-                    include_raw=include_raw,
-                )
+                # O RunnableMap de with_structured_output(include_raw=True)
+                # não encaminha options à chamada interna nesta versão.
+                structured = self.client.bind(format=schema.model_json_schema())
                 self._structured_clients[key] = structured
-            return structured.invoke(messages, **self._runtime_kwargs())
+            raw = structured.invoke(messages, **self._runtime_kwargs(max_tokens=max_tokens))
+            try:
+                parsed = PydanticOutputParser(pydantic_object=schema).invoke(raw)
+            except ValueError as exc:
+                if include_raw:
+                    return {"raw": raw, "parsed": None, "parsing_error": exc}
+                raise
+            return {"raw": raw, "parsed": parsed, "parsing_error": None} if include_raw else parsed
         except Exception as exc:
             self._translate_error(exc)
         finally:
@@ -255,14 +265,20 @@ class _MantleClient:
     def get_model(self):
         self._request("GET", "/models/" + quote(self.config.model, safe=""))
 
-    def converse(self, *, modelId, system, messages, inferenceConfig):
+    def converse(self, *, modelId, system, messages, inferenceConfig, outputConfig=None):
         chat = [{"role": "system", "content": "\n\n".join(item["text"] for item in system)}] if system else []
         chat.extend({"role": item["role"], "content": "\n".join(block["text"] for block in item["content"])} for item in messages)
-        result, headers, retries = self._request("POST", "/chat/completions", {
+        payload = {
             "model": modelId, "messages": chat, "stream": False,
             "max_tokens": inferenceConfig["maxTokens"],
             "temperature": inferenceConfig["temperature"], "top_p": inferenceConfig["topP"],
-        })
+        }
+        if outputConfig is not None:
+            specification = outputConfig["textFormat"]["structure"]["jsonSchema"]
+            payload["response_format"] = {"type": "json_schema", "json_schema": {
+                "name": specification["name"], "schema": json.loads(specification["schema"]), "strict": True,
+            }}
+        result, headers, retries = self._request("POST", "/chat/completions", payload)
         choice = result["choices"][0]
         content = choice["message"].get("content") or ""
         stop = choice.get("finish_reason")
@@ -317,6 +333,9 @@ class BedrockGenerationProvider(GenerationProvider):
         return system, conversation
 
     def invoke(self, messages: list, *, max_tokens=None) -> AIMessage:
+        return self._invoke(messages, max_tokens=max_tokens)
+
+    def _invoke(self, messages: list, *, max_tokens=None, output_config=None) -> AIMessage:
         if not self._slots.acquire(timeout=self.config.acquire_timeout_seconds):
             raise GenerationCapacityError("Serviço de geração ocupado. Tente novamente.")
         try:
@@ -325,15 +344,18 @@ class BedrockGenerationProvider(GenerationProvider):
                 # Soft switch documentado pelo Qwen; não presumir um parâmetro
                 # de template privado na API Converse gerenciada.
                 system.append({"text": "/no_think"})
-            response = self.client.converse(
-                modelId=self.config.model, system=system, messages=conversation,
-                inferenceConfig={
+            request = {
+                "modelId": self.config.model, "system": system, "messages": conversation,
+                "inferenceConfig": {
                     "temperature": self.config.temperature, "topP": self.config.top_p,
                     "maxTokens": self.config.max_tokens if max_tokens is None else max_tokens,
                 },
-            )
+            }
+            if output_config is not None:
+                request["outputConfig"] = output_config
+            response = self.client.converse(**request)
             text = "\n".join(item["text"] for item in response["output"]["message"]["content"] if "text" in item)
-            text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
+            text = text.strip() if output_config is not None else re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
             usage = response.get("usage", {})
             incoming, outgoing = int(usage.get("inputTokens", 0)), int(usage.get("outputTokens", 0))
             with self._usage_lock:
@@ -392,9 +414,12 @@ class BedrockGenerationProvider(GenerationProvider):
             code, status = error.get("Code", "unknown"), metadata.get("HTTPStatusCode")
             quota = status == 429 or any(word in code.lower() for word in ("throttl", "quota", "rate_limit"))
             permission = status in {401, 403} or "credentials" in type(exc).__name__.lower()
-            diagnostics = {"provider": self.config.provider, "reason": "quota" if quota else "permission" if permission else "provider_error", "error_code": code, "error_type": type(exc).__name__,
+            rejected_schema = output_config is not None and status == 400
+            diagnostics = {"provider": self.config.provider, "reason": "structured_output_request_rejected" if rejected_schema else "quota" if quota else "permission" if permission else "provider_error", "error_code": code, "error_type": type(exc).__name__,
                            "http_status": status, "request_id": metadata.get("RequestId", "unknown"), "quota_scope": error.get("QuotaScope", "unknown")}
             logger.warning("bedrock_unavailable %s", json.dumps(diagnostics))
+            if rejected_schema:
+                raise GenerationServiceError("Bedrock recusou o structured output; confira o suporte do modelo/endpoint e o schema.", diagnostics=diagnostics, batch_fatal=True) from None
             raise GenerationServiceError("Bedrock indisponível; consulte o diagnóstico nos logs e no manifest.", diagnostics=diagnostics, batch_fatal=True) from None
         finally:
             self._slots.release()
@@ -408,19 +433,41 @@ class BedrockGenerationProvider(GenerationProvider):
         sleep(delay)
         return True
 
-    def invoke_structured(self, messages, schema, *, include_raw=False):
-        instruction = "Retorne somente um objeto JSON válido, sem Markdown, conforme este JSON Schema:\n" + json.dumps(schema.model_json_schema(), ensure_ascii=False)
+    @staticmethod
+    def _output_config(schema):
+        # O contrato de inferência estrito exige campos presentes e objetos
+        # fechados. Os defaults Pydantic dos checkpoints não são alterados.
+        def strict(node):
+            if isinstance(node, dict):
+                node.pop("default", None)
+                if node.get("type") == "object" and "properties" in node:
+                    node["additionalProperties"] = False
+                    node["required"] = list(node["properties"])
+                for key in ("properties", "$defs", "definitions", "patternProperties"):
+                    for child in node.get(key, {}).values():
+                        strict(child)
+                for key in ("items", "additionalProperties", "not", "if", "then", "else"):
+                    strict(node.get(key))
+                for key in ("anyOf", "allOf", "oneOf", "prefixItems"):
+                    for child in node.get(key, []):
+                        strict(child)
+        specification = schema.model_json_schema()
+        strict(specification)
+        return {"textFormat": {"type": "json_schema", "structure": {"jsonSchema": {
+            "name": schema.__name__, "schema": json.dumps(specification, ensure_ascii=False),
+        }}}}
+
+    def invoke_structured(self, messages, schema, *, include_raw=False, max_tokens=None):
+        output_config = self._output_config(schema)
         last_error = None
         raw = None
-        max_tokens = self.config.max_tokens
+        retry_max_tokens = self.config.response_retry_max_tokens if max_tokens is None else max_tokens
+        max_tokens = self.config.max_tokens if max_tokens is None else max_tokens
         for attempt in range(self.config.response_retries + 1):
             raw, parsed = None, None
             try:
-                raw = self.invoke([("system", instruction), *messages], max_tokens=max_tokens)
-                content = raw.content.strip()
-                if content.startswith("```"):
-                    content = re.sub(r"^```(?:json)?\s*|\s*```$", "", content)
-                parsed = schema.model_validate_json(content)
+                raw = self._invoke(messages, max_tokens=max_tokens, output_config=output_config)
+                parsed = schema.model_validate_json(raw.content, strict=True)
                 if not any(parsed.model_dump().values()):
                     raise ValueError("Saída estruturada vazia.")
                 return {"raw": raw, "parsed": parsed, "parsing_error": None} if include_raw else parsed
@@ -447,9 +494,9 @@ class BedrockGenerationProvider(GenerationProvider):
                 last_error.diagnostics.get("reason") == "truncated"
                 and last_error.diagnostics.get("output_limit_reached")
                 and last_error.diagnostics.get("finish_reason") in {"length", "max_tokens"}
-                and self.config.response_retry_max_tokens > max_tokens
+                and retry_max_tokens > max_tokens
             ):
-                next_max_tokens = min(max_tokens * 2, self.config.response_retry_max_tokens)
+                next_max_tokens = min(max_tokens * 2, retry_max_tokens)
             if not self._retry_response(last_error, attempt, next_max_tokens=next_max_tokens):
                 break
             max_tokens = next_max_tokens

@@ -1,5 +1,15 @@
 # Impeditivos e decisões operacionais
 
+## Chat público e operação — 17/10/2026
+
+O espelho GitHub publica somente a `main`; desenvolvimento e PRs permanecem no Gitea, cujas verificações locais ainda têm a limitação do Raspberry. A validação da revisão que chega à AWS continua no GitHub.
+
+Foram adotados Markdown com HTML/imagens desativados, guia por sessão e o nó `input_guard` do LangGraph antes da busca. O grafo roteia para recuperação ou recusa fixa, preservando o histórico e limpando o contexto da pergunta anterior. A triagem usa o modelo atual, acrescenta uma chamada curta e bloqueia a resposta quando não consegue classificar. Reduz abuso, sem garantir imunidade a prompt injection. Os contadores Redis têm 14 dias; sessões não identificam pessoas e o custo contabilizado não é a fatura AWS.
+
+As dependências foram reunidas no `pyproject.toml`, com os pins de API/Glue e suas diferenças por versão Python preservados. O Redis mantém rede exclusiva da API e loopback na EC2; o notebook usa SSM/IAM e ACL de leitura. Não há abertura pública de 6379 nem acesso automático de outros serviços internos.
+
+O workflow manual `AWS emergency` para EC2/Glue e mantém uma trava contra novos disparos pelas pipelines atualizadas. Preserva dados, não zera custos de armazenamento/IP e exige conferir Terraform/SSM já em andamento. A retomada do ETL é explícita, após verificar o lock. Procedimento: [AWS_AUTOMATION.md](AWS_AUTOMATION.md#parada-de-emergência).
+
 Registro: 15/10/2026. Situação: execução do RAG e deploy local suspensos até a manutenção do Raspberry Pi.
 
 ## Impedimento observado

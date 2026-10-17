@@ -1,6 +1,0 @@
-# Somente coleta HTTP, Parquet e S3; sem modelos ou serviços locais.
-boto3>=1.35,<2
-pandas>=2.2,<4
-pyarrow>=17,<25
-requests>=2.32,<3
-beautifulsoup4>=4.12,<5

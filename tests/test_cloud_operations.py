@@ -88,9 +88,8 @@ def test_github_script_sends_private_tfvars_through_stdin(tmp_path, monkeypatch,
     config = tmp_path / "private.json"
     payload = json.dumps({"github_repository_id": "42", "acme_email": "private-marker@example.org", "ami_id": "ami-123abc"})
     config.write_text(payload)
-    monkeypatch.setattr(setup, "gh", Mock(side_effect=[
-        {"id": 42}, None, {"object": {"sha": "a" * 40}}, [{"ref": "refs/heads/develop"}], None, None,
-    ]))
+    github = Mock(side_effect=[{"id": 42}, None, None, None])
+    monkeypatch.setattr(setup, "gh", github)
     monkeypatch.setattr("sys.argv", ["configure_github.py", "--repo", "owner/repo", "--mirror-source", "--terraform-config", str(config)])
     with patch.object(setup.subprocess, "run") as execute:
         setup.main()
@@ -99,6 +98,7 @@ def test_github_script_sends_private_tfvars_through_stdin(tmp_path, monkeypatch,
         input=payload, text=True, check=True, capture_output=True,
     )
     assert "private-marker" not in capsys.readouterr().out
+    assert not any("/git/" in call.args[0] or "/protection" in call.args[0] for call in github.call_args_list)
 
 
 @pytest.mark.parametrize("payload,error", [

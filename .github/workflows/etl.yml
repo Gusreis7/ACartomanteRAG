@@ -85,7 +85,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install controller dependencies
-        run: python -m pip install -c requirements-runtime.lock boto3
+        run: python scripts/dependencies.py install ops
       - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
         with:
           role-to-assume: ${{ vars.AWS_ETL_ROLE_ARN }}
@@ -94,6 +94,8 @@ jobs:
           role-duration-seconds: 10800
       - name: Read current deployment context
         run: aws s3 cp "s3://$OPS_BUCKET/config/deployment.json" "$RUNNER_TEMP/deployment.local.json" --only-show-errors
+      - name: Check emergency stop
+        run: python scripts/cloud.py check-emergency --bucket "$OPS_BUCKET"
       - name: Prepare immutable Glue bundle if missing
         shell: bash
         run: |
@@ -153,7 +155,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install controller dependencies
-        run: python -m pip install -c requirements-runtime.lock boto3
+        run: python scripts/dependencies.py install ops
       - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
         with:
           role-to-assume: ${{ vars.AWS_ETL_ROLE_ARN }}
@@ -191,7 +193,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install controller dependencies
-        run: python -m pip install -c requirements-runtime.lock boto3
+        run: python scripts/dependencies.py install ops
       - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
         with:
           role-to-assume: ${{ vars.AWS_ETL_ROLE_ARN }}

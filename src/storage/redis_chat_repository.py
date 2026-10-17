@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from secrets import choice
 from uuid import UUID, uuid4
 
-from redis import Redis
+from redis import Redis, RedisError, WatchError
 
 
 REDIS_NAMESPACE = "acartomante"
@@ -47,6 +48,9 @@ class RedisChatRepository:
             "status": "active",
             "created_at": now.isoformat(),
             "updated_at": now.isoformat(),
+            "guide_pending": "1",
+            "guide_first": choice(("cosmo", "damiao")),
+            "persona": "neutral",
         }
 
         pipe = self.redis.pipeline()
@@ -102,6 +106,56 @@ class RedisChatRepository:
                 result.append(item)
 
         return result
+
+    @staticmethod
+    def _guide_state(data: dict) -> dict:
+        # Registros anteriores à tiragem continuam abertos em modo neutro.
+        return {
+            "draw_required": data.get("guide_pending") == "1",
+            "persona": data.get("persona", "neutral"),
+            "drawn_guide": data.get("drawn_guide") or None,
+            "selected_card": int(data["guide_card"]) if data.get("guide_card") in {"0", "1"} else None,
+        }
+
+    def get_guide(self, *, session_id: UUID, chat_id: UUID) -> dict | None:
+        data = self.redis.hgetall(self._chat_key(session_id=session_id, chat_id=chat_id))
+        return self._guide_state(data) if data else None
+
+    def draw_guide(self, *, session_id: UUID, chat_id: UUID, card: int) -> dict | None:
+        if isinstance(card, bool) or card not in (0, 1):
+            raise ValueError("Escolha uma das duas cartas.")
+        return self._update_guide(session_id=session_id, chat_id=chat_id, card=card)
+
+    def set_persona(self, *, session_id: UUID, chat_id: UUID, persona: str) -> dict | None:
+        if persona not in {"neutral", "cosmo", "damiao"}:
+            raise ValueError("Persona inválida.")
+        return self._update_guide(session_id=session_id, chat_id=chat_id, persona=persona)
+
+    def _update_guide(self, *, session_id: UUID, chat_id: UUID, card=None, persona=None) -> dict | None:
+        key = self._chat_key(session_id=session_id, chat_id=chat_id)
+        # A primeira escolha prevalece, inclusive em retries e abas concorrentes.
+        for _ in range(5):
+            with self.redis.pipeline() as pipe:
+                try:
+                    pipe.watch(key)
+                    data = pipe.hgetall(key)
+                    if not data:
+                        return None
+                    if card is not None:
+                        if data.get("guide_pending") != "1":
+                            return self._guide_state(data)
+                        first = data["guide_first"]
+                        guide = first if card == 0 else {"cosmo": "damiao", "damiao": "cosmo"}[first]
+                        changes = {"guide_pending": "0", "drawn_guide": guide, "guide_card": str(card), "persona": guide}
+                    else:
+                        changes = {"guide_pending": "0", "persona": persona}
+                    pipe.multi()
+                    pipe.hset(key, mapping=changes)
+                    pipe.execute()
+                    return self._guide_state({**data, **changes})
+                except WatchError:
+                    continue
+        raise RedisError("Não foi possível salvar a escolha da conversa.")
 
     def touch(
         self,

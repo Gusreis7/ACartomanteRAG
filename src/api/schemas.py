@@ -6,6 +6,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from src.generation.personas import PersonaName
+
 
 class ConversationCreateRequest(BaseModel):
     title: str | None = Field(default=None, max_length=120)
@@ -22,11 +24,22 @@ class ConversationResponse(BaseModel):
 
 class MessageRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
-    persona: Literal[
-        "neutral",
-        "cosmo",
-        "damiao",
-    ] = "neutral"
+    persona: PersonaName = "neutral"
+
+
+class GuideStateResponse(BaseModel):
+    draw_required: bool
+    persona: PersonaName
+    drawn_guide: Literal["cosmo", "damiao"] | None = None
+    selected_card: Literal[0, 1] | None = None
+
+
+class GuideDrawRequest(BaseModel):
+    card: int = Field(ge=0, le=1, strict=True)
+
+
+class PersonaUpdateRequest(BaseModel):
+    persona: PersonaName
 
 
 class EvidenceResponse(BaseModel):
@@ -42,6 +55,7 @@ class ConversationMessageResponse(BaseModel):
     turn_id: UUID
     role: Literal["user", "assistant"]
     content: str
+    content_html: str | None = None
     created_at: datetime
     evidences: list[EvidenceResponse] = Field(
         default_factory=list
@@ -56,6 +70,7 @@ class ConversationHistoryResponse(BaseModel):
 class ChatResponse(BaseModel):
     chat_id: UUID
     answer: str
+    answer_html: str | None = None
     evidences: list[EvidenceResponse]
 
 

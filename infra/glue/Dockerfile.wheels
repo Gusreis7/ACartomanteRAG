@@ -2,9 +2,11 @@
 FROM public.ecr.aws/amazonlinux/amazonlinux:2023 AS wheels
 RUN dnf install -y python3.11 python3.11-pip zip && dnf clean all
 WORKDIR /build
-COPY requirements-glue.lock .
-RUN python3.11 -m pip download --only-binary=:all: --extra-index-url https://download.pytorch.org/whl/cpu \
-    --dest /wheels -r requirements-glue.lock \
+COPY pyproject.toml .
+COPY scripts/dependencies.py ./scripts/dependencies.py
+RUN python3.11 scripts/dependencies.py export glue --output /tmp/glue-requirements.txt \
+    && python3.11 -m pip download --only-binary=:all: \
+    --dest /wheels -r /tmp/glue-requirements.txt \
     && cd /wheels && zip -q /build/dependencies.gluewheels.zip *.whl
 FROM scratch
 COPY --from=wheels /build/dependencies.gluewheels.zip /

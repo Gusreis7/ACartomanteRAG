@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#171711">
   <title>Consulta · Cartomante RAG</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=home-chat-large-9">
+  <link rel="stylesheet" href="/assets/styles.css?v=saint-draw-4">
 </head>
 <body class="chat-page">
   <div class="grain" aria-hidden="true"></div>
@@ -91,6 +91,7 @@
             <span aria-hidden="true">↗</span>
           </button>
         </form>
+        <button class="chat-startup-retry" id="chat-retry" type="button" hidden>Tentar abrir consulta</button>
         <div class="composer-meta">
           <span>Enter envia · Shift + Enter quebra linha</span>
           <span id="runtime-status"><i></i> motor disponível</span>
@@ -98,6 +99,82 @@
       </footer>
     </main>
   </div>
+
+  <dialog class="guide-draw" id="guide-draw" aria-labelledby="guide-draw-title" aria-describedby="guide-draw-description">
+    <div class="guide-draw-shell">
+      <p class="eyebrow">um encontro antes das palavras</p>
+      <h2 id="guide-draw-title">Quem guia a sua consulta?</h2>
+      <p class="guide-draw-description" id="guide-draw-description">Escolha uma carta e descubra seu santo-guia. Depois, você pode mudar para Neutro, Cosmo ou Damião no alto do chat.</p>
+      <div class="guide-draw-cards" role="group" aria-label="Duas cartas de santos-guias">
+        <button class="guide-card" type="button" data-guide-card="0" aria-label="Escolher a primeira carta" aria-pressed="false">
+          <span class="guide-card-inner">
+            <span class="guide-card-face guide-card-back" aria-hidden="true"><span class="guide-card-corner">✧</span><span class="guide-card-seal"><i></i><b>✦</b><i></i></span><span class="guide-card-back-label">o santo-guia</span><span class="guide-card-corner">✧</span></span>
+            <span class="guide-card-face guide-card-front" aria-hidden="true">
+              <span class="guide-card-front-corner guide-card-front-corner-top" aria-hidden="true"></span>
+              <span class="saint-portrait" role="img">
+                <svg class="saint-emblem" viewBox="0 0 300 340" aria-hidden="true" focusable="false">
+                  <circle class="saint-halo" cx="150" cy="115" r="74"/>
+                  <path class="saint-solid" d="M128 205L103 216C81 222 65 239 70 261A110 140 0 0 0 230 261C235 239 219 222 197 216L172 205Z"/>
+                  <path class="saint-cutout" d="M133 201V217L150 235L167 217V201Z"/>
+                  <path class="saint-solid" d="M150 58C120 58 100 72 100 99V133C100 169 122 198 145 208C148 210 152 210 155 208C178 198 200 169 200 133V99C200 72 180 58 150 58Z"/>
+                  <path class="saint-cutout" d="M116 105C132 103 143 92 150 80C157 92 168 103 184 105V139C184 150 179 156 173 158C165 152 158 153 150 158C142 153 135 152 127 158C121 156 116 150 116 139Z"/>
+                  <path class="saint-solid" d="M124 126C129 122 136 122 141 126C136 129 129 129 124 126ZM159 126C164 122 171 122 176 126C171 129 164 129 159 126Z"/>
+                  <path class="saint-feature" d="M150 129V144"/>
+                  <path class="saint-mouth" d="M143 174H157"/>
+                  <path class="saint-fold" d="M112 223C130 245 166 265 188 274"/>
+                  <g class="saint-medallion">
+                    <ellipse cx="150" cy="165" rx="110" ry="140"/>
+                    <path d="M150 7L153 13L150 19L147 13ZM150 313L153 319L150 325L147 319ZM24 165H33M267 165H276"/>
+                    <circle cx="150" cy="34" r="1.8"/>
+                  </g>
+                </svg>
+              </span>
+              <strong></strong>
+              <span class="guide-card-front-corner guide-card-front-corner-bottom" aria-hidden="true"></span>
+            </span>
+          </span>
+        </button>
+        <button class="guide-card" type="button" data-guide-card="1" aria-label="Escolher a segunda carta" aria-pressed="false">
+          <span class="guide-card-inner">
+            <span class="guide-card-face guide-card-back" aria-hidden="true"><span class="guide-card-corner">✧</span><span class="guide-card-seal"><i></i><b>✦</b><i></i></span><span class="guide-card-back-label">o santo-guia</span><span class="guide-card-corner">✧</span></span>
+            <span class="guide-card-face guide-card-front" aria-hidden="true">
+              <span class="guide-card-front-corner guide-card-front-corner-top" aria-hidden="true"></span>
+              <span class="saint-portrait" role="img">
+                <svg class="saint-emblem" viewBox="0 0 300 340" aria-hidden="true" focusable="false">
+                  <circle class="saint-halo" cx="150" cy="115" r="74"/>
+                  <path class="saint-solid" d="M128 205L103 216C81 222 65 239 70 261A110 140 0 0 0 230 261C235 239 219 222 197 216L172 205Z"/>
+                  <path class="saint-cutout" d="M133 201V217L150 235L167 217V201Z"/>
+                  <path class="saint-solid" d="M150 58C120 58 100 72 100 99V133C100 169 122 198 145 208C148 210 152 210 155 208C178 198 200 169 200 133V99C200 72 180 58 150 58Z"/>
+                  <path class="saint-cutout" d="M116 105C132 103 143 92 150 80C157 92 168 103 184 105V139C184 150 179 156 173 158C165 152 158 153 150 158C142 153 135 152 127 158C121 156 116 150 116 139Z"/>
+                  <path class="saint-solid" d="M124 126C129 122 136 122 141 126C136 129 129 129 124 126ZM159 126C164 122 171 122 176 126C171 129 164 129 159 126Z"/>
+                  <path class="saint-feature" d="M150 129V144"/>
+                  <path class="saint-mouth" d="M143 174H157"/>
+                  <path class="saint-fold" d="M112 223C130 245 166 265 188 274"/>
+                  <g class="saint-medallion">
+                    <ellipse cx="150" cy="165" rx="110" ry="140"/>
+                    <path d="M150 7L153 13L150 19L147 13ZM150 313L153 319L150 325L147 319ZM24 165H33M267 165H276"/>
+                    <circle cx="150" cy="34" r="1.8"/>
+                  </g>
+                </svg>
+              </span>
+              <strong></strong>
+              <span class="guide-card-front-corner guide-card-front-corner-bottom" aria-hidden="true"></span>
+            </span>
+          </span>
+        </button>
+      </div>
+      <div class="guide-draw-result" aria-live="polite" aria-atomic="true">
+        <p class="guide-draw-result-title" id="guide-result-title">Duas cartas. Uma companhia para a leitura.</p>
+        <p id="guide-result-description">O verso é igual; o encontro fica por conta da sua escolha.</p>
+      </div>
+      <p class="guide-draw-error" id="guide-draw-error" role="alert"></p>
+      <div class="guide-draw-actions">
+        <button class="button button-primary" id="guide-continue" type="button" hidden>Entrar na consulta <span aria-hidden="true">↗</span></button>
+        <button class="guide-neutral" id="guide-neutral" type="button">Prefiro começar no Neutro</button>
+      </div>
+      <p class="guide-draw-note">Santos-guias são personas de interpretação literária. Você escolhe o rumo da conversa.</p>
+    </div>
+  </dialog>
 
   <dialog class="evidence-table" id="evidence-table" aria-labelledby="evidence-table-title">
     <div class="evidence-table-shell">
@@ -122,7 +199,8 @@
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="/assets/help.js?v=ui-minimal-1" defer></script>
-  <script src="/assets/chat.js?v=ui-minimal-1" defer></script>
+  <script src="/assets/help.js?v=saint-guide-2" defer></script>
+  <script src="/assets/guide-draw.js?v=saint-draw-4" defer></script>
+  <script src="/assets/chat.js?v=saint-draw-1" defer></script>
 </body>
 </html>

@@ -11,7 +11,7 @@ import math
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
@@ -28,15 +28,16 @@ from benchmark.matrix import (
     SPLIT_SEED,
 )
 from src.config.config_manager import AppConfig, ConfigManager
-from src.embeddings.registry import EmbedderRegistry
 from src.etl.preparar_camada_silver_chunking import (
     build_dataset_id,
     salvar_parquet,
 )
-from src.indexing.embedding_index import EmbeddingIndex
 from src.storage.qdrant_manager import QdrantManager
 from src.storage.rustfs_manager import RustFSManager
 from src.utils.chunking import HuggingFaceChunkTokenizer, build_sections
+
+if TYPE_CHECKING:
+    from src.indexing.embedding_index import EmbeddingIndex
 
 
 BRONZE_CURRENT_KEY = "current.json"
@@ -917,6 +918,9 @@ def build_matrix_manifest(
 
 
 def main() -> None:
+    from src.embeddings.registry import EmbedderRegistry
+    from src.indexing.embedding_index import EmbeddingIndex
+
     args = parse_args()
     base_config = ConfigManager.load()
     storage = RustFSManager.from_config(base_config.environment.rustfs)

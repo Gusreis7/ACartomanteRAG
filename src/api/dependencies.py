@@ -17,11 +17,14 @@ def get_session_id(request: Request, response: Response) -> UUID:
 
     if raw:
         try:
-            return UUID(raw)
+            session_id = UUID(raw)
+            request.state.session_id = session_id
+            return session_id
         except ValueError:
             pass
 
     session_id = uuid4()
+    request.state.session_id = session_id
     response.set_cookie(
         key=SESSION_COOKIE,
         value=str(session_id),
