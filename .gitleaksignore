@@ -1,0 +1,4 @@
+# Falso positivo: nome do parametro IfNoneMatch no put_object do S3.
+# O backup usa um caminho de objeto, e o asterisco exige criacao condicional.
+# Excecao restrita ao commit, arquivo, regra e linha identificados abaixo.
+f262f4bf14b91b98b19384170156ee4b88666a63:src/etl/production.py:generic-api-key:258
