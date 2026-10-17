@@ -2,7 +2,7 @@
 (() => {
   const sections = [
     ["1. Traga uma pergunta literária", "Pergunte sobre uma obra, personagem, passagem ou tema. Exemplo: ‘Como Machado trabalha o ciúme em Dom Casmurro?’. O acervo é de Machado de Assis; quando faltar base no texto, a Cartomante deve dizer isso."],
-    ["2. Escolha sua leitura", "Neutro é o padrão. Cosmo e Damião são santos-guias que propõem interpretações diferentes de questões ambíguas. Uma interpretação não comprova um fato da história."],
+    ["2. Descubra seu santo-guia", "Cada nova consulta começa com duas cartas. Escolha uma para revelar Cosmo ou Damião; você também pode começar no Neutro. O seletor no alto do chat permite mudar a leitura depois. As personas propõem interpretações, sem comprovar fatos da história."],
     ["3. Confira as cartas", "Depois da resposta, clique em ‘Mostre-me as evidências’. Vire as cartas para ler as passagens originais que sustentam a leitura."],
     ["4. Continue ou descubra outra obra", "Faça perguntas de continuação na mesma consulta. ‘Nova consulta’ abre outro assunto; ‘Tirar uma leitura’ sorteia uma obra para você conhecer."],
   ];

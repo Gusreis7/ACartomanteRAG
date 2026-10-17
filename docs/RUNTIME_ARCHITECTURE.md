@@ -103,7 +103,11 @@ O enrichment continua auxiliar. Com `fail_open=true`, uma falha nessa camada dur
 
 Quis que a experiência preservasse a possibilidade de verificar a resposta. Por isso, somente os trechos `[E]` entram como evidências citáveis. Os resumos `[R]` ajudam o contexto interno, mas são texto produzido por outro processamento e não substituem a obra original. Scores e ranking também ficam internos. Recuperar dez candidatos não significa que a resposta precise citar os dez; o prompt favorece uma síntese com as referências essenciais.
 
-As personas entram na geração por mensagem. `Neutro` é o padrão; Cosmo é orientado a defender que Capitu não traiu, e Damião, a interpretação oposta. A troca de persona mantém o mesmo índice. A proposta é explorar como uma orientação interpretativa muda a resposta, mantendo o compromisso com os trechos disponíveis. A interface sinaliza essa opinião induzida.
+Cada nova consulta abre uma tiragem de duas cartas com versos iguais: Cosmo e Damião, embaralhados no servidor. A carta escolhida define a persona inicial; também é possível começar no Neutro ou trocar de guia no cabeçalho. Cosmo defende que Capitu não traiu, e Damião, a interpretação oposta. São orientações de leitura, sem alterar o índice ou transformar uma interpretação em prova.
+
+O tutorial aparece antes da primeira tiragem da sessão. A escolha original e a persona atual ficam nos metadados da conversa no Redis, vinculadas ao mesmo cookie usado no histórico. Reabrir a consulta mantém a escolha; uma nova consulta recebe outra tiragem. A gravação é atômica para que retries ou abas concorrentes não virem cartas diferentes. Conversas anteriores continuam no Neutro, sem exigir tiragem. O endpoint `.../guide` consulta ou altera a persona, e `.../guide/draw` registra a carta; ambos conferem o vínculo com a sessão. `guide-draw.js` cuida somente da interação do diálogo.
+
+As cartas usam o mesmo rosto frontal em preto, marfim e ouro envelhecido, desenhado em SVG inline. Apenas o nome e a pequena base sob ele distinguem os guias: verde para Cosmo e vinho para Damião. Os versos são idênticos; nome e cor aparecem após a escolha, sem antecipar a posição interpretativa. O desenho não exige imagens externas, chamadas ao LLM ou processamento do corpus.
 
 A leitura de cartas tem outro funcionamento: sorteia três obras do catálogo Bronze, permite virar uma carta e oferece a fonte oficial. Esse sorteio não é uma recomendação semântica calculada a partir da conversa. O catálogo é cacheado por processo e aceita somente URLs do Domínio Público/MEC.
 

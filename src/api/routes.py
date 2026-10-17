@@ -17,6 +17,9 @@ from src.api.schemas import (
     HealthResponse,
     MessageRequest,
     ReadyResponse,
+    GuideDrawRequest,
+    GuideStateResponse,
+    PersonaUpdateRequest,
 )
 from src.storage.qdrant_manager import check_qdrant_collection_ready
 from src.generation.provider import GenerationQuotaError
@@ -125,6 +128,36 @@ def list_conversations(
         ConversationResponse(**item)
         for item in service.list_for_session(session_id)
     ]
+
+
+def guide_response(state) -> GuideStateResponse:
+    if state is None:
+        raise HTTPException(status_code=404, detail="Conversa não encontrada.")
+    return GuideStateResponse(**state)
+
+
+@router.get("/api/v1/conversations/{chat_id}/guide", response_model=GuideStateResponse)
+def conversation_guide(chat_id: UUID, session_id: SessionId, service: ConversationServiceDep):
+    try:
+        return guide_response(service.guide(session_id=session_id, chat_id=chat_id))
+    except RedisError as exc:
+        raise HTTPException(status_code=503, detail="Não foi possível carregar a tiragem. Tente novamente.") from exc
+
+
+@router.post("/api/v1/conversations/{chat_id}/guide/draw", response_model=GuideStateResponse)
+def draw_conversation_guide(chat_id: UUID, body: GuideDrawRequest, session_id: SessionId, service: ConversationServiceDep):
+    try:
+        return guide_response(service.draw_guide(session_id=session_id, chat_id=chat_id, card=body.card))
+    except RedisError as exc:
+        raise HTTPException(status_code=503, detail="Não foi possível salvar a carta. Tente novamente.") from exc
+
+
+@router.patch("/api/v1/conversations/{chat_id}/guide", response_model=GuideStateResponse)
+def change_conversation_persona(chat_id: UUID, body: PersonaUpdateRequest, session_id: SessionId, service: ConversationServiceDep):
+    try:
+        return guide_response(service.set_persona(session_id=session_id, chat_id=chat_id, persona=body.persona))
+    except RedisError as exc:
+        raise HTTPException(status_code=503, detail="Não foi possível salvar o modo de leitura. Tente novamente.") from exc
 
 
 @router.get(

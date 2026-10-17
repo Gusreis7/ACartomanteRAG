@@ -1,0 +1,79 @@
+name: AWS MCQ benchmark
+on:
+  workflow_dispatch:
+    inputs:
+      split:
+        description: DEV para avaliação; holdout apenas depois de congelar a configuração
+        type: choice
+        options: [dev, holdout]
+        default: dev
+      limit_queries:
+        description: Quantidade de questões; 0 executa todo o split escolhido
+        type: number
+        default: 0
+      run_id:
+        description: Vazio cria um run; repetir o ID retoma somente pendências e erros
+        type: string
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: aws-production
+  cancel-in-progress: false
+jobs:
+  mcq:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_EC2_METADATA_DISABLED: 'true'
+      OPS_BUCKET: ${{ vars.OPS_BUCKET }}
+      BENCHMARK_ROLE: ${{ vars.AWS_ETL_ROLE_ARN }}
+      SPLIT: ${{ inputs.split }}
+      LIMIT_QUERIES: ${{ inputs.limit_queries }}
+      REQUESTED_RUN_ID: ${{ inputs.run_id }}
+      TOKENIZERS_PARALLELISM: 'false'
+      OMP_NUM_THREADS: '2'
+      HF_HOME: ${{ runner.temp }}/hf-cache
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - name: Validate benchmark inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${AWS_REGION:?Execute o bootstrap inicial}"
+          : "${OPS_BUCKET:?Execute o bootstrap inicial}"
+          : "${BENCHMARK_ROLE:?Execute o bootstrap inicial}"
+          case "$SPLIT" in dev|holdout) ;; *) exit 1 ;; esac
+          [[ "$LIMIT_QUERIES" =~ ^[0-9]{1,5}$ ]] || { echo 'limit_queries inválido'; exit 1; }
+          run_id="${REQUESTED_RUN_ID:-mcq-$SPLIT-$GITHUB_RUN_ID}"
+          [[ "$run_id" =~ ^[A-Za-z0-9_-]{1,100}$ ]] || { echo 'run_id inválido'; exit 1; }
+          printf 'MCQ_RUN_ID=%s\n' "$run_id" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Install existing runtime dependencies
+        run: python scripts/dependencies.py install runtime --no-cache-dir
+      - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
+        with:
+          role-to-assume: ${{ vars.AWS_ETL_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: mcq-${{ github.run_id }}
+          role-duration-seconds: 10800
+      - name: Read current deployment context
+        run: aws s3 cp "s3://$OPS_BUCKET/config/deployment.json" "$RUNNER_TEMP/deployment.local.json" --only-show-errors
+      - name: Check emergency stop
+        run: python scripts/cloud.py check-emergency --bucket "$OPS_BUCKET"
+      - name: Run MCQ with the current AWS configuration
+        run: |
+          python -u -m benchmark.run_current_mcq \
+            --deployment-file "$RUNNER_TEMP/deployment.local.json" \
+            --revision "$GITHUB_SHA" --run-id "$MCQ_RUN_ID" \
+            --split "$SPLIT" --limit-queries "$LIMIT_QUERIES" \
+            --output "$RUNNER_TEMP/mcq-report"

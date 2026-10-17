@@ -14,6 +14,7 @@ const evidenceSpread = document.querySelector("#evidence-spread");
 const evidenceTableCount = document.querySelector("#evidence-table-count");
 const evidenceTableClose = document.querySelector("#evidence-table-close");
 const personaButtons = [...document.querySelectorAll("[data-persona]")];
+const retryChat = document.querySelector("#chat-retry");
 
 let sending = false;
 let activePersona = "neutral";
@@ -369,7 +370,21 @@ document.querySelector("#sidebar-toggle")?.addEventListener("click", () => {
 });
 
 personaButtons.forEach((button) => {
-  button.addEventListener("click", () => setPersona(button.dataset.persona));
+  button.addEventListener("click", async () => {
+    if (sending) return;
+    setSending(true);
+    try {
+      const state = await jsonFetch(`/api/v1/conversations/${chatId}/guide`, {
+        method: "PATCH", body: JSON.stringify({ persona: button.dataset.persona }),
+      });
+      setPersona(state.persona);
+    } catch (error) {
+      showToast(error.message);
+    } finally {
+      setSending(false);
+      input.focus();
+    }
+  });
 });
 
 evidenceTableClose?.addEventListener("click", () => evidenceTable.close());
@@ -384,8 +399,32 @@ if (queryPrompt) {
   resizeInput();
 }
 
-setSending(true);
-window.CartomanteGuide.ensure()
-  .then(() => Promise.all([loadConversations(), loadMessages()]))
-  .catch((error) => showToast(error.message))
-  .finally(() => { setSending(false); input.focus(); });
+async function initializeChat() {
+  setSending(true);
+  retryChat.hidden = true;
+  try {
+    await window.CartomanteGuide.ensure();
+    let state = await jsonFetch(`/api/v1/conversations/${chatId}/guide`);
+    setPersona(state.persona);
+    await Promise.all([loadConversations(), loadMessages()]);
+    if (state.draw_required) {
+      state = await window.CartomanteDraw.open({
+        draw: (card) => jsonFetch(`/api/v1/conversations/${chatId}/guide/draw`, {
+          method: "POST", body: JSON.stringify({ card }),
+        }),
+        neutral: () => jsonFetch(`/api/v1/conversations/${chatId}/guide`, {
+          method: "PATCH", body: JSON.stringify({ persona: "neutral" }),
+        }),
+      });
+      setPersona(state.persona);
+    }
+    setSending(false);
+    input.focus();
+  } catch (error) {
+    showToast(error.message);
+    retryChat.hidden = false;
+  }
+}
+
+retryChat.addEventListener("click", initializeChat);
+initializeChat();
