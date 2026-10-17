@@ -47,7 +47,7 @@ class GenerationQuotaError(GenerationCapacityError):
 
 class GenerationProvider(ABC):
     @abstractmethod
-    def invoke(self, messages: list) -> Any:
+    def invoke(self, messages: list, *, max_tokens=None) -> Any:
         raise NotImplementedError
 
     def invoke_structured(
@@ -138,10 +138,14 @@ class OllamaGenerationProvider(GenerationProvider):
             "Serviço de geração indisponível."
         ) from exc
 
-    def invoke(self, messages: list) -> Any:
+    def invoke(self, messages: list, *, max_tokens=None) -> Any:
         self._acquire()
         try:
-            return self.client.invoke(messages, **self._runtime_kwargs())
+            kwargs = self._runtime_kwargs()
+            if max_tokens is not None:
+                kwargs["options"] = {"num_ctx": self.config.num_ctx, "temperature": self.config.temperature,
+                                     "top_p": self.config.top_p, **kwargs.get("options", {}), "num_predict": int(max_tokens)}
+            return self.client.invoke(messages, **kwargs)
         except Exception as exc:
             self._translate_error(exc)
         finally:

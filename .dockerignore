@@ -1,13 +1,12 @@
 # Somente fontes e configuração sem segredos entram no contexto de build.
 **
 !Dockerfile
-!requirements-runtime.txt
-!requirements-runtime.lock
-!requirements-glue.lock
+!pyproject.toml
+!scripts/
+!scripts/dependencies.py
 !infra/
 !infra/glue/
 !infra/glue/Dockerfile.wheels
-!requirements.txt
 !benchmark/
 !benchmark/**
 !AED/

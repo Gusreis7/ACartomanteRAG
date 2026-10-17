@@ -23,6 +23,10 @@ from src.generation.context_builder import (
     build_context,
     build_context_with_enrichment,
 )
+from src.generation.input_guard import (
+    LiteraryInputGuard,
+    REFUSAL,
+)
 from src.generation.prompt import (
     SYSTEM_PROMPT,
 )
@@ -34,12 +38,6 @@ from src.generation.provider import (
     GenerationProvider,
     GenerationServiceError,
     create_generation_provider,
-)
-from src.retrieval.enrichment import (
-    EnrichmentRetriever,
-)
-from src.retrieval.service import (
-    RetrievalService,
 )
 
 
@@ -80,6 +78,8 @@ class RAGState(
 
     answer: str
     generation_usage: dict[str, Any]
+    guard_decision: str
+    guard_usage: dict[str, Any]
 
     timings_ms: dict[
         str,
@@ -98,6 +98,10 @@ class MachadoRAG:
         ) = None,
         checkpointer=None,
     ) -> None:
+        # Modelos de recuperação só são necessários ao construir o runtime.
+        from src.retrieval.enrichment import EnrichmentRetriever
+        from src.retrieval.service import RetrievalService
+
         self.config = config
 
         self.retrieval = (
@@ -126,6 +130,10 @@ class MachadoRAG:
                 config.generation
             )
         )
+        self.input_guard = LiteraryInputGuard(
+            self.generation_provider,
+            max_tokens=config.chat.guard_max_tokens,
+        ) if config.chat.input_guard_enabled else None
 
         self.checkpointer = (
             checkpointer
@@ -140,6 +148,16 @@ class MachadoRAG:
     ):
         graph = StateGraph(
             RAGState
+        )
+
+        graph.add_node(
+            "input_guard",
+            self._input_guard,
+        )
+
+        graph.add_node(
+            "refuse",
+            self._refuse,
         )
 
         graph.add_node(
@@ -159,7 +177,18 @@ class MachadoRAG:
 
         graph.add_edge(
             START,
-            "retrieve",
+            "input_guard",
+        )
+
+        graph.add_conditional_edges(
+            "input_guard",
+            self._route_input,
+            {"retrieve": "retrieve", "refuse": "refuse"},
+        )
+
+        graph.add_edge(
+            "refuse",
+            END,
         )
 
         graph.add_edge(
@@ -229,6 +258,17 @@ class MachadoRAG:
                     "query": query,
                     "persona": persona,
                     "timings_ms": {},
+                    # O checkpoint preserva mensagens, não os resultados da pergunta anterior.
+                    "retrieval_response": None,
+                    "enrichment_response": None,
+                    "retrieval_strategy": "not_run",
+                    "context": "",
+                    "context_usage": {},
+                    "evidences": [],
+                    "answer": "",
+                    "generation_usage": {},
+                    "guard_decision": "pending",
+                    "guard_usage": {},
                 },
                 config=(
                     invoke_config
@@ -236,13 +276,15 @@ class MachadoRAG:
             )
         )
 
-        response = result[
-            "retrieval_response"
-        ]
+        response = result.get("retrieval_response")
 
         return {
             "query": query,
             "generation_usage": result.get("generation_usage", {}),
+            "input_guard": {
+                "decision": result["guard_decision"],
+                "usage": result.get("guard_usage", {}),
+            },
             "answer": (
                 result["answer"]
             ),
@@ -263,16 +305,51 @@ class MachadoRAG:
                     "timings_ms"
                 ]
             ),
-            "silver_dataset_id": (
-                response
-                .silver_dataset_id
-            ),
-            "index_id": (
-                response.index_id
-            ),
-            "collection": (
-                response.collection
-            ),
+            "silver_dataset_id": getattr(response, "silver_dataset_id", None),
+            "index_id": getattr(response, "index_id", None),
+            "collection": getattr(response, "collection", None),
+        }
+
+    def _input_guard(self, state: RAGState) -> dict[str, Any]:
+        started = perf_counter()
+        questions = [
+            _message_text(message.content)[:1000]
+            for message in state.get("messages", [])
+            if isinstance(message, HumanMessage)
+        ][-2:]
+        decision = self.input_guard.review(state["query"], questions) if self.input_guard else None
+        timings = dict(state.get("timings_ms", {}))
+        timings["input_guard_ms"] = (perf_counter() - started) * 1000.0
+        return {
+            "guard_decision": decision.decision if decision else "disabled",
+            "guard_usage": decision.usage if decision else {},
+            "timings_ms": timings,
+        }
+
+    @staticmethod
+    def _route_input(state: RAGState) -> str:
+        decision = state.get("guard_decision")
+        if decision in {"allow", "disabled"}:
+            return "retrieve"
+        if decision in {"off_topic", "unsafe"}:
+            return "refuse"
+        raise GenerationServiceError("Não foi possível validar o assunto da pergunta. Tente novamente.")
+
+    @staticmethod
+    def _refuse(state: RAGState) -> dict[str, Any]:
+        timings = dict(state.get("timings_ms", {}))
+        timings["total_ms"] = timings.get("input_guard_ms", 0.0)
+        return {
+            "answer": REFUSAL,
+            "messages": [HumanMessage(content=state["query"]), AIMessage(content=REFUSAL)],
+            "evidences": [],
+            "context": "",
+            "context_usage": {},
+            "retrieval_response": None,
+            "enrichment_response": None,
+            "retrieval_strategy": "not_run",
+            "generation_usage": {},
+            "timings_ms": timings,
         }
 
     def _retrieve(

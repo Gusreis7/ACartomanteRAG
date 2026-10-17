@@ -32,6 +32,7 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION }}
       STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
       STATE_KEY: ${{ vars.TF_STATE_KEY }}
+      OPS_BUCKET: ${{ vars.OPS_BUCKET }}
       OPERATION: ${{ inputs.operation }}
       TF_IN_AUTOMATION: 'true'
     steps:
@@ -96,11 +97,18 @@ jobs:
             -backend-config=encrypt=true -backend-config=use_lockfile=true
           terraform -chdir=infra/aws fmt -check
           terraform -chdir=infra/aws validate
+      - name: Install AWS operation client
+        run: python3 scripts/dependencies.py install ops
+      - name: Check emergency stop
+        if: inputs.operation == 'apply'
+        run: python3 scripts/cloud.py check-emergency --bucket "$OPS_BUCKET"
       - name: Plan
         run: terraform -chdir=infra/aws plan -input=false -lock-timeout=5m -var-file=production.tfvars.json -out="$RUNNER_TEMP/deployment.tfplan"
       - name: Apply
         if: inputs.operation == 'apply'
-        run: terraform -chdir=infra/aws apply -input=false "$RUNNER_TEMP/deployment.tfplan"
+        run: |
+          python3 scripts/cloud.py check-emergency --bucket "$OPS_BUCKET"
+          terraform -chdir=infra/aws apply -input=false "$RUNNER_TEMP/deployment.tfplan"
       - name: Remove private Terraform inputs and plan
         if: always()
         run: rm -f -- infra/aws/production.tfvars.json "$RUNNER_TEMP/deployment.tfplan"

@@ -101,11 +101,7 @@ jobs:
         run: |
           python3 -m venv .venv-release
 
-          .venv-release/bin/pip install \
-            "PyYAML>=6,<7" \
-            "python-dotenv>=1.2,<2" \
-            "pydantic>=2.13,<3" \
-            "boto3>=1.40,<2"
+          .venv-release/bin/python scripts/dependencies.py install ops
 
       - name: Promote production release
         if: ${{ false }} # Pausado: docs/IMPEDITIVOS.md

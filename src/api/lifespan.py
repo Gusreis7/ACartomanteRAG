@@ -12,6 +12,7 @@ from src.generation.graph import MachadoRAG
 from src.generation.provider import create_generation_provider
 from src.services.chat import ChatService
 from src.services.conversations import ConversationService
+from src.services.usage import UsageStats
 from src.storage.redis_chat_repository import RedisChatRepository
 from src.storage.redis_message_repository import RedisMessageRepository
 
@@ -64,6 +65,7 @@ async def lifespan(app: FastAPI):
 
             app.state.config = config
             app.state.redis = redis
+            app.state.usage = UsageStats(redis)
             app.state.checkpointer = checkpointer
             app.state.generation_provider = generation_provider
             app.state.rag = rag

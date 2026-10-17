@@ -4,6 +4,8 @@
 
 O Gitea no Raspberry mantém o repositório e o espelho do GitHub. O GitHub Actions executa CI/CD; o runtime local permanece suspenso durante a manutenção do Raspberry.
 
+Branches de desenvolvimento e PRs são tratados no Gitea. No GitHub, `CI and AWS deploy` dispara somente por push na `main` ou manualmente; os testes, scanner, build e validação Terraform da revisão publicada continuam ativos. Isso elimina a segunda passagem `develop` → PR → `main` no espelho. O bootstrap em modo `--mirror-source` também deixa de criar `develop` no GitHub. As checagens locais do Gitea continuam sujeitas à limitação do Raspberry descrita em [IMPEDITIVOS.md](IMPEDITIVOS.md).
+
 O Terraform define rede, EC2, discos, buckets, ECR, IAM, SSM, Glue, DNS e alerta de orçamento. O state fica no S3 com lock. A coleta Raw ocorre uma vez no notebook; as demais etapas do ETL rodam no Glue, com vetores no Qdrant Cloud.
 
 | Configuração | Local | Uso |
@@ -29,7 +31,7 @@ gh auth status
 
 test -d .venv || python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -c requirements-runtime.lock boto3 python-dotenv
+python scripts/dependencies.py install ops
 ```
 
 Confirme a identidade `terraform`. Para renovar a sessão: `aws login --profile terraform-login`. Em novos terminais, selecione novamente `AWS_PROFILE=terraform`.
@@ -193,3 +195,76 @@ Com DNS resolvendo e dados promovidos:
 | Rotação Qdrant | Atualizar o arquivo privado, executar `bootstrap_aws.py configure` e publicar novamente a API. |
 
 Terraform, deploy e ETL compartilham a concorrência `aws-production`. Os workflows consultam o contexto atualizado no S3, sem depender de IDs EC2 antigos. O benchmark Qwen/Scout permanece separado do deploy e reutiliza a base, com DEV e holdout separados.
+
+## Chat: leitura, escopo e primeira visita
+
+As respostas usam Markdown no histórico e nas novas mensagens: negrito, listas, títulos, citações e tabelas. A conversão ocorre na API, com HTML e imagens desativados; mensagens do visitante continuam como texto. O renderer já fazia parte do lock de dependências e agora é uma dependência direta.
+
+No LangGraph, `input_guard` classifica o pedido como literatura, fora de assunto ou tentativa de alterar regras/explorar o sistema. Uma aresta condicional segue para `retrieve → build_context → generate` ou para `refuse → END`, com resposta fixa e sem recuperação. O serviço HTTP mantém propriedade da conversa, limites e persistência; a decisão de caminho pertence ao grafo.
+
+A triagem usa o mesmo provider e as mesmas vagas de concorrência, até 128 tokens de saída e as duas perguntas anteriores do checkpoint, limitadas para entender continuações. Acrescenta uma inferência curta, latência e tokens; falha de classificação bloqueia a geração com erro temporário. Cada pergunta limpa contexto, evidências e metadados transitórios, preservando as mensagens da conversa. Recusas também entram no histórico e consomem a cota de tentativa. Configuração: `chat.input_guard_enabled` e `chat.guard_max_tokens`.
+
+Essa proteção reduz pedidos indevidos e prompt injection, sem garantir detecção de todos os ataques. O modelo não recebe ferramentas de administração. A regra vale nas chamadas a `MachadoRAG`, inclusive API e CLI; ETL e benchmarks que chamam os módulos diretamente continuam separados.
+
+O guia abre antes da primeira consulta, explica perguntas, personas, evidências e continuidade. O aceite fica no Redis por até 30 dias, associado ao cookie da sessão; limpar o cookie ou trocar de navegador abre uma nova sessão. `Ajuda` reabre o guia. O aviso informa que consultas são registradas e recomenda evitar dados pessoais.
+
+## Parada de emergência
+
+No GitHub: **Actions → AWS emergency → Run workflow → main**.
+
+| Operação | Efeito |
+|---|---|
+| `stop` | Grava uma trava no bucket Ops, solicita a parada dos jobs Glue ativos do projeto e da EC2; acompanha a conclusão. |
+| `resume` | Inicia a EC2 e libera a trava depois de confirmar o estado `running`. Aguarde o aquecimento e teste a URL. O ETL exige novo disparo. |
+
+O workflow usa a role de infraestrutura por OIDC, sem nova chave ou Secret. Tem concorrência própria para atender mesmo durante um ETL. A trava bloqueia novos applies, deploys e inícios de ETL pelos workflows atualizados; plano Terraform e inspeção permanecem disponíveis. Em falha parcial, a trava permanece e o workflow acusa erro: confira os serviços e repita `stop`.
+
+EC2, volumes, snapshots, buckets, Redis e checkpoints não são excluídos. Armazenamento e IP público ainda podem ter custo; isso não é um teto de gastos AWS. Uma chamada Bedrock em andamento pode terminar antes da parada. Um Terraform/SSM já em andamento pode cruzar a última verificação; confira essas execuções e os recursos finais. Comandos administrativos diretos e workflows antigos não são bloqueados pela trava. Antes de retomar um ETL interrompido, confirme que não há Glue ativo e confira seu lock; não o apague automaticamente.
+
+Na primeira publicação deste patch, o job de infraestrutura atualiza as permissões de leitura da trava para as roles de deploy/ETL antes da imagem. Não altere AMI, tfvars privados ou Secret para esta atualização; revise o plano normal da pipeline.
+
+## Inspeção das consultas e do tráfego
+
+O Redis aceita a API pela rede Docker `redis_private` e a administração pelo loopback da EC2 (`127.0.0.1:6379`). Só API e Redis participam dessa rede; Caddy e outros serviços não recebem acesso direto. O security group mantém somente HTTPS de entrada: não se abre 6379 no IP público nem para a VPC. O notebook chega ao loopback por túnel SSM autorizado por IAM, usando o perfil `terraform`; o IP do notebook não entra em uma lista pública de Redis.
+
+Autenticar na AWS autoriza a sessão SSM conforme a política IAM; a conexão Redis ainda exige a senha da ACL `inspector`. Uma requisição web não recebe essas credenciais nem um endpoint de administração. A própria API precisa usar o Redis: o isolamento de rede não revoga esse acesso legítimo de seu processo. Não se concede acesso por estar apenas na rede interna.
+
+Na raiz do projeto, com AWS CLI e plugin Session Manager instalados, abra o túnel no notebook:
+
+```bash
+export AWS_PROFILE=terraform
+export AWS_REGION=us-east-1
+python scripts/cloud.py redis-tunnel
+```
+
+Mantenha esse terminal aberto. Em outro terminal, com o mesmo perfil e ambiente Python, obtenha a senha de leitura:
+
+```bash
+python scripts/cloud.py redis-password
+```
+
+No [RedisInsight instalado no notebook](https://redis.io/docs/latest/develop/tools/insight/), adicione `127.0.0.1:16379`, usuário `inspector`, senha retornada e TLS desativado nessa conexão local. O transporte até a EC2 passa pelo túnel SSM; a porta Redis continua privada. A ACL permite leitura, inclusive `INFO`, sem operações de alteração ou `MONITOR`. O RedisInsight não está hospedado na EC2. Se usar uma instalação Docker, o `localhost` é o do container; prefira o aplicativo local para este túnel.
+
+| Chave/filtro no Browser do RedisInsight | Conteúdo |
+|---|---|
+| `acartomante:session:*:chat:*:messages` | Streams com perguntas, respostas, evidências e `metadata` de geração/triagem. |
+| `acartomante:usage:AAAAMMDD` | Contadores de requisições, páginas, status HTTP, respostas, recusas, tokens e custo estimado. |
+| `acartomante:usage:AAAAMMDD:sessions` | HyperLogLog de sessões aproximadas; não equivale a pessoas nem a usuários simultâneos. |
+
+Com o túnel aberto, o resumo pode ser consultado sem interface:
+
+```bash
+python scripts/dependencies.py install ops
+python scripts/cloud.py usage
+python scripts/cloud.py usage --day 20261017
+```
+
+Os contadores começam na publicação, usam dia UTC e expiram em 14 dias. Requisições excluem assets e health checks. Tokens/custo somam triagem e resposta dos atendimentos concluídos; chamadas falhas e retries podem ficar fora, portanto não substituem a fatura. Limpar cookies aumenta o número de sessões. As perguntas continuam sujeitas à retenção já existente do histórico, independente dos contadores.
+
+A API registra método, rota normalizada, status e duração no log Docker, sem corpo, IP ou query string. No Console **EC2 → Instance → Monitoring**, acompanhe CPU, `NetworkIn`, `NetworkOut` e status checks. Memória/disco dentro do SO exigem instrumentação adicional. Este patch usa Redis e logs locais; não instala agente nem cria envio de logs da API para o CloudWatch. Os limites existentes continuam em seis tentativas por sessão/minuto, 300/dia globais e duas inferências simultâneas; não substituem controle financeiro.
+
+## Dependências em um manifesto
+
+`pyproject.toml` reúne os perfis PEP 735 `runtime`, `glue`, `ci`, `crawler`, `ops` e `tools`. Os antigos arquivos `requirements*.txt`, `.in` e `.lock` foram removidos. Os pins de produção ficam no próprio manifesto; markers de versão mantêm NumPy, SciPy e NetworkX compatíveis com os locks anteriores de Python 3.11/3.12. Ferramentas de testes/análise conservam suas faixas anteriores. O índice PyTorch continua CPU.
+
+Use `python scripts/dependencies.py install PERFIL` dentro do venv. O leitor aplica os pins centrais também aos perfis leves e não exige instalar um novo gerenciador. `check` valida o manifesto sem instalar; `export glue --output /tmp/glue-requirements.txt` gera a entrada temporária do pip para as wheels Glue. Dockerfiles, GitHub, preparo de release no Gitea e guia de coleta consomem a mesma fonte. Não há cópia manual de listas em outros arquivos.

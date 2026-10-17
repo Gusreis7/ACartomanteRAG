@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from time import time
 from uuid import UUID
 
+from src.services.usage import UsageStats
+
 from src.generation.provider import (
     GenerationCapacityError,
     GenerationServiceError,
@@ -37,6 +39,7 @@ class ChatService:
         self.repository = repository
         self.message_repository = message_repository
         self.rag = rag
+        self.usage = UsageStats(repository.redis)
 
     def send_message(
         self,
@@ -72,6 +75,7 @@ class ChatService:
             ),
             persona=persona,
         )
+        guard = result.get("input_guard", {"decision": "disabled", "usage": {}})
 
         evidences = [
             {
@@ -93,6 +97,7 @@ class ChatService:
             metadata={
                 "persona": persona, "timings_ms": result["timings_ms"],
                 "index_id": result.get("index_id"), **result.get("generation_usage", {}),
+                "input_guard": guard,
             },
         )
 
@@ -100,6 +105,8 @@ class ChatService:
             session_id=session_id,
             chat_id=chat_id,
         )
+        decision = "allow" if guard["decision"] in {"allow", "disabled"} else guard["decision"]
+        self.usage.record_chat(decision, guard["usage"], result.get("generation_usage", {}))
 
         if conversation["title"] == "Nova conversa":
             self.repository.rename(

@@ -42,6 +42,7 @@ class ConversationMessageResponse(BaseModel):
     turn_id: UUID
     role: Literal["user", "assistant"]
     content: str
+    content_html: str | None = None
     created_at: datetime
     evidences: list[EvidenceResponse] = Field(
         default_factory=list
@@ -56,6 +57,7 @@ class ConversationHistoryResponse(BaseModel):
 class ChatResponse(BaseModel):
     chat_id: UUID
     answer: str
+    answer_html: str | None = None
     evidences: list[EvidenceResponse]
 
 

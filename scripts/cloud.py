@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import subprocess
 import time
+from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 import boto3
@@ -24,6 +25,84 @@ ETL_STEPS = (
     "enrichment",
     "enrichment-index",
 )
+EMERGENCY_KEY = "config/emergency.json"
+ACTIVE_GLUE_STATES = {"STARTING", "RUNNING", "WAITING", "STOPPING"}
+
+
+def emergency_state(s3, bucket):
+    listed = s3.list_objects_v2(Bucket=bucket, Prefix=EMERGENCY_KEY, MaxKeys=1)
+    if not any(item["Key"] == EMERGENCY_KEY for item in listed.get("Contents", [])):
+        return {"active": False}
+    state = json.loads(s3.get_object(Bucket=bucket, Key=EMERGENCY_KEY)["Body"].read())
+    if not isinstance(state, dict) or type(state.get("active")) is not bool:
+        raise ValueError("Estado de emergência inválido; operação recusada.")
+    return state
+
+
+def require_operations_enabled(s3, bucket):
+    if emergency_state(s3, bucket)["active"]:
+        raise RuntimeError("Parada de emergência ativa. Use AWS emergency → resume antes de publicar ou iniciar ETL.")
+
+
+def active_glue_runs(glue, job):
+    return [run for page in glue.get_paginator("get_job_runs").paginate(JobName=job)
+            for run in page.get("JobRuns", []) if run["JobRunState"] in ACTIVE_GLUE_STATES]
+
+
+def emergency_operation(s3, ec2, glue, out, operation):
+    bucket, instance, job = out["ops_bucket"], out["instance_id"], out["glue_job"]
+    if not re.fullmatch(r"i-[0-9a-f]{8,17}", instance):
+        raise ValueError("ID da instância inválido no contexto de deploy.")
+    def save(active):
+        s3.put_object(Bucket=bucket, Key=EMERGENCY_KEY, ContentType="application/json",
+                      Body=json.dumps({"active": active, "updated_at": datetime.now(timezone.utc).isoformat(),
+                                       "github_run_id": os.getenv("GITHUB_RUN_ID", "local")}).encode())
+    if operation == "stop":
+        save(True)
+        errors = []
+        try:
+            runs = [run["Id"] for run in active_glue_runs(glue, job) if run["JobRunState"] != "STOPPING"]
+            for offset in range(0, len(runs), 25):
+                result = glue.batch_stop_job_run(JobName=job, JobRunIds=runs[offset:offset + 25])
+                if result.get("Errors"):
+                    errors.append("Glue recusou parte das solicitações")
+        except Exception as exc:
+            errors.append(f"Glue: {type(exc).__name__}")
+        try:
+            ec2.stop_instances(InstanceIds=[instance])
+        except Exception as exc:
+            errors.append(f"EC2: {type(exc).__name__}")
+        if errors:
+            raise RuntimeError("Parada parcial; trava mantida. Confira os serviços: " + "; ".join(errors))
+        deadline = time.monotonic() + 600
+        while time.monotonic() < deadline:
+            state = ec2.describe_instances(InstanceIds=[instance])["Reservations"][0]["Instances"][0]["State"]["Name"]
+            remaining = active_glue_runs(glue, job)
+            new_runs = [run["Id"] for run in remaining if run["JobRunState"] != "STOPPING"]
+            for offset in range(0, len(new_runs), 25):
+                result = glue.batch_stop_job_run(JobName=job, JobRunIds=new_runs[offset:offset + 25])
+                if result.get("Errors"):
+                    raise RuntimeError("Glue recusou uma parada; trava mantida. Confira o job.")
+            if state == "stopped" and not remaining:
+                print("Emergência ativa: EC2 parada e nenhum Glue ativo. Dados e volumes preservados.")
+                return
+            time.sleep(5)
+        raise RuntimeError("Prazo de parada excedido; trava mantida. Confira EC2 e Glue antes de retomar.")
+    elif operation == "resume":
+        # A trava só é liberada depois de o início da instância ser confirmado.
+        state = ec2.describe_instances(InstanceIds=[instance])["Reservations"][0]["Instances"][0]["State"]["Name"]
+        if state == "stopping":
+            ec2.get_waiter("instance_stopped").wait(InstanceIds=[instance])
+            state = "stopped"
+        if state == "stopped":
+            ec2.start_instances(InstanceIds=[instance])
+        elif state not in {"running", "pending"}:
+            raise RuntimeError("Instância fora de um estado retomável; trava preservada.")
+        ec2.get_waiter("instance_running").wait(InstanceIds=[instance])
+        save(False)
+        print("Instância iniciada e trava liberada. Aguarde a aplicação aquecer; ETL não é reiniciado automaticamente.")
+    else:
+        raise ValueError("Operação de emergência inválida.")
 
 
 def read_secret_file(path):
@@ -371,6 +450,12 @@ def main():
     reload.add_argument("--document")
     commands.add_parser("redis-tunnel")
     commands.add_parser("redis-password")
+    usage = commands.add_parser("usage", help="Resumo privado; exige redis-tunnel aberto em outro terminal")
+    usage.add_argument("--day", default=datetime.now(timezone.utc).strftime("%Y%m%d"))
+    control = commands.add_parser("check-emergency")
+    control.add_argument("--bucket", required=True)
+    emergency = commands.add_parser("emergency")
+    emergency.add_argument("operation", choices=["stop", "resume"])
     a = commands.add_parser("admin")
     a.add_argument("operation", choices=["backup", "restart", "restore"])
     a.add_argument("--key")
@@ -397,8 +482,14 @@ def main():
     region = os.getenv("AWS_REGION", "us-east-1")
     ssm = boto3.client("ssm", region_name=region)
     s3 = boto3.client("s3", region_name=region)
+    if args.command == "check-emergency":
+        require_operations_enabled(s3, args.bucket)
+        print("Operações habilitadas.")
+        return
     if args.command in {"deploy", "reload-data"}:
         target = outputs(args.outputs) if args.outputs else {}
+        if target.get("ops_bucket"):
+            require_operations_enabled(s3, target["ops_bucket"])
         instance = args.instance or target.get("instance_id")
         document = args.document or target.get(
             "ssm_deploy_document"
@@ -423,7 +514,24 @@ def main():
         wait_command(ssm, command, instance)
         return
     out = outputs(args.outputs)
-    if args.command == "secrets":
+    if args.command == "emergency":
+        emergency_operation(s3, boto3.client("ec2", region_name=region), boto3.client("glue", region_name=region), out, args.operation)
+    elif args.command == "usage":
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        from redis import Redis
+        from src.services.usage import UsageStats
+        try:
+            datetime.strptime(args.day, "%Y%m%d")
+        except ValueError:
+            raise ValueError("Use --day AAAAMMDD em UTC.")
+        if not re.fullmatch(r"[0-9]{8}", args.day):
+            raise ValueError("Use --day AAAAMMDD em UTC.")
+        settings = json.loads(ssm.get_parameter(Name=out["app_settings_parameter"], WithDecryption=True)["Parameter"]["Value"])
+        with Redis(host="127.0.0.1", port=16379, username="inspector", password=settings["REDIS_INSPECT_PASSWORD"],
+                   decode_responses=True, socket_timeout=5, socket_connect_timeout=5) as redis:
+            print(json.dumps(UsageStats(redis).summary(args.day), ensure_ascii=False, indent=2))
+    elif args.command == "secrets":
         values = (
             read_secret_file(args.env_file)
             if args.env_file
@@ -452,6 +560,7 @@ def main():
             raise SystemExit(3)
         print("Bundle Glue íntegro e pronto.")
     elif args.command == "glue":
+        require_operations_enabled(s3, out["ops_bucket"])
         if args.run_id_file and (args.run_id_file.exists() or not args.run_id_file.parent.is_dir()):
             p.error("--run-id-file exige um arquivo novo em um diretório existente")
         arguments = glue_arguments(

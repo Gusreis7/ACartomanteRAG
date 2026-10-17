@@ -28,7 +28,8 @@ resource "aws_iam_role" "github_etl" {
 resource "aws_iam_role_policy" "github_etl" {
   role = aws_iam_role.github_etl.id
   policy = jsonencode({ Version = "2012-10-17", Statement = [
-    { Effect = "Allow", Action = ["s3:GetObject"], Resource = ["${aws_s3_bucket.data["ops"].arn}/config/deployment.json"] },
+    { Effect = "Allow", Action = ["s3:GetObject"], Resource = ["${aws_s3_bucket.data["ops"].arn}/config/deployment.json", "${aws_s3_bucket.data["ops"].arn}/config/emergency.json"] },
+    { Effect = "Allow", Action = ["s3:ListBucket"], Resource = [aws_s3_bucket.data["ops"].arn], Condition = { StringEquals = { "s3:prefix" = "config/emergency.json" } } },
     { Effect = "Allow", Action = ["s3:ListBucket"], Resource = [aws_s3_bucket.data["ops"].arn], Condition = { StringLike = { "s3:prefix" = ["glue/*"] } } },
     { Effect = "Allow", Action = ["s3:GetObject", "s3:PutObject"], Resource = ["${aws_s3_bucket.data["ops"].arn}/glue/*"] },
     { Effect = "Allow", Action = ["glue:GetJob", "glue:StartJobRun", "glue:GetJobRun"], Resource = [aws_glue_job.etl.arn] },

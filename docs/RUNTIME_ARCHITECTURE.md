@@ -65,7 +65,7 @@ As responsabilidades no código acompanham essas etapas:
 | `src/etl` e `src/utils/chunking.py` | Preparar as camadas e a divisão dos textos. |
 | `src/indexing` e `src/embeddings` | Construir índices, descrever seus manifests e publicar releases. |
 | `src/retrieval` | Buscar candidatos, reranquear e recuperar os resumos auxiliares. |
-| `src/generation` | Montar o contexto, aplicar a persona e chamar o modelo pelo grafo. |
+| `src/generation` | Classificar o escopo, rotear para recusa ou recuperação, montar contexto, aplicar persona e gerar a resposta pelo grafo. |
 | `src/services` | Organizar conversas, mensagens, vínculo com a sessão e catálogo de obras. |
 | `src/api` | Validar as entradas HTTP, expor os contratos e servir as telas. |
 | `benchmark` | Executar experimentos diretamente sobre os módulos, com configurações próprias. |
@@ -74,12 +74,26 @@ O `ConfigManager` reúne e valida as configurações de comportamento do `config
 
 ## Acompanhando uma pergunta do começo ao fim
 
+O roteamento pertence ao LangGraph. O serviço HTTP valida a sessão e a cota,
+registra mensagens e chama o grafo; não decide se deve executar a recuperação.
+
+```mermaid
+flowchart TD
+    Guard["input_guard"] -->|Literatura| Retrieve["retrieve"]
+    Guard -->|Fora de escopo ou tentativa de exploração| Refuse["refuse"]
+    Retrieve --> Context["build_context"]
+    Context --> Generate["generate"]
+    Generate --> Finish["END"]
+    Refuse --> Finish
+```
+
 1. **Identifico a conversa.** Um cookie anônimo identifica a sessão. Antes de ler ou escrever mensagens, o `ChatService` verifica se a conversa pertence a ela. O thread usado no LangGraph combina sessão e conversa.
 2. **Registro a pergunta.** A mensagem do usuário entra no Redis Stream e segue para o RAG. A busca usa a pergunta atual; o histórico é aproveitado na geração, sem uma etapa de reescrita da query de recuperação.
-3. **Recupero os candidatos textuais.** O Dense traz 25 candidatos e o CrossEncoder os reranqueia para selecionar até 10. Em paralelo ao caminho textual, o enrichment pode trazer até 3 resumos, sem CrossEncoder. Para esse índice auxiliar, uso o embedder textual quando há um índice correspondente publicado e Qwen 0.6B como fallback configurado.
-4. **Monto o contexto.** Os trechos originais recebem identificadores `[E]`; os resumos derivados, `[R]`. O orçamento conjunto é de 20.000 caracteres. O enrichment está limitado a 6.000 caracteres e a 25% do total: com a configuração atual, o teto efetivo é 5.000, incluindo sua formatação. Se usar menos, o espaço restante pode ficar com os trechos originais.
-5. **Gero a resposta.** O provider chama o Ollama com `qwen3.5:4b`, reasoning desativado e temperatura 0,1. Considero os últimos 3 turns da conversa, com `num_ctx=10240` e saída de até 1024 tokens. Esses limites em tokens e o orçamento do contexto em caracteres são controles diferentes.
-6. **Persisto e apresento o resultado.** O serviço grava a resposta e as evidências públicas no Redis. A interface mostra o texto e as cartas com os trechos, para que o leitor consiga inspecionar o material recuperado.
+3. **Classifico o escopo no grafo.** O nó `input_guard` usa o provider configurado e até duas perguntas anteriores do checkpoint, limitadas a 1.000 caracteres cada. A aresta condicional segue para `retrieve` quando permitido ou para `refuse → END`, com recusa fixa. Falha de classificação interrompe a geração. Cada pergunta limpa contexto, evidências e metadados transitórios, preservando as mensagens; a recusa não reutiliza dados recuperados anteriormente.
+4. **Recupero os candidatos textuais.** O Dense traz 25 candidatos e o CrossEncoder os reranqueia para selecionar até 10. Em paralelo ao caminho textual, o enrichment pode trazer até 3 resumos, sem CrossEncoder. Para esse índice auxiliar, uso o embedder textual quando há um índice correspondente publicado e Qwen 0.6B como fallback configurado.
+5. **Monto o contexto.** Os trechos originais recebem identificadores `[E]`; os resumos derivados, `[R]`. O orçamento conjunto é de 20.000 caracteres. O enrichment está limitado a 6.000 caracteres e a 25% do total: com a configuração atual, o teto efetivo é 5.000, incluindo sua formatação. Se usar menos, o espaço restante pode ficar com os trechos originais.
+6. **Gero a resposta.** O provider chama o Ollama com `qwen3.5:4b`, reasoning desativado e temperatura 0,1. Considero os últimos 3 turns da conversa, com `num_ctx=10240` e saída de até 1024 tokens. Esses limites em tokens e o orçamento do contexto em caracteres são controles diferentes.
+7. **Persisto e apresento o resultado.** O serviço grava a resposta e as evidências públicas no Redis. A interface renderiza Markdown com HTML e imagens desativados e mostra as cartas com os trechos, para que o leitor consiga inspecionar o material recuperado.
 
 No Redis, mantive três responsabilidades distintas: `RedisChatRepository` para os metadados das conversas, `RedisMessageRepository` para o histórico público e suas evidências, e `RedisSaver` para os checkpoints internos do grafo. Assim, a tela não precisa interpretar o formato interno do checkpointer para reconstruir uma conversa.
 

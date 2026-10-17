@@ -133,7 +133,7 @@ Os benchmarks chamam os módulos diretamente e usam configurações da execuçã
 
 ## Versões e configuração da publicação
 
-A base da imagem é `python:3.12-slim`. No Compose estão `redis/redis-stack-server:7.4.0-v8`, `qdrant/qdrant:v1.19.1` e `rustfs/rustfs:1.0.0`. As entradas em `requirements-runtime.txt` mantêm as faixas aceitas, mas o build agora consome `requirements-runtime.lock`, com versões resolvidas para Python 3.12/CPU. O Glue tem um lock separado para Python 3.11. As revisões de Colibri, tokenizer e reranker na configuração cloud foram fixadas por SHA. Imagens base e auxiliares ainda usam tags de versão; por isso não descrevo os builds como idênticos bit a bit. A imagem publicada é selecionada por digest no ECR.
+A base da imagem é `python:3.12-slim`. No Compose estão `redis/redis-stack-server:7.4.0-v8`, `qdrant/qdrant:v1.19.1` e `rustfs/rustfs:1.0.0`. As dependências ficam somente em `pyproject.toml`, com perfis e pins de produção preservados. Markers mantêm as diferenças de NumPy, SciPy e NetworkX entre Python 3.12/CPU da API e 3.11 do Glue. `scripts/dependencies.py` atende a instalação e o export temporário para wheels. As revisões dos modelos permanecem fixadas por SHA; as imagens auxiliares ainda usam tags de versão, e a imagem publicada é selecionada por digest no ECR.
 
 Mantenho a entrada LAN para o trabalho local. Na AWS, uso o desenho abaixo, com configuração própria e cookie seguro para HTTPS.
 
@@ -161,7 +161,7 @@ Separei IAM de runtime e ETL. O runtime lê os artefatos e usa uma chave Qdrant 
 
 O guia de [bootstrap e automação AWS](AWS_AUTOMATION.md) define o que configurar, onde e quando. O Gitea continua no homelab e espelha o GitHub. O GitHub executa testes, Terraform e publicação em runners hospedados, sem acesso à rede doméstica.
 
-Push na develop e PRs executam scanner de segredos, testes, validação dos Composes e Terraform e build/import da API. Na main, após as validações, o workflow chama o Terraform com uma role própria e aguarda o apply antes do deploy da API. A publicação da aplicação é habilitada pela variável `AWS_APP_DEPLOY_ENABLED`, inicialmente false. O ETL tem outro workflow e outra role; não roda em cada feature.
+Desenvolvimento e PRs ficam no Gitea. O GitHub recebe o espelho e dispara o CI/CD somente na `main` ou manualmente, sem uma segunda promoção `develop` → `main`. Scanner, testes, validação dos Composes/Terraform e build/import da API continuam na revisão publicada. Depois, o workflow chama o Terraform com uma role própria e aguarda o apply antes do deploy da API. A publicação da aplicação é habilitada pela variável `AWS_APP_DEPLOY_ENABLED`, inicialmente false. O ETL tem outro workflow e outra role; não roda em cada feature.
 
 As roles OIDC exigem o ID imutável do repositório e `refs/heads/main`. Não há access keys AWS no GitHub. No modo espelhado, o bootstrap preserva proteções GitHub existentes e não acrescenta a exigência de PR que impediria o push do espelho. A revisão da main fica no fluxo do Gitea. Para um GitHub que seja a origem principal, a opção `--protect-main` aplica a proteção de PR e check validate.
 
@@ -228,6 +228,8 @@ python scripts/cloud.py --outputs infra/aws/outputs.local.json admin restart
 O túnel exige o plugin Session Manager instalado no notebook e uma identidade AWS autorizada. A porta 6379 continua fechada para a internet. A restauração valida o RDB, preserva a pasta Redis anterior e reconstrói o AOF antes de voltar à configuração normal.
 
 Os registros de resposta guardam persona, modelo, índice, tokens, custo estimado e tempos no campo `metadata` dos streams Redis. As sessões são anônimas: não as conto como pessoas identificadas. Configurei também limites de seis consultas por sessão/minuto, 300 tentativas por dia para a aplicação inteira e duas gerações simultâneas, ajustáveis no YAML cloud. Falhas também consomem a cota de tentativa. Esses limites não substituem um orçamento financeiro; as tarifas no YAML são referências, não uma leitura da fatura AWS.
+
+A triagem literária ocorre antes do RAG, com recusa fixa para pedidos fora de escopo. O guia inicial acompanha o cookie e as respostas são renderizadas em Markdown seguro. Para consultar os novos contadores privados e operar o workflow **AWS emergency** (`stop`/`resume`), siga [AWS_AUTOMATION.md](AWS_AUTOMATION.md#parada-de-emergência). A parada preserva dados, mas armazenamento e IP podem continuar consumindo créditos.
 
 ## O que falta medir antes de chamar isso de produção validada
 

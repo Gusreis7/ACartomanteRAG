@@ -404,6 +404,8 @@ class ApiConfig(BaseModel):
 
 
 class ChatConfig(BaseModel):
+    input_guard_enabled: bool = True
+    guard_max_tokens: int = Field(default=128, ge=32, le=512)
     history_turns: int = Field(
         default=3,
         gt=0,

@@ -33,6 +33,7 @@ async function createConversation(prompt = "") {
   startButton?.setAttribute("disabled", "disabled");
 
   try {
+    await window.CartomanteGuide.ensure();
     const conversation = await jsonFetch("/api/v1/conversations", {
       method: "POST",
       body: JSON.stringify({ title: null }),
@@ -84,4 +85,4 @@ document.querySelectorAll("[data-prompt]").forEach((button) => {
   button.addEventListener("click", () => createConversation(button.dataset.prompt || ""));
 });
 
-loadRecent();
+window.CartomanteGuide.ensure().then(loadRecent).catch((error) => showToast(error.message));

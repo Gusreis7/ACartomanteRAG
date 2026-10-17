@@ -22,7 +22,7 @@ Na raiz do projeto:
 
 ```bash
 source .venv/bin/activate
-python -m pip install -c requirements-glue.lock -r requirements-crawler.txt
+python scripts/dependencies.py install crawler
 export AWS_PROFILE=terraform
 export AWS_REGION=us-east-1
 aws sts get-caller-identity

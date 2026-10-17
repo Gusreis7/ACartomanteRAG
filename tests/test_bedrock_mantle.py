@@ -235,6 +235,7 @@ def test_controller_forwards_migration_and_rejects_smoke(monkeypatch):
     spec = importlib.util.spec_from_file_location("mantle_cloud", ROOT / "scripts/cloud.py")
     cloud = importlib.util.module_from_spec(spec); spec.loader.exec_module(cloud)
     clients = {name: Mock() for name in ("s3", "ssm", "glue")}
+    clients["s3"].list_objects_v2.return_value = {}
     clients["glue"].start_job_run.return_value = {"JobRunId": "jr_test"}
     monkeypatch.setattr(cloud.boto3, "client", lambda name, **_: clients[name])
     monkeypatch.setattr(cloud, "outputs", lambda _: {"ops_bucket": "ops", "glue_job": "etl"})

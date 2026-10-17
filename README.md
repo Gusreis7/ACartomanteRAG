@@ -75,6 +75,15 @@ docker compose --env-file config/.env -f docker-compose.local.yml config --quiet
 docker compose --env-file config/.env -f docker-compose.local.yml up -d --build
 ```
 
-A aplicação fica em `http://<IP_LAN>:8000`. Na AWS, uso `docker-compose.aws.yml`, Terraform, S3, Qdrant Cloud e Bedrock. O GitHub Actions executa as validações na `develop` e o deploy após o merge na `main`. O Gitea permanece no homelab, sem participar do deploy AWS.
+A aplicação fica em `http://<IP_LAN>:8000`. Na AWS, uso `docker-compose.aws.yml`, Terraform, S3, Qdrant Cloud e Bedrock. Desenvolvimento e PRs ficam no Gitea; o GitHub espelhado valida e publica somente a `main` ou por disparo manual.
+
+As dependências ficam em um único `pyproject.toml`, organizadas por perfil. Com Python 3.11+ e o ambiente virtual ativo:
+
+```bash
+python scripts/dependencies.py install runtime  # API/RAG, CPU
+python scripts/dependencies.py install ci       # testes, sem instalar os modelos
+```
+
+Os perfis `glue`, `crawler`, `ops` e `tools` atendem às outras operações. O mesmo leitor é usado pelos Dockerfiles e workflows; os sete arquivos antigos de requirements foram removidos. Os pins de API/Glue foram preservados, inclusive as diferenças entre Python 3.11 e 3.12. Não é necessário instalar todos os perfis no notebook.
 
 A preparação da infraestrutura, o ETL integral na nuvem, o reaproveitamento do enrichment e o CI/CD estão no guia de [bootstrap e automação AWS](docs/AWS_AUTOMATION.md). Aplicar o patch não cria recursos nem executa deploy.

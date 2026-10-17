@@ -1,0 +1,42 @@
+name: AWS emergency
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: stop para EC2 e Glue; resume inicia a EC2 e libera novas operações
+        type: choice
+        options: [stop, resume]
+        default: stop
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: aws-emergency
+  cancel-in-progress: false
+jobs:
+  emergency:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      OPS_BUCKET: ${{ vars.OPS_BUCKET }}
+      OPERATION: ${{ inputs.operation }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - name: Install operation client
+        run: python scripts/dependencies.py install ops
+      - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502
+        with:
+          role-to-assume: ${{ vars.AWS_INFRA_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: emergency-${{ github.run_id }}
+      - name: Read current deployment context
+        run: aws s3 cp "s3://$OPS_BUCKET/config/deployment.json" "$RUNNER_TEMP/deployment.local.json" --only-show-errors
+      - name: Stop or resume project services
+        run: python scripts/cloud.py --outputs "$RUNNER_TEMP/deployment.local.json" emergency "$OPERATION"

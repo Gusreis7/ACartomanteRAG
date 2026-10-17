@@ -9,8 +9,9 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # CPU para embeddings/reranker; geração via Ollama local ou Bedrock.
-COPY requirements-runtime.lock ./
-RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu -r requirements-runtime.lock \
+COPY pyproject.toml ./
+COPY scripts/dependencies.py ./scripts/dependencies.py
+RUN python scripts/dependencies.py install runtime --no-cache-dir \
     && pip check \
     && groupadd --gid 10001 app \
     && useradd --uid 10001 --gid app --create-home app \
@@ -29,8 +30,7 @@ CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--wo
 # Imagem opcional para os jobs existentes. Não faz parte do serviço HTTP.
 FROM runtime AS tools
 USER root
-COPY requirements.txt requirements-runtime.txt ./
-RUN pip install --no-cache-dir -c requirements-runtime.lock -r requirements.txt \
+RUN python scripts/dependencies.py install tools --no-cache-dir \
     && pip check \
     && chown app:app /app
 COPY --chown=app:app benchmark ./benchmark

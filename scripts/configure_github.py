@@ -76,14 +76,15 @@ def main():
         method="PATCH",
         payload={"allow_squash_merge": True, "allow_merge_commit": False},
     )
-    ref = gh(f"repos/{args.repo}/git/ref/heads/main")
-    refs = gh(f"repos/{args.repo}/git/matching-refs/heads/develop")
-    if not any(item["ref"] == "refs/heads/develop" for item in refs):
-        gh(
-            f"repos/{args.repo}/git/refs",
-            method="POST",
-            payload={"ref": "refs/heads/develop", "sha": ref["object"]["sha"]},
-        )
+    if not args.mirror_source:
+        ref = gh(f"repos/{args.repo}/git/ref/heads/main")
+        refs = gh(f"repos/{args.repo}/git/matching-refs/heads/develop")
+        if not any(item["ref"] == "refs/heads/develop" for item in refs):
+            gh(
+                f"repos/{args.repo}/git/refs",
+                method="POST",
+                payload={"ref": "refs/heads/develop", "sha": ref["object"]["sha"]},
+            )
     gh(
         f"repos/{args.repo}/actions/oidc/customization/sub",
         method="PUT",

@@ -17,3 +17,9 @@ class ConversationService:
 
     def list_for_session(self, session_id: UUID) -> list[dict]:
         return self.repository.list_for_session(session_id)
+
+    def tutorial_completed(self, session_id: UUID) -> bool:
+        return bool(self.repository.redis.get(f"acartomante:tutorial:v1:{session_id}"))
+
+    def complete_tutorial(self, session_id: UUID) -> None:
+        self.repository.redis.set(f"acartomante:tutorial:v1:{session_id}", "1", ex=30 * 24 * 3600)

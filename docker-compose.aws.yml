@@ -13,6 +13,7 @@ services:
       REDIS_ARGS: "${REDIS_ARGS_OVERRIDE:---appendonly yes --appendfsync everysec --aclfile /data/users.acl --maxmemory 1gb --maxmemory-policy noeviction}"
       REDIS_PASSWORD: ${REDIS_PASSWORD:?Configuração SSM ausente}
     ports:
+      # Inspeção pelo notebook somente via SSM/IAM até o loopback da EC2.
       - "127.0.0.1:6379:6379"
     volumes:
       - /srv/acartomante/data/redis:/data
@@ -84,6 +85,7 @@ services:
     logging: *logging
 networks:
   redis_private:
+    # Exclusiva de API/Redis; proxy e outros serviços não participam.
     internal: true
   proxy_private:
     internal: true

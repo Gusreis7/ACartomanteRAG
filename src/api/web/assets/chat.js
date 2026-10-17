@@ -200,8 +200,14 @@ function addMessage(role, content, evidences = [], options = {}) {
   const bubble = document.createElement("div");
   bubble.className = "message-bubble";
 
-  const text = document.createElement("p");
-  text.textContent = content;
+  const text = document.createElement(role === "assistant" && options.html ? "div" : "p");
+  if (role === "assistant" && options.html) {
+    text.className = "markdown-body";
+    // HTML produzido exclusivamente pelo renderer Markdown do servidor.
+    text.innerHTML = options.html;
+  } else {
+    text.textContent = content;
+  }
   bubble.appendChild(text);
 
   const evidence = role === "assistant" ? evidenceTriggerNode(evidences) : null;
@@ -274,7 +280,7 @@ async function loadMessages() {
         message.role,
         message.content,
         message.evidences || [],
-        { instant: true },
+        { instant: true, html: message.content_html },
       );
     });
   } catch (error) {
@@ -290,6 +296,14 @@ async function sendMessage(message) {
   const clean = message.trim();
   if (!clean || sending) return;
 
+  setSending(true);
+  try {
+    await window.CartomanteGuide.ensure();
+  } catch (error) {
+    showToast(error.message);
+    setSending(false);
+    return;
+  }
   const requestPersona = activePersona;
 
   addMessage("user", clean);
@@ -306,7 +320,7 @@ async function sendMessage(message) {
     });
 
     pending.remove();
-    addMessage("assistant", payload.answer, payload.evidences || []);
+    addMessage("assistant", payload.answer, payload.evidences || [], { html: payload.answer_html });
     await loadConversations();
   } catch (error) {
     pending.remove();
@@ -370,4 +384,8 @@ if (queryPrompt) {
   resizeInput();
 }
 
-Promise.all([loadConversations(), loadMessages()]).then(() => input.focus());
+setSending(true);
+window.CartomanteGuide.ensure()
+  .then(() => Promise.all([loadConversations(), loadMessages()]))
+  .catch((error) => showToast(error.message))
+  .finally(() => { setSending(false); input.focus(); });
