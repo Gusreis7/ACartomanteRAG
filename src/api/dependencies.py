@@ -8,7 +8,6 @@ from fastapi import Depends, Request, Response
 from src.services.chat import ChatService
 from src.services.conversations import ConversationService
 
-
 SESSION_COOKIE = "acartomante_session"
 
 

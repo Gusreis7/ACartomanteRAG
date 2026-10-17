@@ -1,0 +1,18 @@
+minimum_pre_commit_version: '4.7.0'
+default_install_hook_types: [pre-commit]
+default_stages: [pre-commit]
+repos:
+  - repo: https://github.com/psf/black-pre-commit-mirror
+    # Mesma versão do perfil format em pyproject.toml.
+    rev: '26.10.1'
+    hooks:
+      - id: black
+  - repo: local
+    hooks:
+      - id: terraform-fmt
+        name: Terraform fmt
+        entry: bash scripts/format_terraform.sh
+        language: system
+        files: '\.(tf|tfvars|tftest\.hcl)$'
+        types: [file]
+        require_serial: true

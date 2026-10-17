@@ -42,9 +42,7 @@ class CrossEncoderReranker:
                 timings_ms={
                     **dense_response.timings_ms,
                     "rerank_ms": 0.0,
-                    "total_ms": dense_response.timings_ms.get(
-                        "total_ms", 0.0
-                    ),
+                    "total_ms": dense_response.timings_ms.get("total_ms", 0.0),
                 },
                 silver_dataset_id=dense_response.silver_dataset_id,
                 index_id=dense_response.index_id,
@@ -52,9 +50,9 @@ class CrossEncoderReranker:
             )
 
         pairs = [(query, hit.text) for hit in dense_response.hits]
-        scores = np.asarray(
-            self.model.predict(pairs, show_progress_bar=False)
-        ).reshape(-1)
+        scores = np.asarray(self.model.predict(pairs, show_progress_bar=False)).reshape(
+            -1
+        )
         ordered = np.argsort(-scores)
         top_k = min(int(top_k), len(ordered))
 
@@ -85,9 +83,7 @@ class CrossEncoderReranker:
                 "embedding_ms": float(
                     dense_response.timings_ms.get("embedding_ms", 0.0)
                 ),
-                "qdrant_ms": float(
-                    dense_response.timings_ms.get("qdrant_ms", 0.0)
-                ),
+                "qdrant_ms": float(dense_response.timings_ms.get("qdrant_ms", 0.0)),
                 "rerank_ms": rerank_ms,
                 "total_ms": base_total + rerank_ms,
             },

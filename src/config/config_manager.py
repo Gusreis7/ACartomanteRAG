@@ -11,7 +11,14 @@ from pydantic import BaseModel, Field, model_validator
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ENV_PATH = PROJECT_ROOT / "config" / ".env"
 DEFAULT_YAML_PATH = PROJECT_ROOT / "config" / "config.yaml"
-ENRICHMENT_RUNTIME_FIELDS = {"max_parallel", "timeout_seconds", "keep_alive", "num_batch", "response_retries", "response_retry_max_tokens"}
+ENRICHMENT_RUNTIME_FIELDS = {
+    "max_parallel",
+    "timeout_seconds",
+    "keep_alive",
+    "num_batch",
+    "response_retries",
+    "response_retry_max_tokens",
+}
 
 
 class RustFSConfig(BaseModel):
@@ -24,10 +31,16 @@ class RustFSConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_credentials(self):
-        if self.provider == "rustfs" and not all((self.endpoint, self.access_key, self.secret_key)):
+        if self.provider == "rustfs" and not all(
+            (self.endpoint, self.access_key, self.secret_key)
+        ):
             raise ValueError("RustFS exige endpoint, access_key e secret_key.")
-        if self.provider == "s3" and any((self.endpoint, self.access_key, self.secret_key)):
-            raise ValueError("S3 usa a cadeia de credenciais AWS, sem credenciais RustFS.")
+        if self.provider == "s3" and any(
+            (self.endpoint, self.access_key, self.secret_key)
+        ):
+            raise ValueError(
+                "S3 usa a cadeia de credenciais AWS, sem credenciais RustFS."
+            )
         return self
 
 
@@ -43,9 +56,7 @@ class RedisEnvironmentConfig(BaseModel):
 class EnvironmentConfig(BaseModel):
     rustfs: RustFSConfig
     qdrant: QdrantConfig
-    redis: RedisEnvironmentConfig = Field(
-        default_factory=RedisEnvironmentConfig
-    )
+    redis: RedisEnvironmentConfig = Field(default_factory=RedisEnvironmentConfig)
 
     @property
     def redis_url(self) -> str | None:
@@ -286,7 +297,6 @@ class RetrievalBenchmarkConfig(BaseModel):
     warmup_runs: int = Field(default=3, ge=0)
 
 
-
 class GenerationConfig(BaseModel):
     provider: Literal["ollama", "bedrock", "bedrock-mantle"] = "ollama"
     model: str = "qwen3.5:4b"
@@ -349,9 +359,10 @@ class GenerationConfig(BaseModel):
     @model_validator(mode="after")
     def validate_response_retry_budget(self):
         if 0 < self.response_retry_max_tokens < self.max_tokens:
-            raise ValueError("response_retry_max_tokens deve ser zero ou pelo menos max_tokens.")
+            raise ValueError(
+                "response_retry_max_tokens deve ser zero ou pelo menos max_tokens."
+            )
         return self
-
 
 
 class EnrichmentSemanticConfig(BaseModel):
@@ -386,7 +397,9 @@ class EnrichmentConfig(BaseModel):
     @model_validator(mode="after")
     def validate_char_overlap(self):
         if 0 < self.response_retry_max_tokens < self.max_tokens:
-            raise ValueError("enrichment.response_retry_max_tokens deve ser zero ou pelo menos max_tokens.")
+            raise ValueError(
+                "enrichment.response_retry_max_tokens deve ser zero ou pelo menos max_tokens."
+            )
         if self.char_overlap >= self.unit_chars:
             raise ValueError(
                 "enrichment.char_overlap deve ser menor que enrichment.unit_chars."
@@ -450,6 +463,7 @@ class AppConfig(BaseModel):
     def retrieval(self) -> RetrievalIndexConfig:
         """Compatibilidade com IndexResolver/ReleaseManager."""
         return self.retrieval_index
+
     api: ApiConfig = Field(default_factory=ApiConfig)
     chat: ChatConfig = Field(default_factory=ChatConfig)
 
@@ -461,8 +475,16 @@ class ConfigManager:
         env_file: str | Path = DEFAULT_ENV_PATH,
         yaml_file: str | Path = DEFAULT_YAML_PATH,
     ) -> AppConfig:
-        env_file = Path(os.getenv("ENV_FILE", str(env_file))) if env_file == DEFAULT_ENV_PATH else Path(env_file)
-        yaml_file = Path(os.getenv("CONFIG_FILE", str(yaml_file))) if yaml_file == DEFAULT_YAML_PATH else Path(yaml_file)
+        env_file = (
+            Path(os.getenv("ENV_FILE", str(env_file)))
+            if env_file == DEFAULT_ENV_PATH
+            else Path(env_file)
+        )
+        yaml_file = (
+            Path(os.getenv("CONFIG_FILE", str(yaml_file)))
+            if yaml_file == DEFAULT_YAML_PATH
+            else Path(yaml_file)
+        )
 
         if env_file.exists():
             load_dotenv(
@@ -485,11 +507,17 @@ class ConfigManager:
             base_path = yaml_file.parent / yaml_config.pop("extends")
             with base_path.open(encoding="utf-8") as base_file:
                 base_config = yaml.safe_load(base_file) or {}
+
             def merge(base, overlay):
                 result = dict(base)
                 for key, value in overlay.items():
-                    result[key] = merge(result[key], value) if isinstance(value, dict) and isinstance(result.get(key), dict) else value
+                    result[key] = (
+                        merge(result[key], value)
+                        if isinstance(value, dict) and isinstance(result.get(key), dict)
+                        else value
+                    )
                 return result
+
             yaml_config = merge(base_config, yaml_config)
 
         if not isinstance(
@@ -508,8 +536,16 @@ class ConfigManager:
             }
 
         for section, fields in {
-            "generation": {"LLM_PROVIDER": "provider", "LLM_MODEL": "model", "AWS_REGION": "region"},
-            "enrichment": {"ENRICHMENT_PROVIDER": "provider", "ENRICHMENT_MODEL": "model", "AWS_REGION": "region"},
+            "generation": {
+                "LLM_PROVIDER": "provider",
+                "LLM_MODEL": "model",
+                "AWS_REGION": "region",
+            },
+            "enrichment": {
+                "ENRICHMENT_PROVIDER": "provider",
+                "ENRICHMENT_MODEL": "model",
+                "AWS_REGION": "region",
+            },
         }.items():
             for env_key, field in fields.items():
                 if os.getenv(env_key):
@@ -519,9 +555,13 @@ class ConfigManager:
             if value:
                 yaml_config.setdefault("storage", {})[field] = value
         if os.getenv("ACARTOMANTE_INDEX_ID"):
-            yaml_config.setdefault("retrieval_index", {})["index_id"] = os.environ["ACARTOMANTE_INDEX_ID"]
+            yaml_config.setdefault("retrieval_index", {})["index_id"] = os.environ[
+                "ACARTOMANTE_INDEX_ID"
+            ]
         if os.getenv("COLIBRI_REVISION"):
-            yaml_config.setdefault("embedding", {}).setdefault("models", {}).setdefault("colibri", {})["revision"] = os.environ["COLIBRI_REVISION"]
+            yaml_config.setdefault("embedding", {}).setdefault("models", {}).setdefault(
+                "colibri", {}
+            )["revision"] = os.environ["COLIBRI_REVISION"]
 
         environment_values = {
             "RUSTFS_ENDPOINT": os.getenv("RUSTFS_ENDPOINT"),
@@ -535,12 +575,14 @@ class ConfigManager:
         storage_provider = os.getenv("STORAGE_PROVIDER", "rustfs")
         required_environment_keys = ["QDRANT_URL", "QDRANT_API_KEY"]
         if storage_provider == "rustfs":
-            required_environment_keys += ["RUSTFS_ENDPOINT", "RUSTFS_ACCESS_KEY", "RUSTFS_SECRET_KEY"]
+            required_environment_keys += [
+                "RUSTFS_ENDPOINT",
+                "RUSTFS_ACCESS_KEY",
+                "RUSTFS_SECRET_KEY",
+            ]
 
         missing = [
-            key
-            for key in required_environment_keys
-            if not environment_values[key]
+            key for key in required_environment_keys if not environment_values[key]
         ]
 
         if missing:
@@ -552,9 +594,21 @@ class ConfigManager:
             "rustfs": {
                 "provider": storage_provider,
                 "region": os.getenv("AWS_REGION", "us-east-1"),
-                "endpoint": environment_values["RUSTFS_ENDPOINT"] if storage_provider == "rustfs" else None,
-                "access_key": environment_values["RUSTFS_ACCESS_KEY"] if storage_provider == "rustfs" else None,
-                "secret_key": environment_values["RUSTFS_SECRET_KEY"] if storage_provider == "rustfs" else None,
+                "endpoint": (
+                    environment_values["RUSTFS_ENDPOINT"]
+                    if storage_provider == "rustfs"
+                    else None
+                ),
+                "access_key": (
+                    environment_values["RUSTFS_ACCESS_KEY"]
+                    if storage_provider == "rustfs"
+                    else None
+                ),
+                "secret_key": (
+                    environment_values["RUSTFS_SECRET_KEY"]
+                    if storage_provider == "rustfs"
+                    else None
+                ),
             },
             "qdrant": {
                 "url": (environment_values["QDRANT_URL"]),
@@ -577,12 +631,29 @@ class ConfigManager:
         if release_key:
             import json
             from src.storage.rustfs_manager import RustFSManager
+
             storage = RustFSManager.from_config(resolved.environment.rustfs)
-            release = json.loads(storage.download_bytes(resolved.storage.embedding_indexes_bucket, release_key))
-            if release.get("status") != "success" or not all(release.get(key) for key in ("index_id", "enrichment_index_pointer", "bronze_pointer", "silver_pointer")):
-                raise ValueError("Manifest de dados incompleto; publique o ETL antes de iniciar a API.")
+            release = json.loads(
+                storage.download_bytes(
+                    resolved.storage.embedding_indexes_bucket, release_key
+                )
+            )
+            if release.get("status") != "success" or not all(
+                release.get(key)
+                for key in (
+                    "index_id",
+                    "enrichment_index_pointer",
+                    "bronze_pointer",
+                    "silver_pointer",
+                )
+            ):
+                raise ValueError(
+                    "Manifest de dados incompleto; publique o ETL antes de iniciar a API."
+                )
             resolved.retrieval_index.index_id = release["index_id"]
-            resolved.enrichment_retrieval.index_pointer_key = release["enrichment_index_pointer"]
+            resolved.enrichment_retrieval.index_pointer_key = release[
+                "enrichment_index_pointer"
+            ]
             resolved.storage.bronze_current_key = release["bronze_pointer"]
             resolved.storage.silver_current_key = release["silver_pointer"]
         return resolved

@@ -49,11 +49,7 @@ def _matched_gold_positions(
 
 
 def _denominator_positions(gold_normalized: str) -> set[int]:
-    return {
-        index
-        for index, char in enumerate(gold_normalized)
-        if not char.isspace()
-    }
+    return {index for index, char in enumerate(gold_normalized) if not char.isspace()}
 
 
 def coverage_curve(
@@ -151,10 +147,7 @@ def query_metrics(
 
     for rank, (item, coverage) in enumerate(zip(retrieved, curve), start=1):
         retrieved_work = str(
-            item.get("titulo")
-            or item.get("work")
-            or item.get("canonical_work")
-            or ""
+            item.get("titulo") or item.get("work") or item.get("canonical_work") or ""
         )
         correct_work = (
             bool(canonical_work_norm)
@@ -192,9 +185,7 @@ def query_metrics(
         ),
         "ndcg_at_10": ndcg_at_k(individual_values, 10),
         "coverage_auc_at_10": (
-            float(np.mean(cumulative_values[:10]))
-            if cumulative_values
-            else 0.0
+            float(np.mean(cumulative_values[:10])) if cumulative_values else 0.0
         ),
     }
 

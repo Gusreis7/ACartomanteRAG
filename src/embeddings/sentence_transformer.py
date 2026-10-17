@@ -39,23 +39,17 @@ class SentenceTransformerEmbedder(Embedder):
         self.normalize_embeddings = normalize_embeddings
 
         self.requested_device = device
-        self.resolved_device = self._resolve_device(
-            device
-        )
+        self.resolved_device = self._resolve_device(device)
 
         self.batch_size_requested = batch_size
         self.batch_size_effective = batch_size
 
-        self.resolved_revision = (
-            self._resolve_revision(
-                model_config.model,
-                model_config.revision,
-            )
+        self.resolved_revision = self._resolve_revision(
+            model_config.model,
+            model_config.revision,
         )
 
-        torch_dtype = self._resolve_torch_dtype(
-            model_config.inference_dtype
-        )
+        torch_dtype = self._resolve_torch_dtype(model_config.inference_dtype)
 
         self._validate_dtype_device(
             dtype=torch_dtype,
@@ -81,57 +75,29 @@ class SentenceTransformerEmbedder(Embedder):
             self.query_prompt_name,
         ) = self._resolve_prompts()
 
-        self.dimension = (
-            self._resolve_dimension()
-        )
+        self.dimension = self._resolve_dimension()
 
     @property
     def info(self) -> EmbedderInfo:
         return EmbedderInfo(
             backend=self.BACKEND,
             model=self.model_config.model,
-            configured_revision=(
-                self.model_config.revision
-            ),
-            resolved_revision=(
-                self.resolved_revision
-            ),
+            configured_revision=(self.model_config.revision),
+            resolved_revision=(self.resolved_revision),
             dimension=self.dimension,
             output_dtype="float32",
-            inference_dtype=(
-                self.model_config.inference_dtype
-            ),
-            normalize_embeddings=(
-                self.normalize_embeddings
-            ),
+            inference_dtype=(self.model_config.inference_dtype),
+            normalize_embeddings=(self.normalize_embeddings),
             pooling=self.model_config.pooling,
-            truncate_dim=(
-                self.model_config.truncate_dim
-            ),
-            configured_document_prompt_name=(
-                self.model_config.document_prompt_name
-            ),
-            configured_query_prompt_name=(
-                self.model_config.query_prompt_name
-            ),
-            document_prompt_name=(
-                self.document_prompt_name
-            ),
-            query_prompt_name=(
-                self.query_prompt_name
-            ),
-            requested_device=(
-                self.requested_device
-            ),
-            resolved_device=(
-                self.resolved_device
-            ),
-            batch_size_requested=(
-                self.batch_size_requested
-            ),
-            batch_size_effective=(
-                self.batch_size_effective
-            ),
+            truncate_dim=(self.model_config.truncate_dim),
+            configured_document_prompt_name=(self.model_config.document_prompt_name),
+            configured_query_prompt_name=(self.model_config.query_prompt_name),
+            document_prompt_name=(self.document_prompt_name),
+            query_prompt_name=(self.query_prompt_name),
+            requested_device=(self.requested_device),
+            resolved_device=(self.resolved_device),
+            batch_size_requested=(self.batch_size_requested),
+            batch_size_effective=(self.batch_size_effective),
         )
 
     def embed_documents(
@@ -146,9 +112,7 @@ class SentenceTransformerEmbedder(Embedder):
 
         return self._encode(
             texts,
-            prompt_name=(
-                self.document_prompt_name
-            ),
+            prompt_name=(self.document_prompt_name),
         )
 
     def embed_query(
@@ -156,15 +120,11 @@ class SentenceTransformerEmbedder(Embedder):
         text: str,
     ) -> np.ndarray:
         if not isinstance(text, str):
-            raise TypeError(
-                "text deve ser str."
-            )
+            raise TypeError("text deve ser str.")
 
         vectors = self._encode(
             [text],
-            prompt_name=(
-                self.query_prompt_name
-            ),
+            prompt_name=(self.query_prompt_name),
         )
 
         return vectors[0]
@@ -193,12 +153,8 @@ class SentenceTransformerEmbedder(Embedder):
                     precision="float32",
                     convert_to_numpy=True,
                     convert_to_tensor=False,
-                    normalize_embeddings=(
-                        self.normalize_embeddings
-                    ),
-                    truncate_dim=(
-                        self.model_config.truncate_dim
-                    ),
+                    normalize_embeddings=(self.normalize_embeddings),
+                    truncate_dim=(self.model_config.truncate_dim),
                 )
 
                 vectors = np.asarray(
@@ -216,8 +172,7 @@ class SentenceTransformerEmbedder(Embedder):
 
                 if batch_size <= 1:
                     raise RuntimeError(
-                        "CUDA sem memória mesmo com "
-                        "batch_size=1."
+                        "CUDA sem memória mesmo com " "batch_size=1."
                     ) from exc
 
                 next_batch_size = max(
@@ -255,17 +210,13 @@ class SentenceTransformerEmbedder(Embedder):
         )
 
         document_prompt = self._resolve_prompt(
-            configured_name=(
-                self.model_config.document_prompt_name
-            ),
+            configured_name=(self.model_config.document_prompt_name),
             role="document",
             prompts=prompts,
         )
 
         query_prompt = self._resolve_prompt(
-            configured_name=(
-                self.model_config.query_prompt_name
-            ),
+            configured_name=(self.model_config.query_prompt_name),
             role="query",
             prompts=prompts,
         )
@@ -305,37 +256,23 @@ class SentenceTransformerEmbedder(Embedder):
             self.model,
             "get_embedding_dimension",
         ):
-            dimension = (
-                self.model
-                .get_embedding_dimension()
-            )
+            dimension = self.model.get_embedding_dimension()
         else:
-            dimension = (
-                self.model
-                .get_sentence_embedding_dimension()
-            )
+            dimension = self.model.get_sentence_embedding_dimension()
 
         if dimension is None:
-            raise ValueError(
-                "Não foi possível determinar a "
-                "dimensão do embedding."
-            )
+            raise ValueError("Não foi possível determinar a " "dimensão do embedding.")
 
         dimension = int(dimension)
 
-        if (
-            self.model_config.truncate_dim
-            is not None
-        ):
+        if self.model_config.truncate_dim is not None:
             dimension = min(
                 dimension,
                 self.model_config.truncate_dim,
             )
 
         if dimension <= 0:
-            raise ValueError(
-                "Dimensão de embedding inválida."
-            )
+            raise ValueError("Dimensão de embedding inválida.")
 
         return dimension
 
@@ -351,8 +288,7 @@ class SentenceTransformerEmbedder(Embedder):
 
         if not info.sha:
             raise ValueError(
-                "Hugging Face não retornou SHA "
-                f"para {model}@{revision}."
+                "Hugging Face não retornou SHA " f"para {model}@{revision}."
             )
 
         return info.sha
@@ -403,17 +339,14 @@ class SentenceTransformerEmbedder(Embedder):
             and not torch.cuda.is_bf16_supported()
         ):
             raise RuntimeError(
-                "A GPU CUDA selecionada não suporta "
-                "bfloat16 no PyTorch atual."
+                "A GPU CUDA selecionada não suporta " "bfloat16 no PyTorch atual."
             )
 
     def _is_cuda_oom(
         self,
         exc: Exception,
     ) -> bool:
-        if not self.resolved_device.startswith(
-            "cuda"
-        ):
+        if not self.resolved_device.startswith("cuda"):
             return False
 
         if isinstance(
@@ -422,7 +355,4 @@ class SentenceTransformerEmbedder(Embedder):
         ):
             return True
 
-        return (
-            "out of memory"
-            in str(exc).lower()
-        )
+        return "out of memory" in str(exc).lower()

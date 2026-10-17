@@ -30,8 +30,7 @@ def build_evidence_matches(
     missing = required_benchmark - set(benchmark.columns)
     if missing:
         raise ValueError(
-            "Benchmark sem colunas obrigatórias: "
-            + ", ".join(sorted(missing))
+            "Benchmark sem colunas obrigatórias: " + ", ".join(sorted(missing))
         )
 
     required_chunks = {"chunk_id", "titulo", "text"}
@@ -42,9 +41,7 @@ def build_evidence_matches(
             + ", ".join(sorted(missing_chunks))
         )
 
-    chunk_titles = (
-        chunks["titulo"].fillna("").astype(str).map(normalize_text)
-    )
+    chunk_titles = chunks["titulo"].fillna("").astype(str).map(normalize_text)
     rows = []
 
     for _, item in benchmark.iterrows():

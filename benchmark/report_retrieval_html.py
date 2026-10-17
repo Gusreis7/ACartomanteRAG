@@ -116,9 +116,7 @@ def parse_args() -> argparse.Namespace:
         "--output",
         type=Path,
         default=None,
-        help=(
-            "HTML local. Padrão: reports/retrieval_<run-id>.html"
-        ),
+        help=("HTML local. Padrão: reports/retrieval_<run-id>.html"),
     )
     parser.add_argument(
         "--no-upload",
@@ -335,12 +333,8 @@ def _paired_factor(
     # Convertemos explicitamente para float para que métricas binárias sejam
     # tratadas como 0.0/1.0 e o delta emparelhado continue significando
     # diferença de proporção/acerto.
-    right_values = pd.to_numeric(
-        paired["right_value"], errors="coerce"
-    ).astype(float)
-    left_values = pd.to_numeric(
-        paired["left_value"], errors="coerce"
-    ).astype(float)
+    right_values = pd.to_numeric(paired["right_value"], errors="coerce").astype(float)
+    left_values = pd.to_numeric(paired["left_value"], errors="coerce").astype(float)
     paired["delta"] = right_values - left_values
     result = _bootstrap_cluster_mean(
         paired[["query_id", "delta"]],
@@ -445,9 +439,9 @@ def _balanced_consensus_selection(
     family_columns: list[str] = []
     for family, metrics in CONSENSUS_FAMILIES.items():
         col = f"family_score__{family}"
-        frame[col] = pd.concat(
-            [metric_percentiles[m] for m in metrics], axis=1
-        ).mean(axis=1)
+        frame[col] = pd.concat([metric_percentiles[m] for m in metrics], axis=1).mean(
+            axis=1
+        )
         family_columns.append(col)
 
     frame["consensus_score"] = frame[family_columns].mean(axis=1)
@@ -461,8 +455,7 @@ def _balanced_consensus_selection(
             for family in CONSENSUS_FAMILIES
         }
         config["metric_rank_percentiles"] = {
-            metric: float(row[f"rank_pct__{metric}"])
-            for metric in METRIC_SPECS
+            metric: float(row[f"rank_pct__{metric}"]) for metric in METRIC_SPECS
         }
         output.append(config)
 
@@ -487,9 +480,11 @@ def build_automatic_insights(
     bootstrap_runs: int,
 ) -> dict[str, Any]:
     frame = query_df.copy()
-    frame["embedder_key"] = frame.get(
-        "embedder", pd.Series(index=frame.index, dtype=object)
-    ).fillna("__none__").astype(str)
+    frame["embedder_key"] = (
+        frame.get("embedder", pd.Series(index=frame.index, dtype=object))
+        .fillna("__none__")
+        .astype(str)
+    )
 
     configs: list[dict[str, Any]] = []
     for config_id, group in frame.groupby("config_id", sort=False):
@@ -507,13 +502,13 @@ def build_automatic_insights(
                 pd.to_numeric(group["retrieval_latency_ms"], errors="coerce").mean()
             ),
             "latency_p95": float(
-                pd.to_numeric(group["retrieval_latency_ms"], errors="coerce").quantile(0.95)
+                pd.to_numeric(group["retrieval_latency_ms"], errors="coerce").quantile(
+                    0.95
+                )
             ),
         }
         for metric in METRIC_SPECS:
-            item[metric] = float(
-                pd.to_numeric(group[metric], errors="coerce").mean()
-            )
+            item[metric] = float(pd.to_numeric(group[metric], errors="coerce").mean())
         configs.append(item)
 
     factor_specs = [
@@ -534,7 +529,12 @@ def build_automatic_insights(
             & frame["retrieval_strategy"].isin(["dense", "dense_cross_encoder"]),
             "right_mask": frame["embedder_key"].eq("qwen3_embedding_06b")
             & frame["retrieval_strategy"].isin(["dense", "dense_cross_encoder"]),
-            "match": ["query_variant", "chunk_strategy", "chunk_size", "retrieval_strategy"],
+            "match": [
+                "query_variant",
+                "chunk_strategy",
+                "chunk_size",
+                "retrieval_strategy",
+            ],
             "description": "Diferença entre embedders mantendo os demais fatores iguais.",
         },
         {
@@ -543,7 +543,12 @@ def build_automatic_insights(
             "right_label": "Hybrid",
             "left_mask": frame["chunk_strategy"].eq("fixed"),
             "right_mask": frame["chunk_strategy"].eq("hybrid"),
-            "match": ["query_variant", "chunk_size", "retrieval_strategy", "embedder_key"],
+            "match": [
+                "query_variant",
+                "chunk_size",
+                "retrieval_strategy",
+                "embedder_key",
+            ],
             "description": "Diferença entre estratégias de chunking no mesmo tamanho e retrieval.",
         },
         {
@@ -561,7 +566,12 @@ def build_automatic_insights(
             "right_label": "Chunk 512",
             "left_mask": pd.to_numeric(frame["chunk_size"], errors="coerce").eq(256),
             "right_mask": pd.to_numeric(frame["chunk_size"], errors="coerce").eq(512),
-            "match": ["query_variant", "chunk_strategy", "retrieval_strategy", "embedder_key"],
+            "match": [
+                "query_variant",
+                "chunk_strategy",
+                "retrieval_strategy",
+                "embedder_key",
+            ],
             "description": "Efeito de 512 contra 256 mantendo os demais fatores iguais.",
         },
         {
@@ -570,7 +580,12 @@ def build_automatic_insights(
             "right_label": "Chunk 1024",
             "left_mask": pd.to_numeric(frame["chunk_size"], errors="coerce").eq(256),
             "right_mask": pd.to_numeric(frame["chunk_size"], errors="coerce").eq(1024),
-            "match": ["query_variant", "chunk_strategy", "retrieval_strategy", "embedder_key"],
+            "match": [
+                "query_variant",
+                "chunk_strategy",
+                "retrieval_strategy",
+                "embedder_key",
+            ],
             "description": "Efeito de 1024 contra 256 mantendo os demais fatores iguais.",
         },
     ]
@@ -645,7 +660,7 @@ def build_html(
         "top_k": run_config.get("top_k"),
     }
 
-    template = r'''<!doctype html>
+    template = r"""<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
@@ -1126,7 +1141,7 @@ function init(){
 init();
 </script>
 </body>
-</html>'''
+</html>"""
 
     return (
         template.replace("__META__", safe_script_json(meta))
@@ -1135,7 +1150,6 @@ init();
         .replace("__INSIGHTS__", safe_script_json(insights))
         .replace("__DEFAULT_METRIC__", DEFAULT_METRIC)
     )
-
 
 
 def _empty_insights() -> dict[str, Any]:
@@ -1153,12 +1167,18 @@ def _empty_insights() -> dict[str, Any]:
 def _aggregate_retrieval(frame: pd.DataFrame) -> dict[str, float | int]:
     if frame.empty:
         return {
-            "n": 0, "hit_at_10": 0.0, "evidence_coverage_at_10": 0.0,
-            "mrr_at_10": 0.0, "ndcg_at_10": 0.0,
-            "correct_work_at_10": 0.0, "latency_p95_ms": 0.0,
+            "n": 0,
+            "hit_at_10": 0.0,
+            "evidence_coverage_at_10": 0.0,
+            "mrr_at_10": 0.0,
+            "ndcg_at_10": 0.0,
+            "correct_work_at_10": 0.0,
+            "latency_p95_ms": 0.0,
         }
+
     def mean(column: str) -> float:
         return float(pd.to_numeric(frame[column], errors="coerce").mean())
+
     latency = pd.to_numeric(frame["retrieval_latency_ms"], errors="coerce").dropna()
     return {
         "n": int(len(frame)),
@@ -1171,7 +1191,9 @@ def _aggregate_retrieval(frame: pd.DataFrame) -> dict[str, float | int]:
     }
 
 
-def _load_selection(storage: RustFSManager, bucket: str, run_id: str) -> dict[str, Any] | None:
+def _load_selection(
+    storage: RustFSManager, bucket: str, run_id: str
+) -> dict[str, Any] | None:
     key = f"{BENCHMARK_PREFIX}/runs/{run_id}/retrieval/final_selection_10.json"
     if not storage.object_exists(bucket, key):
         return None
@@ -1201,7 +1223,9 @@ def load_retrieval_run(
     run_manifest = load_json(storage, bucket, manifest_key)
     run_config = load_json(storage, bucket, config_key)
     if run_manifest.get("status") != "success":
-        raise RuntimeError(f"Run {run_id} não está concluído: status={run_manifest.get('status')}")
+        raise RuntimeError(
+            f"Run {run_id} não está concluído: status={run_manifest.get('status')}"
+        )
     query_df = read_parquet(storage, bucket, query_key)
     summary_df = read_parquet(storage, bucket, summary_key)
     if query_df.empty or summary_df.empty:
@@ -1209,7 +1233,9 @@ def load_retrieval_run(
 
     split = str(run_config.get("split") or run_manifest.get("split") or "").strip()
     if split == "dev":
-        print(f"[insights] {run_id}: seleção balanceada, fatores e bootstrap ({bootstrap_runs} runs)...")
+        print(
+            f"[insights] {run_id}: seleção balanceada, fatores e bootstrap ({bootstrap_runs} runs)..."
+        )
         insights = build_automatic_insights(query_df, bootstrap_runs=bootstrap_runs)
     else:
         insights = _empty_insights()
@@ -1229,10 +1255,17 @@ def load_retrieval_run(
         )
 
     return {
-        "run_id": run_id, "run_prefix": run_prefix, "retrieval_prefix": retrieval_prefix,
-        "manifest": run_manifest, "config": run_config, "split": split,
-        "query_df": query_df, "summary_df": summary_df, "insights": insights,
-        "html": html, "benchmark_sha256": run_config.get("benchmark_sha256"),
+        "run_id": run_id,
+        "run_prefix": run_prefix,
+        "retrieval_prefix": retrieval_prefix,
+        "manifest": run_manifest,
+        "config": run_config,
+        "split": split,
+        "query_df": query_df,
+        "summary_df": summary_df,
+        "insights": insights,
+        "html": html,
+        "benchmark_sha256": run_config.get("benchmark_sha256"),
         "config_ids": sorted(query_df["config_id"].astype(str).unique().tolist()),
         "selection": _load_selection(storage, bucket, run_id),
     }
@@ -1240,9 +1273,13 @@ def load_retrieval_run(
 
 def _validate_retrieval_pair(dev: dict[str, Any], holdout: dict[str, Any]) -> list[str]:
     if dev["split"] != "dev":
-        raise RuntimeError(f"--run-id deve ser DEV quando --holdout-run-id é usado; split={dev['split']}")
+        raise RuntimeError(
+            f"--run-id deve ser DEV quando --holdout-run-id é usado; split={dev['split']}"
+        )
     if holdout["split"] != "holdout":
-        raise RuntimeError(f"--holdout-run-id deve ser HOLDOUT; split={holdout['split']}")
+        raise RuntimeError(
+            f"--holdout-run-id deve ser HOLDOUT; split={holdout['split']}"
+        )
     if dev.get("benchmark_sha256") != holdout.get("benchmark_sha256"):
         raise RuntimeError("DEV e HOLDOUT usam benchmark_sha256 diferentes.")
     holdout_ids = set(holdout["config_ids"])
@@ -1272,45 +1309,75 @@ def _retrieval_comparison_payload(
     if holdout is None:
         return {"dev": None, "holdout": None, "configs": []}
     compare_ids = _validate_retrieval_pair(dev, holdout)
-    dev_frame = dev["query_df"].loc[dev["query_df"]["config_id"].astype(str).isin(compare_ids)].copy()
-    hold_frame = holdout["query_df"].loc[holdout["query_df"]["config_id"].astype(str).isin(compare_ids)].copy()
+    dev_frame = (
+        dev["query_df"]
+        .loc[dev["query_df"]["config_id"].astype(str).isin(compare_ids)]
+        .copy()
+    )
+    hold_frame = (
+        holdout["query_df"]
+        .loc[holdout["query_df"]["config_id"].astype(str).isin(compare_ids)]
+        .copy()
+    )
 
     def row_label(group: pd.DataFrame) -> str:
         first = group.iloc[0]
         return _config_label_from_row(first)
 
     dev_cfg = {
-        str(config_id): {"config_id": str(config_id), "label": row_label(group), **_aggregate_retrieval(group)}
+        str(config_id): {
+            "config_id": str(config_id),
+            "label": row_label(group),
+            **_aggregate_retrieval(group),
+        }
         for config_id, group in dev_frame.groupby("config_id", sort=False)
     }
     hold_cfg = {
-        str(config_id): {"config_id": str(config_id), "label": row_label(group), **_aggregate_retrieval(group)}
+        str(config_id): {
+            "config_id": str(config_id),
+            "label": row_label(group),
+            **_aggregate_retrieval(group),
+        }
         for config_id, group in hold_frame.groupby("config_id", sort=False)
     }
     return {
         "dev": {
-            "run_id": dev["run_id"], "overall": _aggregate_retrieval(dev_frame),
+            "run_id": dev["run_id"],
+            "overall": _aggregate_retrieval(dev_frame),
             "queries": int(dev_frame["query_id"].astype(str).nunique()),
             "executions": int(len(dev_frame)),
         },
         "holdout": {
-            "run_id": holdout["run_id"], "overall": _aggregate_retrieval(hold_frame),
+            "run_id": holdout["run_id"],
+            "overall": _aggregate_retrieval(hold_frame),
             "queries": int(hold_frame["query_id"].astype(str).nunique()),
             "executions": int(len(hold_frame)),
         },
         "configs": [
-            {"config_id": config_id, "label": dev_cfg[config_id]["label"], "dev": dev_cfg[config_id], "holdout": hold_cfg[config_id]}
+            {
+                "config_id": config_id,
+                "label": dev_cfg[config_id]["label"],
+                "dev": dev_cfg[config_id],
+                "holdout": hold_cfg[config_id],
+            }
             for config_id in compare_ids
         ],
     }
 
 
-def render_dual_retrieval_html(*, dev: dict[str, Any], holdout: dict[str, Any] | None) -> str:
+def render_dual_retrieval_html(
+    *, dev: dict[str, Any], holdout: dict[str, Any] | None
+) -> str:
     import base64
+
     comparison = _retrieval_comparison_payload(dev, holdout)
     dev_b64 = base64.b64encode(dev["html"].encode("utf-8")).decode("ascii")
-    holdout_b64 = base64.b64encode(holdout["html"].encode("utf-8")).decode("ascii") if holdout is not None else ""
-    template = r'''<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>ACartomante · Retrieval DEV × HOLDOUT</title><style>
+    holdout_b64 = (
+        base64.b64encode(holdout["html"].encode("utf-8")).decode("ascii")
+        if holdout is not None
+        else ""
+    )
+    template = r"""<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>ACartomante · Retrieval DEV × HOLDOUT</title><style>
 :root{--bg:#f6f7fb;--card:#fff;--ink:#182033;--muted:#697386;--line:#e5e8f0;--blue:#3157d5;--green:#18864b;--red:#c43d4b;--shadow:0 8px 24px rgba(30,40,70,.07)}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.top{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);padding:14px 20px;box-shadow:0 3px 14px rgba(17,24,39,.04)}.topline{max-width:1600px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:16px}.title h1{font-size:20px;margin:0}.title p{margin:3px 0 0;color:var(--muted);font-size:12px}.split-nav{display:flex;gap:6px}.split-btn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 14px;font-weight:700;cursor:pointer}.split-btn.active{background:var(--blue);border-color:var(--blue);color:#fff}.split-btn:disabled{opacity:.38;cursor:not-allowed}.view{display:none}.view.active{display:block}.compare{max-width:1500px;margin:0 auto;padding:20px}.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px}.span-12{grid-column:span 12}.span-6{grid-column:span 6}.card{background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px}.card h2{font-size:16px;margin:0 0 5px}.sub{color:var(--muted);font-size:12px;margin-bottom:12px}.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}.kpi{border:1px solid var(--line);border-radius:11px;padding:11px}.kpi .v{font-size:21px;font-weight:760}.kpi .l{font-size:11px;color:var(--muted)}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}th{background:#f9fafc;color:#4f596e}th:first-child,td:first-child{text-align:left}.delta-pos{color:var(--green);font-weight:700}.delta-neg{color:var(--red);font-weight:700}.chart{height:310px;position:relative}.chart svg{width:100%;height:100%;overflow:visible}.chart .gridline{stroke:#edf0f6;stroke-width:1}.chart .axis{stroke:#cbd3df;stroke-width:1}.chart .tick{fill:#697386;font-size:11px}.chart .bar-dev{fill:#3157d5}.chart .bar-holdout{fill:#7652cc}.chart-legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:11px;margin-top:7px}.chart-legend span:before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;background:#3157d5}.chart-legend span.holdout:before{background:#7652cc}.frame{width:100%;height:calc(100vh - 82px);border:0;background:#fff}.empty{padding:50px;text-align:center;color:var(--muted)}@media(max-width:900px){.span-6{grid-column:span 12}.kpis{grid-template-columns:repeat(2,1fr)}.topline{align-items:flex-start;flex-direction:column}}
 </style></head><body><header class="top"><div class="topline"><div class="title"><h1>ACartomante · Retrieval Benchmark</h1><p id="headerMeta"></p></div><nav class="split-nav"><button class="split-btn" id="btn-general">GERAL</button><button class="split-btn" id="btn-dev">DEV</button><button class="split-btn" id="btn-holdout">HOLDOUT</button></nav></div></header><section id="view-general" class="view"><div class="compare" id="generalContent"></div></section><section id="view-dev" class="view"><iframe class="frame" id="frame-dev" title="Retrieval DEV"></iframe></section><section id="view-holdout" class="view"><iframe class="frame" id="frame-holdout" title="Retrieval HOLDOUT"></iframe></section><script>
 const DATA=__COMPARISON__,DEV_B64="__DEV_B64__",HOLDOUT_B64="__HOLDOUT_B64__",hasHoldout=Boolean(DATA.holdout);const $=id=>document.getElementById(id);const pct=v=>`${(100*Number(v||0)).toFixed(1)}%`;const num=v=>Number(v||0).toFixed(3);const ms=v=>`${Number(v||0).toFixed(1)} ms`;const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));const delta=(a,b)=>Number(b||0)-Number(a||0);const dc=v=>v>1e-12?'delta-pos':v<-1e-12?'delta-neg':'';const dnum=v=>`${v>=0?'+':''}${v.toFixed(3)}`;const dpct=v=>`${v>=0?'+':''}${(100*v).toFixed(1)} pp`;function decode64(x){if(!x)return '';const bin=atob(x),bytes=Uint8Array.from(bin,c=>c.charCodeAt(0));return new TextDecoder().decode(bytes)}
@@ -1320,13 +1387,14 @@ function metricOverviewChart(){const svg=chartSvg('retrievalMetricsChart'),w=900
 function horizontalConfigChart(id,valueKey,formatter){const rows=DATA.configs,h=Math.max(340,rows.length*34+45),svg=chartSvg(id,900,h),w=900,l=320,r=25,t=18,b=25,iw=w-l-r,gap=(h-t-b)/rows.length,bh=Math.min(10,gap*.32),max=Math.max(1e-9,...rows.flatMap(x=>[Number(x.dev[valueKey]||0),Number(x.holdout[valueKey]||0)]));for(let i=0;i<=4;i++){const x=l+iw*i/4;svg.appendChild(svgEl('line',{x1:x,y1:t,x2:x,y2:h-b,class:'gridline'}));svgText(svg,x,h-5,formatter(max*i/4));}rows.forEach((row,i)=>{const cy=t+gap*(i+.5),raw=String(row.label),label=raw.length>44?raw.slice(0,41)+'…':raw;svgText(svg,l-10,cy+4,label,'end');[['dev','bar-dev',-bh*.7,'DEV'],['holdout','bar-holdout',bh*.7,'HOLDOUT']].forEach(([side,cls,off,sideLabel])=>{const v=Number(row[side][valueKey]||0),rect=svgEl('rect',{x:l,y:cy+off-bh/2,width:iw*(v/max),height:bh,rx:3,class:cls});const title=svgEl('title');title.textContent=`${raw} · ${sideLabel}: ${formatter(v)}`;rect.appendChild(title);svg.appendChild(rect);});});}
 function renderGeneral(){if(!hasHoldout){$('generalContent').innerHTML='<div class="card empty">O comparativo GERAL é habilitado quando um run HOLDOUT é informado.</div>';return}const d=DATA.dev,h=DATA.holdout,da=d.overall,ha=h.overall;$('generalContent').innerHTML=`<div class="grid"><div class="card span-6"><h2>DEV · mesmas 10 configs</h2><div class="sub">${d.queries} queries · ${d.executions} execuções usadas no comparativo</div><div class="kpis"><div class="kpi"><div class="v">${num(da.ndcg_at_10)}</div><div class="l">nDCG@10</div></div><div class="kpi"><div class="v">${pct(da.hit_at_10)}</div><div class="l">Hit@10</div></div><div class="kpi"><div class="v">${pct(da.evidence_coverage_at_10)}</div><div class="l">Coverage@10</div></div><div class="kpi"><div class="v">${num(da.mrr_at_10)}</div><div class="l">MRR@10</div></div></div></div><div class="card span-6"><h2>HOLDOUT</h2><div class="sub">${h.queries} queries · ${h.executions} execuções · mesmas configs congeladas no DEV</div><div class="kpis"><div class="kpi"><div class="v">${num(ha.ndcg_at_10)}</div><div class="l">nDCG@10</div></div><div class="kpi"><div class="v">${pct(ha.hit_at_10)}</div><div class="l">Hit@10</div></div><div class="kpi"><div class="v">${pct(ha.evidence_coverage_at_10)}</div><div class="l">Coverage@10</div></div><div class="kpi"><div class="v">${num(ha.mrr_at_10)}</div><div class="l">MRR@10</div></div></div></div><div class="card span-6"><h2>Métricas gerais · DEV × HOLDOUT</h2><div class="sub">Visão rápida da estabilidade das quatro métricas principais.</div><div class="chart" id="retrievalMetricsChart"></div><div class="chart-legend"><span>DEV</span><span class="holdout">HOLDOUT</span></div></div><div class="card span-6"><h2>nDCG@10 por configuração</h2><div class="sub">As mesmas 10 configurações congeladas, comparadas sem nova seleção.</div><div class="chart" id="retrievalNdcgChart" style="height:390px"></div><div class="chart-legend"><span>DEV</span><span class="holdout">HOLDOUT</span></div></div><div class="card span-12"><h2>Latência p95 por configuração</h2><div class="sub">Ajuda a verificar se o custo operacional observado no DEV também se manteve no HOLDOUT.</div><div class="chart" id="retrievalLatencyChart" style="height:390px"></div><div class="chart-legend"><span>DEV</span><span class="holdout">HOLDOUT</span></div></div><div class="card span-12"><h2>10 configurações congeladas · DEV × HOLDOUT</h2><div class="sub">A lista não é recalculada no HOLDOUT. A tabela mostra somente estabilidade/deslocamento de desempenho.</div><div class="table-wrap"><table><thead><tr><th>Configuração</th><th>DEV nDCG</th><th>HOLDOUT nDCG</th><th>Δ nDCG</th><th>DEV Hit@10</th><th>HOLDOUT Hit@10</th><th>Δ Hit</th><th>DEV Cov@10</th><th>HOLDOUT Cov@10</th><th>DEV p95</th><th>HOLDOUT p95</th></tr></thead><tbody>${DATA.configs.map(x=>{const a=x.dev,b=x.holdout,dn=delta(a.ndcg_at_10,b.ndcg_at_10),dh=delta(a.hit_at_10,b.hit_at_10);return `<tr><td>${esc(x.label)}</td><td>${num(a.ndcg_at_10)}</td><td>${num(b.ndcg_at_10)}</td><td class="${dc(dn)}">${dnum(dn)}</td><td>${pct(a.hit_at_10)}</td><td>${pct(b.hit_at_10)}</td><td class="${dc(dh)}">${dpct(dh)}</td><td>${pct(a.evidence_coverage_at_10)}</td><td>${pct(b.evidence_coverage_at_10)}</td><td>${ms(a.latency_p95_ms)}</td><td>${ms(b.latency_p95_ms)}</td></tr>`}).join('')}</tbody></table></div></div></div>`;metricOverviewChart();horizontalConfigChart('retrievalNdcgChart','ndcg_at_10',v=>Number(v).toFixed(3));horizontalConfigChart('retrievalLatencyChart','latency_p95_ms',v=>`${Number(v).toFixed(0)} ms`);}
 $('btn-dev').onclick=()=>setView('dev');$('btn-holdout').onclick=()=>hasHoldout&&setView('holdout');$('btn-general').onclick=()=>hasHoldout&&setView('general');$('btn-holdout').disabled=!hasHoldout;$('btn-general').disabled=!hasHoldout;$('headerMeta').textContent=hasHoldout?`${DATA.dev.run_id} × ${DATA.holdout.run_id}`:`${__DEV_RUN__} · HOLDOUT ainda não informado`;renderGeneral();setView(hasHoldout?'general':'dev');
-</script></body></html>'''
+</script></body></html>"""
     return (
         template.replace("__COMPARISON__", safe_script_json(comparison))
         .replace("__DEV_B64__", dev_b64)
         .replace("__HOLDOUT_B64__", holdout_b64)
         .replace("__DEV_RUN__", safe_script_json(dev["run_id"]))
     )
+
 
 def main() -> None:
     args = parse_args()
@@ -1351,7 +1419,9 @@ def main() -> None:
     if args.output is not None:
         output = args.output
     elif holdout is not None:
-        output = Path("reports") / f"retrieval_{dev['run_id']}__{holdout['run_id']}.html"
+        output = (
+            Path("reports") / f"retrieval_{dev['run_id']}__{holdout['run_id']}.html"
+        )
     else:
         output = Path("reports") / f"retrieval_{dev['run_id']}.html"
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -1377,7 +1447,9 @@ def main() -> None:
             storage.upload_bytes(
                 bucket,
                 selection_key,
-                json.dumps(selection_payload, ensure_ascii=False, indent=2).encode("utf-8"),
+                json.dumps(selection_payload, ensure_ascii=False, indent=2).encode(
+                    "utf-8"
+                ),
                 content_type="application/json; charset=utf-8",
             )
             print(f"selection: s3://{bucket}/{selection_key}")

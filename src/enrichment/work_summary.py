@@ -27,7 +27,6 @@ from src.config.config_manager import ConfigManager
 from src.storage.rustfs_manager import RustFSManager
 from src.utils.chunking import build_sections
 
-
 logger = logging.getLogger("acartomante.enrichment")
 
 BRONZE_CURRENT_KEY = "current.json"
@@ -70,9 +69,7 @@ class FinalNarrativeSummary(BaseModel):
     )
     eventos_principais: list[str] = Field(
         default_factory=list,
-        description=(
-            "Principais eventos da obra em ordem narrativa aproximada."
-        ),
+        description=("Principais eventos da obra em ordem narrativa aproximada."),
     )
 
 
@@ -150,9 +147,7 @@ def utc_now() -> str:
 
 def normalize_text(value: str) -> str:
     value = unicodedata.normalize("NFKD", str(value))
-    value = "".join(
-        char for char in value if not unicodedata.combining(char)
-    )
+    value = "".join(char for char in value if not unicodedata.combining(char))
     return re.sub(r"\s+", " ", value.casefold()).strip()
 
 
@@ -276,11 +271,7 @@ class WorkEnrichmentAgent:
 
         self.workers = max(
             1,
-            int(
-                workers
-                if workers is not None
-                else config.generation.max_parallel
-            ),
+            int(workers if workers is not None else config.generation.max_parallel),
         )
         self.max_tokens = int(max_tokens)
         self.unit_chars = int(
@@ -305,17 +296,13 @@ class WorkEnrichmentAgent:
             client_kwargs={"timeout": config.generation.timeout_seconds},
         )
 
-        self.unit_llm = (
-            llm.with_structured_output(UnitSummary, method="json_schema")
-            .with_retry(stop_after_attempt=2)
-        )
-        self.final_llm = (
-            llm.with_structured_output(
-                FinalNarrativeSummary,
-                method="json_schema",
-            )
-            .with_retry(stop_after_attempt=2)
-        )
+        self.unit_llm = llm.with_structured_output(
+            UnitSummary, method="json_schema"
+        ).with_retry(stop_after_attempt=2)
+        self.final_llm = llm.with_structured_output(
+            FinalNarrativeSummary,
+            method="json_schema",
+        ).with_retry(stop_after_attempt=2)
 
         self._progress_lock = threading.Lock()
         self._map_progress = None
@@ -363,9 +350,7 @@ class WorkEnrichmentAgent:
             ).decode("utf-8")
         )
 
-        bronze_artifact_id = str(
-            current.get("bronze_artifact_id") or ""
-        ).strip()
+        bronze_artifact_id = str(current.get("bronze_artifact_id") or "").strip()
         bronze_manifest_key = str(current.get("manifest_key") or "").strip()
 
         if not bronze_artifact_id or not bronze_manifest_key:
@@ -483,9 +468,7 @@ class WorkEnrichmentAgent:
         )
 
         chapter_sections = [
-            section
-            for section in sections
-            if looks_like_chapter(section)
+            section for section in sections if looks_like_chapter(section)
         ]
         use_chapters = len(chapter_sections) >= int(semantic.min_capitulos)
 
@@ -524,9 +507,7 @@ class WorkEnrichmentAgent:
             ) in enumerate(windows, start=1):
                 units.append(
                     PlannedUnit(
-                        unit_id=(
-                            f"s{section_position + 1:03d}_p{part_index:02d}"
-                        ),
+                        unit_id=(f"s{section_position + 1:03d}_p{part_index:02d}"),
                         section_index=int(
                             section.get("section_index", section_position) or 0
                         ),
@@ -669,9 +650,7 @@ TRECHO:
             update={
                 "resumo": summary.resumo.strip(),
                 "eventos": [
-                    event.strip()
-                    for event in summary.eventos
-                    if event.strip()
+                    event.strip() for event in summary.eventos if event.strip()
                 ][:5],
             }
         )
@@ -816,9 +795,7 @@ ANOTAÇÕES POR CAPÍTULO/BLOCO:
             }
         )
 
-        self._timings["final_summary"] = (
-            perf_counter() - self._final_started
-        )
+        self._timings["final_summary"] = perf_counter() - self._final_started
 
         return {"final_summary": final_summary}
 
@@ -887,18 +864,15 @@ ANOTAÇÕES POR CAPÍTULO/BLOCO:
         started = perf_counter()
         source = state["source"]
 
-        run_id = (
-            f"summary_{slugify(source.title)}_"
-            + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        )
+        run_id = f"summary_{slugify(source.title)}_" + datetime.now(
+            timezone.utc
+        ).strftime("%Y%m%dT%H%M%SZ")
 
         output_dir = state["output_root"] / run_id
         output_dir.mkdir(parents=True, exist_ok=True)
 
         markdown = self._render_markdown(source, state)
-        source_sha256 = hashlib.sha256(
-            source.text.encode("utf-8")
-        ).hexdigest()
+        source_sha256 = hashlib.sha256(source.text.encode("utf-8")).hexdigest()
 
         summary_payload = {
             "run_id": run_id,
@@ -929,9 +903,7 @@ ANOTAÇÕES POR CAPÍTULO/BLOCO:
             ],
             "summary": {
                 "resumo_geral": state["final_summary"].resumo_geral,
-                "eventos_principais": (
-                    state["final_summary"].eventos_principais
-                ),
+                "eventos_principais": (state["final_summary"].eventos_principais),
             },
         }
 
@@ -967,10 +939,7 @@ ANOTAÇÕES POR CAPÍTULO/BLOCO:
             },
             "plan": state["plan"],
             "timings_seconds": {
-                **{
-                    key: round(value, 4)
-                    for key, value in self._timings.items()
-                },
+                **{key: round(value, 4) for key, value in self._timings.items()},
                 "total": round(total_seconds, 4),
             },
             "unit_timings": [
@@ -985,9 +954,7 @@ ANOTAÇÕES POR CAPÍTULO/BLOCO:
                 "summary_chars": len(markdown),
                 "summary_words": len(markdown.split()),
                 "summary_bytes_utf8": len(markdown.encode("utf-8")),
-                "compression_ratio_chars": (
-                    len(markdown) / max(1, len(source.text))
-                ),
+                "compression_ratio_chars": (len(markdown) / max(1, len(source.text))),
             },
         }
 
@@ -1072,14 +1039,8 @@ ANOTAÇÕES POR CAPÍTULO/BLOCO:
             "compression_ratio_chars: "
             f"{metrics['output']['compression_ratio_chars']:.4f}"
         )
-        print(
-            "elapsed_total_s: "
-            f"{metrics['timings_seconds']['total']:.2f}"
-        )
-        print(
-            "elapsed_map_s: "
-            f"{metrics['timings_seconds'].get('map_wall', 0):.2f}"
-        )
+        print("elapsed_total_s: " f"{metrics['timings_seconds']['total']:.2f}")
+        print("elapsed_map_s: " f"{metrics['timings_seconds'].get('map_wall', 0):.2f}")
         print(
             "elapsed_final_s: "
             f"{metrics['timings_seconds'].get('final_summary', 0):.2f}"
@@ -1125,10 +1086,7 @@ ANOTAÇÕES POR CAPÍTULO/BLOCO:
         )
 
     def unload_model(self) -> None:
-        endpoint = (
-            str(self.config.generation.base_url).rstrip("/")
-            + "/api/generate"
-        )
+        endpoint = str(self.config.generation.base_url).rstrip("/") + "/api/generate"
 
         payload = json.dumps(
             {
@@ -1162,9 +1120,7 @@ ANOTAÇÕES POR CAPÍTULO/BLOCO:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=(
-            "Smoke de enriquecimento mínimo: resumo + eventos."
-        )
+        description=("Smoke de enriquecimento mínimo: resumo + eventos.")
     )
 
     parser.add_argument("--title", default=DEFAULT_TITLE)
@@ -1184,10 +1140,7 @@ def parse_args() -> argparse.Namespace:
         "--unit-chars",
         type=int,
         default=None,
-        help=(
-            "Fallback por caracteres. "
-            "Padrão: generation.max_context_chars."
-        ),
+        help=("Fallback por caracteres. " "Padrão: generation.max_context_chars."),
     )
     parser.add_argument(
         "--char-overlap",
@@ -1215,10 +1168,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     logging.basicConfig(
         level=logging.INFO,
-        format=(
-            "%(asctime)s %(levelname)s "
-            "%(name)s %(message)s"
-        ),
+        format=("%(asctime)s %(levelname)s " "%(name)s %(message)s"),
     )
 
     args = parse_args()

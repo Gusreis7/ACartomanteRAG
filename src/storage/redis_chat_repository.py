@@ -6,7 +6,6 @@ from uuid import UUID, uuid4
 
 from redis import Redis, RedisError, WatchError
 
-
 REDIS_NAMESPACE = "acartomante"
 
 
@@ -22,10 +21,7 @@ def conversation_thread_id(
     `checkpoint_write`, `write_keys_zset`). Ao estruturar o thread_id,
     o RedisInsight passa a agrupar os checkpoints por sessão e chat.
     """
-    return (
-        f"{REDIS_NAMESPACE}:session:{session_id}:"
-        f"chat:{chat_id}"
-    )
+    return f"{REDIS_NAMESPACE}:session:{session_id}:" f"chat:{chat_id}"
 
 
 class RedisChatRepository:
@@ -114,11 +110,17 @@ class RedisChatRepository:
             "draw_required": data.get("guide_pending") == "1",
             "persona": data.get("persona", "neutral"),
             "drawn_guide": data.get("drawn_guide") or None,
-            "selected_card": int(data["guide_card"]) if data.get("guide_card") in {"0", "1"} else None,
+            "selected_card": (
+                int(data["guide_card"])
+                if data.get("guide_card") in {"0", "1"}
+                else None
+            ),
         }
 
     def get_guide(self, *, session_id: UUID, chat_id: UUID) -> dict | None:
-        data = self.redis.hgetall(self._chat_key(session_id=session_id, chat_id=chat_id))
+        data = self.redis.hgetall(
+            self._chat_key(session_id=session_id, chat_id=chat_id)
+        )
         return self._guide_state(data) if data else None
 
     def draw_guide(self, *, session_id: UUID, chat_id: UUID, card: int) -> dict | None:
@@ -126,12 +128,18 @@ class RedisChatRepository:
             raise ValueError("Escolha uma das duas cartas.")
         return self._update_guide(session_id=session_id, chat_id=chat_id, card=card)
 
-    def set_persona(self, *, session_id: UUID, chat_id: UUID, persona: str) -> dict | None:
+    def set_persona(
+        self, *, session_id: UUID, chat_id: UUID, persona: str
+    ) -> dict | None:
         if persona not in {"neutral", "cosmo", "damiao"}:
             raise ValueError("Persona inválida.")
-        return self._update_guide(session_id=session_id, chat_id=chat_id, persona=persona)
+        return self._update_guide(
+            session_id=session_id, chat_id=chat_id, persona=persona
+        )
 
-    def _update_guide(self, *, session_id: UUID, chat_id: UUID, card=None, persona=None) -> dict | None:
+    def _update_guide(
+        self, *, session_id: UUID, chat_id: UUID, card=None, persona=None
+    ) -> dict | None:
         key = self._chat_key(session_id=session_id, chat_id=chat_id)
         # A primeira escolha prevalece, inclusive em retries e abas concorrentes.
         for _ in range(5):
@@ -145,8 +153,17 @@ class RedisChatRepository:
                         if data.get("guide_pending") != "1":
                             return self._guide_state(data)
                         first = data["guide_first"]
-                        guide = first if card == 0 else {"cosmo": "damiao", "damiao": "cosmo"}[first]
-                        changes = {"guide_pending": "0", "drawn_guide": guide, "guide_card": str(card), "persona": guide}
+                        guide = (
+                            first
+                            if card == 0
+                            else {"cosmo": "damiao", "damiao": "cosmo"}[first]
+                        )
+                        changes = {
+                            "guide_pending": "0",
+                            "drawn_guide": guide,
+                            "guide_card": str(card),
+                            "persona": guide,
+                        }
                     else:
                         changes = {"guide_pending": "0", "persona": persona}
                     pipe.multi()
@@ -210,18 +227,13 @@ class RedisChatRepository:
         session_id: UUID,
         chat_id: UUID,
     ) -> str:
-        return (
-            f"{REDIS_NAMESPACE}:session:{session_id}:"
-            f"chat:{chat_id}:metadata"
-        )
+        return f"{REDIS_NAMESPACE}:session:{session_id}:" f"chat:{chat_id}:metadata"
 
     @staticmethod
     def _session_chats_key(
         session_id: UUID,
     ) -> str:
-        return (
-            f"{REDIS_NAMESPACE}:session:{session_id}:chats"
-        )
+        return f"{REDIS_NAMESPACE}:session:{session_id}:chats"
 
     @staticmethod
     def _deserialize(data: dict) -> dict:
@@ -230,12 +242,8 @@ class RedisChatRepository:
             "session_id": data["session_id"],
             "title": data["title"],
             "status": data["status"],
-            "created_at": datetime.fromisoformat(
-                data["created_at"]
-            ),
-            "updated_at": datetime.fromisoformat(
-                data["updated_at"]
-            ),
+            "created_at": datetime.fromisoformat(data["created_at"]),
+            "updated_at": datetime.fromisoformat(data["updated_at"]),
         }
 
 

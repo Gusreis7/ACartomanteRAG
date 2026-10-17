@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Literal
 
-
 PersonaName = Literal[
     "neutral",
     "cosmo",
@@ -31,7 +30,6 @@ Preserve a ambiguidade sem transformar a resposta em inventário de evidências.
 A persona desta requisição substitui qualquer posição opinativa assumida pelo
 assistente no histórico recente.
 """.strip(),
-
     "cosmo": """
 PERSONA ATIVA: COSMO.
 
@@ -63,7 +61,6 @@ de retrieval.
 A persona desta requisição substitui qualquer posição opinativa assumida pelo
 assistente no histórico recente.
 """.strip(),
-
     "damiao": """
 PERSONA ATIVA: DAMIÃO.
 
@@ -112,9 +109,7 @@ def normalize_persona(value: str | None) -> PersonaName:
     }
 
     if normalized not in aliases:
-        raise ValueError(
-            "Persona inválida. Use neutral, cosmo ou damiao."
-        )
+        raise ValueError("Persona inválida. Use neutral, cosmo ou damiao.")
 
     return aliases[normalized]  # type: ignore[return-value]
 

@@ -271,14 +271,35 @@ class WorkEnrichmentService:
         self._checkpoint_prefix = None
         self.storage = RustFSManager.from_config(config.environment.rustfs)
         if self.enrichment.provider in {"bedrock", "bedrock-mantle"}:
-            generation = config.generation.model_copy(update={
-                **{key: getattr(self.enrichment, key) for key in (
-                    "provider", "region", "model", "temperature", "top_p", "max_tokens", "timeout_seconds", "max_parallel", "reasoning", "response_retries", "response_retry_max_tokens"
-                )},
-            })
+            generation = config.generation.model_copy(
+                update={
+                    **{
+                        key: getattr(self.enrichment, key)
+                        for key in (
+                            "provider",
+                            "region",
+                            "model",
+                            "temperature",
+                            "top_p",
+                            "max_tokens",
+                            "timeout_seconds",
+                            "max_parallel",
+                            "reasoning",
+                            "response_retries",
+                            "response_retry_max_tokens",
+                        )
+                    },
+                }
+            )
             self.provider = create_generation_provider(generation)
-            self.unit_llm = RunnableLambda(lambda messages: self.provider.invoke_structured(messages, UnitSummary))
-            self.final_llm = RunnableLambda(lambda messages: self.provider.invoke_structured(messages, FinalNarrativeSummary))
+            self.unit_llm = RunnableLambda(
+                lambda messages: self.provider.invoke_structured(messages, UnitSummary)
+            )
+            self.final_llm = RunnableLambda(
+                lambda messages: self.provider.invoke_structured(
+                    messages, FinalNarrativeSummary
+                )
+            )
         else:
             self._configure_ollama()
 
@@ -289,6 +310,7 @@ class WorkEnrichmentService:
 
     def _configure_ollama(self):
         from langchain_ollama import ChatOllama
+
         config = self.config
         llm = ChatOllama(
             model=self.enrichment.model,
@@ -315,7 +337,9 @@ class WorkEnrichmentService:
         ).with_retry(stop_after_attempt=2)
 
     def _cached_summary(self, llm, messages, schema, *, context=None):
-        digest = hashlib.sha256(json.dumps(messages, ensure_ascii=False).encode()).hexdigest()
+        digest = hashlib.sha256(
+            json.dumps(messages, ensure_ascii=False).encode()
+        ).hexdigest()
         key = f"{self._checkpoint_prefix}/{schema.__name__}/{digest}.json"
         bucket = self.config.storage.enrichment_bucket
         if self._checkpoint_prefix and self.storage.object_exists(bucket, key):
@@ -325,31 +349,49 @@ class WorkEnrichmentService:
         except GenerationResponseError as exc:
             exc.diagnostics["enrichment_context"] = context or {}
             self._save_rejected_response(exc, schema, digest)
-            logger.warning("enrichment_response_error %s", json.dumps(exc.diagnostics, ensure_ascii=False))
+            logger.warning(
+                "enrichment_response_error %s",
+                json.dumps(exc.diagnostics, ensure_ascii=False),
+            )
             raise
         if self._checkpoint_prefix:
-            self.storage.upload_bytes(bucket, key, summary.model_dump_json().encode(), "application/json")
+            self.storage.upload_bytes(
+                bucket, key, summary.model_dump_json().encode(), "application/json"
+            )
         return summary
 
     def _save_rejected_response(self, error, schema, message_hash):
         if not self._checkpoint_prefix or error.response_text is None:
             return
-        identity = json.dumps([error.diagnostics.get("request_id"), error.diagnostics.get("response_sha256")])
+        identity = json.dumps(
+            [
+                error.diagnostics.get("request_id"),
+                error.diagnostics.get("response_sha256"),
+            ]
+        )
         suffix = hashlib.sha256(identity.encode()).hexdigest()[:16]
         key = f"{self._checkpoint_prefix}/diagnostics/{schema.__name__}/{message_hash}-{suffix}.json"
         bucket = self.config.storage.enrichment_bucket
         payload = {
-            "diagnostics": dict(error.diagnostics), "message_sha256": message_hash,
+            "diagnostics": dict(error.diagnostics),
+            "message_sha256": message_hash,
             "expected_schema": schema.model_json_schema(),
             "response_text": error.response_text[:65536],
             "response_capture_truncated": len(error.response_text) > 65536,
         }
         try:
-            self.storage.upload_bytes(bucket, key, json.dumps(payload, ensure_ascii=False).encode(), "application/json")
+            self.storage.upload_bytes(
+                bucket,
+                key,
+                json.dumps(payload, ensure_ascii=False).encode(),
+                "application/json",
+            )
         except Exception as exc:
             error.diagnostics["response_capture_error"] = type(exc).__name__
         else:
-            error.diagnostics.update(response_error_bucket=bucket, response_error_key=key)
+            error.diagnostics.update(
+                response_error_bucket=bucket, response_error_key=key
+            )
 
     def _build_graph(self):
         graph = StateGraph(EnrichmentState)
@@ -364,7 +406,9 @@ class WorkEnrichmentService:
         graph.add_edge("final_summary", END)
         return graph.compile()
 
-    def _plan_units(self, source: WorkSource) -> tuple[list[PlannedUnit], dict[str, Any]]:
+    def _plan_units(
+        self, source: WorkSource
+    ) -> tuple[list[PlannedUnit], dict[str, Any]]:
         semantic = self.enrichment.semantic
         sections, effective_strategy = build_sections(
             text=source.text,
@@ -374,21 +418,25 @@ class WorkEnrichmentService:
             min_mediana_chars=semantic.min_mediana_chars,
         )
 
-        chapter_sections = [section for section in sections if looks_like_chapter(section)]
+        chapter_sections = [
+            section for section in sections if looks_like_chapter(section)
+        ]
         use_chapters = len(chapter_sections) >= int(semantic.min_capitulos)
 
         if use_chapters:
             source_sections = chapter_sections
             plan_mode = "chapter_semantic"
         else:
-            source_sections = [{
-                "section_index": 0,
-                "section_type": "document",
-                "section_header": source.title,
-                "section_title": "",
-                "start_char": 0,
-                "text": source.text,
-            }]
+            source_sections = [
+                {
+                    "section_index": 0,
+                    "section_type": "document",
+                    "section_header": source.title,
+                    "section_title": "",
+                    "start_char": 0,
+                    "text": source.text,
+                }
+            ]
             plan_mode = "character_windows"
 
         units: list[PlannedUnit] = []
@@ -402,36 +450,56 @@ class WorkEnrichmentService:
             )
             label = section_label(section)
 
-            for part_index, (local_start, local_end, piece) in enumerate(windows, start=1):
-                units.append(PlannedUnit(
-                    unit_id=f"s{section_position + 1:03d}_p{part_index:02d}",
-                    section_index=int(section.get("section_index", section_position) or 0),
-                    section_label=label,
-                    section_type=str(section.get("section_type") or ("chapter" if use_chapters else "document")),
-                    part_index=part_index,
-                    part_count=len(windows),
-                    start_char=section_start + local_start,
-                    end_char=section_start + local_end,
-                    text=piece,
-                ))
+            for part_index, (local_start, local_end, piece) in enumerate(
+                windows, start=1
+            ):
+                units.append(
+                    PlannedUnit(
+                        unit_id=f"s{section_position + 1:03d}_p{part_index:02d}",
+                        section_index=int(
+                            section.get("section_index", section_position) or 0
+                        ),
+                        section_label=label,
+                        section_type=str(
+                            section.get("section_type")
+                            or ("chapter" if use_chapters else "document")
+                        ),
+                        part_index=part_index,
+                        part_count=len(windows),
+                        start_char=section_start + local_start,
+                        end_char=section_start + local_end,
+                        text=piece,
+                    )
+                )
 
         if not units:
             raise RuntimeError("Planejamento do enrichment não gerou blocos.")
 
         # Filtrar depois de numerar preserva IDs, posições e chaves dos caches.
-        skipped = [{
-            "unit_id": unit.unit_id, "section_index": unit.section_index,
-            "section_label": unit.section_label, "section_type": unit.section_type,
-            "part_index": unit.part_index, "part_count": unit.part_count,
-            "start_char": unit.start_char, "end_char": unit.end_char,
-            "status": "skipped", "reason": "roman_marker_and_dotted_lines",
-            "text_chars": len(unit.text),
-            "text_sha256": hashlib.sha256(unit.text.encode()).hexdigest(),
-        } for unit in units if is_ornamental_unit(unit.text)]
+        skipped = [
+            {
+                "unit_id": unit.unit_id,
+                "section_index": unit.section_index,
+                "section_label": unit.section_label,
+                "section_type": unit.section_type,
+                "part_index": unit.part_index,
+                "part_count": unit.part_count,
+                "start_char": unit.start_char,
+                "end_char": unit.end_char,
+                "status": "skipped",
+                "reason": "roman_marker_and_dotted_lines",
+                "text_chars": len(unit.text),
+                "text_sha256": hashlib.sha256(unit.text.encode()).hexdigest(),
+            }
+            for unit in units
+            if is_ornamental_unit(unit.text)
+        ]
         skipped_ids = {item["unit_id"] for item in skipped}
         active_units = [unit for unit in units if unit.unit_id not in skipped_ids]
         if not active_units:
-            raise RuntimeError("Enrichment sem unidades processáveis: somente marcadores romanos e linhas pontilhadas.")
+            raise RuntimeError(
+                "Enrichment sem unidades processáveis: somente marcadores romanos e linhas pontilhadas."
+            )
 
         return active_units, {
             "requested_strategy": self.enrichment.strategy,
@@ -450,11 +518,18 @@ class WorkEnrichmentService:
     def _plan_node(self, state: EnrichmentState) -> dict[str, Any]:
         units, plan = self._plan_units(state["source"])
         if plan["skipped_units_count"]:
-            print("[skip] Enrichment: " + json.dumps({
-                "title": state["source"].title,
-                "unit_ids": [item["unit_id"] for item in plan["skipped_units"]],
-                "reason": "roman_marker_and_dotted_lines",
-            }, ensure_ascii=False), flush=True)
+            print(
+                "[skip] Enrichment: "
+                + json.dumps(
+                    {
+                        "title": state["source"].title,
+                        "unit_ids": [item["unit_id"] for item in plan["skipped_units"]],
+                        "reason": "roman_marker_and_dotted_lines",
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
         self._map_started = perf_counter()
         return {"units": units, "plan": plan}
 
@@ -470,45 +545,65 @@ class WorkEnrichmentService:
         unit = state["unit"]
         started = perf_counter()
 
-        summary = self._cached_summary(self.unit_llm, [
-            ("system", UNIT_SYSTEM_PROMPT),
-            ("human", UNIT_PROMPT_TEMPLATE.format(
-                title=source.title,
-                author=source.author,
-                max_events=MAX_EVENTS_PER_BLOCK,
-                unit_id=unit.unit_id,
-                section_label=unit.section_label,
-                part_index=unit.part_index,
-                part_count=unit.part_count,
-                text=unit.text,
-            )),
-        ], UnitSummary, context={
-            "phase": "unit", "title": source.title, "source_document_id": source.source_document_id,
-            "unit_id": unit.unit_id, "section_label": unit.section_label,
-            "start_char": unit.start_char, "end_char": unit.end_char,
-        })
+        summary = self._cached_summary(
+            self.unit_llm,
+            [
+                ("system", UNIT_SYSTEM_PROMPT),
+                (
+                    "human",
+                    UNIT_PROMPT_TEMPLATE.format(
+                        title=source.title,
+                        author=source.author,
+                        max_events=MAX_EVENTS_PER_BLOCK,
+                        unit_id=unit.unit_id,
+                        section_label=unit.section_label,
+                        part_index=unit.part_index,
+                        part_count=unit.part_count,
+                        text=unit.text,
+                    ),
+                ),
+            ],
+            UnitSummary,
+            context={
+                "phase": "unit",
+                "title": source.title,
+                "source_document_id": source.source_document_id,
+                "unit_id": unit.unit_id,
+                "section_label": unit.section_label,
+                "start_char": unit.start_char,
+                "end_char": unit.end_char,
+            },
+        )
 
         elapsed = perf_counter() - started
         if not isinstance(summary, UnitSummary):
             summary = UnitSummary.model_validate(summary)
 
-        summary = summary.model_copy(update={
-            "resumo": summary.resumo.strip(),
-            "eventos": [event.strip() for event in summary.eventos if event.strip()][:MAX_EVENTS_PER_BLOCK],
-        })
+        summary = summary.model_copy(
+            update={
+                "resumo": summary.resumo.strip(),
+                "eventos": [
+                    event.strip() for event in summary.eventos if event.strip()
+                ][:MAX_EVENTS_PER_BLOCK],
+            }
+        )
 
-        return {"unit_results": [UnitResult(
-            unit_id=unit.unit_id,
-            section_index=unit.section_index,
-            section_label=unit.section_label,
-            section_type=unit.section_type,
-            part_index=unit.part_index,
-            part_count=unit.part_count,
-            start_char=unit.start_char,
-            end_char=unit.end_char,
-            elapsed_seconds=round(elapsed, 4),
-            summary=summary,
-        )]}
+        return {
+            "unit_results": [
+                UnitResult(
+                    unit_id=unit.unit_id,
+                    section_index=unit.section_index,
+                    section_label=unit.section_label,
+                    section_type=unit.section_type,
+                    part_index=unit.part_index,
+                    part_count=unit.part_count,
+                    start_char=unit.start_char,
+                    end_char=unit.end_char,
+                    elapsed_seconds=round(elapsed, 4),
+                    summary=summary,
+                )
+            ]
+        }
 
     def _assemble_node(self, state: EnrichmentState) -> dict[str, Any]:
         self._map_elapsed = perf_counter() - self._map_started
@@ -526,12 +621,16 @@ class WorkEnrichmentService:
         )
 
     @staticmethod
-    def _pack_items(items: list[dict[str, Any]], max_chars: int) -> list[list[dict[str, Any]]]:
+    def _pack_items(
+        items: list[dict[str, Any]], max_chars: int
+    ) -> list[list[dict[str, Any]]]:
         packs: list[list[dict[str, Any]]] = []
         current: list[dict[str, Any]] = []
         current_chars = 0
         for item in items:
-            item_chars = len(json.dumps(item, ensure_ascii=False, separators=(",", ":")))
+            item_chars = len(
+                json.dumps(item, ensure_ascii=False, separators=(",", ":"))
+            )
             if current and current_chars + item_chars > max_chars:
                 packs.append(current)
                 current = []
@@ -550,39 +649,52 @@ class WorkEnrichmentService:
         items: list[dict[str, Any]],
         phase: str = "final",
     ) -> FinalNarrativeSummary:
-        response = self._cached_summary(self.final_llm, [
-            ("system", FINAL_SYSTEM_PROMPT),
-            ("human", FINAL_PROMPT_TEMPLATE.format(
-                title=title,
-                author=author,
-                max_events=MAX_EVENTS_FINAL,
-                material=self._serialize_items(items),
-            )),
-        ], FinalNarrativeSummary, context={"phase": phase, "title": title, "items": len(items)})
+        response = self._cached_summary(
+            self.final_llm,
+            [
+                ("system", FINAL_SYSTEM_PROMPT),
+                (
+                    "human",
+                    FINAL_PROMPT_TEMPLATE.format(
+                        title=title,
+                        author=author,
+                        max_events=MAX_EVENTS_FINAL,
+                        material=self._serialize_items(items),
+                    ),
+                ),
+            ],
+            FinalNarrativeSummary,
+            context={"phase": phase, "title": title, "items": len(items)},
+        )
         self._reduce_calls += 1
         if not isinstance(response, FinalNarrativeSummary):
             response = FinalNarrativeSummary.model_validate(response)
-        return response.model_copy(update={
-            "resumo_geral": response.resumo_geral.strip(),
-            "eventos_principais": [
-                event.strip()
-                for event in response.eventos_principais
-                if event.strip()
-            ][:MAX_EVENTS_FINAL],
-        })
+        return response.model_copy(
+            update={
+                "resumo_geral": response.resumo_geral.strip(),
+                "eventos_principais": [
+                    event.strip()
+                    for event in response.eventos_principais
+                    if event.strip()
+                ][:MAX_EVENTS_FINAL],
+            }
+        )
 
     def _hierarchical_final(
         self,
         source: WorkSource,
         ordered: list[UnitResult],
     ) -> FinalNarrativeSummary:
-        items: list[dict[str, Any]] = [{
-            "unidade": item.unit_id,
-            "secao": item.section_label,
-            "parte": f"{item.part_index}/{item.part_count}",
-            "resumo": item.summary.resumo,
-            "eventos": item.summary.eventos,
-        } for item in ordered]
+        items: list[dict[str, Any]] = [
+            {
+                "unidade": item.unit_id,
+                "secao": item.section_label,
+                "parte": f"{item.part_index}/{item.part_count}",
+                "resumo": item.summary.resumo,
+                "eventos": item.summary.eventos,
+            }
+            for item in ordered
+        ]
 
         budget = int(self.enrichment.final_context_chars)
         while len(self._serialize_items(items)) > budget and len(items) > 1:
@@ -597,12 +709,14 @@ class WorkEnrichmentService:
                     items=pack,
                     phase="reduce",
                 )
-                reduced_items.append({
-                    "unidade": f"reduce_{index:03d}",
-                    "secao": f"Consolidação {index}",
-                    "resumo": reduced.resumo_geral,
-                    "eventos": reduced.eventos_principais,
-                })
+                reduced_items.append(
+                    {
+                        "unidade": f"reduce_{index:03d}",
+                        "secao": f"Consolidação {index}",
+                        "resumo": reduced.resumo_geral,
+                        "eventos": reduced.eventos_principais,
+                    }
+                )
             if len(reduced_items) >= len(items):
                 raise RuntimeError(
                     "Reduce hierárquico não conseguiu reduzir o contexto final."
@@ -619,7 +733,9 @@ class WorkEnrichmentService:
         final = self._hierarchical_final(state["source"], state["ordered_results"])
         return {"final_summary": final, "reduce_calls": self._reduce_calls}
 
-    def enrich(self, source: WorkSource, *, checkpoint_prefix: str | None = None) -> EnrichmentResult:
+    def enrich(
+        self, source: WorkSource, *, checkpoint_prefix: str | None = None
+    ) -> EnrichmentResult:
         self._checkpoint_prefix = checkpoint_prefix
         before_usage = self.provider.usage_snapshot() if self.provider else {}
         self._reduce_calls = 0
@@ -632,23 +748,34 @@ class WorkEnrichmentService:
         ordered = result["ordered_results"]
         final = result["final_summary"]
 
-        blocks = [{
-            "unit_id": item.unit_id,
-            "section_index": item.section_index,
-            "section_label": item.section_label,
-            "section_type": item.section_type,
-            "part_index": item.part_index,
-            "part_count": item.part_count,
-            "start_char": item.start_char,
-            "end_char": item.end_char,
-            "resumo": item.summary.resumo,
-            "eventos": item.summary.eventos,
-        } for item in ordered]
+        blocks = [
+            {
+                "unit_id": item.unit_id,
+                "section_index": item.section_index,
+                "section_label": item.section_label,
+                "section_type": item.section_type,
+                "part_index": item.part_index,
+                "part_count": item.part_count,
+                "start_char": item.start_char,
+                "end_char": item.end_char,
+                "resumo": item.summary.resumo,
+                "eventos": item.summary.eventos,
+            }
+            for item in ordered
+        ]
 
-        usage = {key: value - before_usage.get(key, 0) for key, value in (self.provider.usage_snapshot() if self.provider else {}).items()}
+        usage = {
+            key: value - before_usage.get(key, 0)
+            for key, value in (
+                self.provider.usage_snapshot() if self.provider else {}
+            ).items()
+        }
         prices = self.config.generation.model_prices.get(self.enrichment.model, {})
         if usage:
-            usage["estimated_cost_usd"] = (usage.get("input_tokens", 0) * prices.get("input", 0) + usage.get("output_tokens", 0) * prices.get("output", 0)) / 1_000_000
+            usage["estimated_cost_usd"] = (
+                usage.get("input_tokens", 0) * prices.get("input", 0)
+                + usage.get("output_tokens", 0) * prices.get("output", 0)
+            ) / 1_000_000
         return EnrichmentResult(
             plan=result["plan"],
             blocks=blocks,
@@ -659,11 +786,14 @@ class WorkEnrichmentService:
             timings_seconds={
                 "total": round(total_seconds, 4),
                 "map_wall": round(self._map_elapsed, 4),
-                "units": [{
-                    "unit_id": item.unit_id,
-                    "section_label": item.section_label,
-                    "seconds": item.elapsed_seconds,
-                } for item in ordered],
+                "units": [
+                    {
+                        "unit_id": item.unit_id,
+                        "section_label": item.section_label,
+                        "seconds": item.elapsed_seconds,
+                    }
+                    for item in ordered
+                ],
             },
             reduce_calls=result.get("reduce_calls", self._reduce_calls),
             usage=usage,
@@ -673,10 +803,12 @@ class WorkEnrichmentService:
         if self.enrichment.provider in {"bedrock", "bedrock-mantle"}:
             return
         endpoint = str(self.config.generation.base_url).rstrip("/") + "/api/generate"
-        payload = json.dumps({
-            "model": self.enrichment.model,
-            "keep_alive": 0,
-        }).encode("utf-8")
+        payload = json.dumps(
+            {
+                "model": self.enrichment.model,
+                "keep_alive": 0,
+            }
+        ).encode("utf-8")
         req = urllib_request.Request(
             endpoint,
             data=payload,
@@ -701,10 +833,12 @@ def structured_output_schema_sha256() -> str:
 
 
 def prompt_sha256() -> str:
-    payload = "\n---\n".join([
-        UNIT_SYSTEM_PROMPT,
-        UNIT_PROMPT_TEMPLATE,
-        FINAL_SYSTEM_PROMPT,
-        FINAL_PROMPT_TEMPLATE,
-    ])
+    payload = "\n---\n".join(
+        [
+            UNIT_SYSTEM_PROMPT,
+            UNIT_PROMPT_TEMPLATE,
+            FINAL_SYSTEM_PROMPT,
+            FINAL_PROMPT_TEMPLATE,
+        ]
+    )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()

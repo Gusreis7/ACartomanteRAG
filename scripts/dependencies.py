@@ -1,4 +1,5 @@
 """Instala/exporta perfis do pyproject.toml sem depender de bibliotecas externas."""
+
 from __future__ import annotations
 
 import argparse
@@ -36,9 +37,17 @@ def resolve(groups, name, ancestors=()):
         raise ValueError(f"Perfil de dependências inválido: {name}")
     result = []
     for item in groups[key]:
-        if isinstance(item, str) and re.match(r"^[A-Za-z0-9][A-Za-z0-9_.-]*", item) and not any(char in item for char in "\r\n"):
+        if (
+            isinstance(item, str)
+            and re.match(r"^[A-Za-z0-9][A-Za-z0-9_.-]*", item)
+            and not any(char in item for char in "\r\n")
+        ):
             result.append(item)
-        elif isinstance(item, dict) and set(item) == {"include-group"} and isinstance(item["include-group"], str):
+        elif (
+            isinstance(item, dict)
+            and set(item) == {"include-group"}
+            and isinstance(item["include-group"], str)
+        ):
             result.extend(resolve(groups, item["include-group"], (*ancestors, key)))
         else:
             raise ValueError(f"Entrada inválida no perfil {name}.")
@@ -47,8 +56,12 @@ def resolve(groups, name, ancestors=()):
 
 def constraints(groups, settings):
     lines = resolve(groups, settings["constraints-group"])
-    if not all(re.match(r"^[A-Za-z0-9_.-]+==[^\s;]+(?:\s*;.+)?$", line) for line in lines):
-        raise ValueError("O grupo de constraints deve conter somente versões exatas, sem extras.")
+    if not all(
+        re.match(r"^[A-Za-z0-9_.-]+==[^\s;]+(?:\s*;.+)?$", line) for line in lines
+    ):
+        raise ValueError(
+            "O grupo de constraints deve conter somente versões exatas, sem extras."
+        )
     return lines
 
 
@@ -57,10 +70,14 @@ def main():
     parser.add_argument("--project", type=Path, default=ROOT)
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("check", help="Valida todos os perfis sem instalar")
-    export = commands.add_parser("export", help="Gera requirements temporário para pip/wheels")
+    export = commands.add_parser(
+        "export", help="Gera requirements temporário para pip/wheels"
+    )
     export.add_argument("profile")
     export.add_argument("--output", type=Path)
-    install = commands.add_parser("install", help="Instala o perfil e aplica os pins centrais")
+    install = commands.add_parser(
+        "install", help="Instala o perfil e aplica os pins centrais"
+    )
     install.add_argument("profile")
     install.add_argument("--no-cache-dir", action="store_true")
     args = parser.parse_args()
@@ -76,9 +93,16 @@ def main():
         return
     requested = resolve(groups, args.profile)
     # Perfis leves não precisam consultar o repositório de wheels PyTorch.
-    cpu = any(re.match(r"^torch(?:\[|[<>=!~;\s]|$)", line, re.IGNORECASE) for line in requested)
+    cpu = any(
+        re.match(r"^torch(?:\[|[<>=!~;\s]|$)", line, re.IGNORECASE)
+        for line in requested
+    )
     if args.command == "export":
-        payload = ("--extra-index-url " + index + "\n" if cpu else "") + "\n".join(requested) + "\n"
+        payload = (
+            ("--extra-index-url " + index + "\n" if cpu else "")
+            + "\n".join(requested)
+            + "\n"
+        )
         if args.output:
             args.output.write_text(payload, encoding="utf-8")
         else:
@@ -92,7 +116,12 @@ def main():
         command = [sys.executable, "-m", "pip", "install"]
         if cpu:
             command += ["--extra-index-url", index]
-        command += ["--constraint", str(constraint_file), "--requirement", str(requirement_file)]
+        command += [
+            "--constraint",
+            str(constraint_file),
+            "--requirement",
+            str(requirement_file),
+        ]
         if args.no_cache_dir:
             command.append("--no-cache-dir")
         subprocess.run(command, check=True)

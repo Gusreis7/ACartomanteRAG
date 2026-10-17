@@ -13,10 +13,7 @@ from src.retrieval.service import RetrievalService
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=(
-            "Executa benchmark BM25 vs Dense "
-            "vs Dense + CrossEncoder."
-        )
+        description=("Executa benchmark BM25 vs Dense " "vs Dense + CrossEncoder.")
     )
     parser.add_argument("--env-file", type=Path, default=None)
     parser.add_argument("--config-file", type=Path, default=None)
@@ -24,8 +21,7 @@ def parse_args() -> argparse.Namespace:
         "--index-id",
         default=None,
         help=(
-            "Pin opcional do índice. Se omitido, usa a política "
-            "do IndexResolver."
+            "Pin opcional do índice. Se omitido, usa a política " "do IndexResolver."
         ),
     )
     parser.add_argument(

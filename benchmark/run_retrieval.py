@@ -30,9 +30,7 @@ from benchmark.retrieval_metrics import EVAL_KS, query_metrics
 from src.config.config_manager import ConfigManager
 from src.storage.rustfs_manager import RustFSManager
 
-PREPARATION_MANIFEST_KEY = (
-    f"{BENCHMARK_PREFIX}/prepared/preparation_manifest.json"
-)
+PREPARATION_MANIFEST_KEY = f"{BENCHMARK_PREFIX}/prepared/preparation_manifest.json"
 MATRIX_KEY = f"{BENCHMARK_PREFIX}/prepared/matrix.json"
 SPLIT_KEY = f"{BENCHMARK_PREFIX}/prepared/splits/benchmark_with_split.csv"
 
@@ -73,15 +71,15 @@ class SilverCorpusCache:
         if frame.empty:
             raise RuntimeError(f"Silver vazia: {silver_dataset_id}")
         if "chunk_id" not in frame.columns or "text" not in frame.columns:
-            raise RuntimeError(
-                f"Silver {silver_dataset_id} sem chunk_id/text."
-            )
+            raise RuntimeError(f"Silver {silver_dataset_id} sem chunk_id/text.")
 
         self.current_id = silver_dataset_id
         self.current_df = frame.reset_index(drop=True)
         return self.current_df
 
-    def bm25(self, silver_dataset_id: str, tokenizer: Callable[[str], list[str]]) -> Any:
+    def bm25(
+        self, silver_dataset_id: str, tokenizer: Callable[[str], list[str]]
+    ) -> Any:
         frame = self.load(silver_dataset_id)
         if self.current_bm25 is not None:
             return self.current_bm25
@@ -155,8 +153,7 @@ def parse_args() -> argparse.Namespace:
         "--smoke",
         action="store_true",
         help=(
-            "Smoke curto: fixed/512, 2 queries, BM25 + Dense Qwen + "
-            "Dense+CE Qwen."
+            "Smoke curto: fixed/512, 2 queries, BM25 + Dense Qwen + " "Dense+CE Qwen."
         ),
     )
     parser.add_argument(
@@ -249,7 +246,10 @@ def resolve_bm25_tokenizer() -> tuple[Callable[[str], list[str]], str]:
         if isinstance(probe, (list, tuple)) and all(
             isinstance(item, str) for item in probe
         ):
-            return lambda value, fn=candidate: list(fn(value)), f"src.retrieval.text.{name}"
+            return (
+                lambda value, fn=candidate: list(fn(value)),
+                f"src.retrieval.text.{name}",
+            )
 
     return fallback_bm25_tokenizer, "benchmark.fallback_bm25_tokenizer"
 
@@ -266,9 +266,7 @@ def load_query_vectors(
     manifest_key = f"{prefix}/manifest.json"
 
     manifest = load_json(storage, bucket, manifest_key)
-    metadata = pd.read_parquet(
-        io.BytesIO(storage.download_bytes(bucket, meta_key))
-    )
+    metadata = pd.read_parquet(io.BytesIO(storage.download_bytes(bucket, meta_key)))
     npz = np.load(io.BytesIO(storage.download_bytes(bucket, vectors_key)))
     vectors = np.asarray(npz["vectors"], dtype=np.float32)
 
@@ -296,9 +294,7 @@ def index_lookup(matrix: dict[str, Any]) -> dict[tuple[str, str], dict[str, Any]
         manifest = item.get("manifest") or {}
         source = manifest.get("source") or {}
         silver_id = str(
-            signature.get("silver_dataset_id")
-            or source.get("silver_dataset_id")
-            or ""
+            signature.get("silver_dataset_id") or source.get("silver_dataset_id") or ""
         )
         if not alias or not silver_id:
             continue
@@ -331,9 +327,7 @@ def build_runtime_configs(matrix: dict[str, Any]) -> list[RuntimeConfig]:
         chunk_size = int(item.get("chunk_size") or 0)
         overlap = int(item.get("overlap") or 0)
         suffix = strategy if embedder is None else f"{strategy}_{embedder}"
-        config_id = (
-            f"{chunk_strategy}_c{chunk_size}_o{overlap}__{suffix}"
-        )
+        config_id = f"{chunk_strategy}_c{chunk_size}_o{overlap}__{suffix}"
         signature = {
             "silver_dataset_id": silver_id,
             "chunk_strategy": chunk_strategy,
@@ -399,10 +393,7 @@ def filter_selected_configs(
         )
 
     rows = selection.get("selected") or []
-    selected_ids = [
-        str(row.get("config_id") or "").strip()
-        for row in rows
-    ]
+    selected_ids = [str(row.get("config_id") or "").strip() for row in rows]
     if len(selected_ids) != 10 or any(not item for item in selected_ids):
         raise RuntimeError(
             "final_selection_10.json deve conter exatamente 10 config_id válidos."
@@ -443,9 +434,7 @@ def qdrant_search(
     else:
         search = getattr(client, "search", None)
         if not callable(search):
-            raise RuntimeError(
-                "QdrantClient não possui query_points nem search."
-            )
+            raise RuntimeError("QdrantClient não possui query_points nem search.")
         points = search(
             collection_name=collection,
             query_vector=query_vector,
@@ -524,9 +513,7 @@ class LazyCrossEncoder:
                 "sentence-transformers é necessário para Dense+CrossEncoder."
             ) from exc
 
-        print(
-            f"[reranker] loading {self.model_name} | device={self.resolved_device}"
-        )
+        print(f"[reranker] loading {self.model_name} | device={self.resolved_device}")
         kwargs: dict[str, Any] = {
             "device": self.resolved_device,
         }
@@ -544,10 +531,7 @@ class LazyCrossEncoder:
         batch_size: int = 32,
     ) -> list[dict[str, Any]]:
         model = self._ensure()
-        pairs = [
-            (query, str(item.get("text") or ""))
-            for item in candidates
-        ]
+        pairs = [(query, str(item.get("text") or "")) for item in candidates]
         scores = np.asarray(
             model.predict(
                 pairs,
@@ -631,15 +615,11 @@ def build_summary(query_df: pd.DataFrame) -> pd.DataFrame:
                 group[f"evidence_coverage_at_{k}"].mean()
             )
             row[f"hit_at_{k}"] = float(group[f"hit_at_{k}"].mean())
-            row[f"correct_work_at_{k}"] = float(
-                group[f"correct_work_at_{k}"].mean()
-            )
+            row[f"correct_work_at_{k}"] = float(group[f"correct_work_at_{k}"].mean())
 
         row["mrr_at_10"] = float(group["mrr_at_10"].mean())
         row["ndcg_at_10"] = float(group["ndcg_at_10"].mean())
-        row["coverage_auc_at_10"] = float(
-            group["coverage_auc_at_10"].mean()
-        )
+        row["coverage_auc_at_10"] = float(group["coverage_auc_at_10"].mean())
 
         for latency in (
             "retrieval_latency_ms",
@@ -718,9 +698,7 @@ def execute_one_query(
         lookup = vector_lookups[runtime.embedder]
         vector_key = (str(row.query_id), query_variant)
         if vector_key not in lookup:
-            raise RuntimeError(
-                f"Query vector ausente: {runtime.embedder} {vector_key}"
-            )
+            raise RuntimeError(f"Query vector ausente: {runtime.embedder} {vector_key}")
 
         candidate_k = (
             config.retrievals.dense.top_k
@@ -840,16 +818,12 @@ def main() -> None:
             selection=selection_source,
             benchmark_sha256=prep["benchmark_sha256"],
         )
-        print(
-            f"[selection] run={selection_run_id} | configs={len(configs)}"
-        )
+        print(f"[selection] run={selection_run_id} | configs={len(configs)}")
 
     if args.smoke:
         configs = smoke_filter(configs)
         if len(configs) != 3:
-            raise RuntimeError(
-                f"Smoke esperava 3 configs; encontrou {len(configs)}."
-            )
+            raise RuntimeError(f"Smoke esperava 3 configs; encontrou {len(configs)}.")
 
     query_variants = tuple(args.query_variants)
     run_id = sanitize_run_id(args.run_id or default_run_id(args.split))
@@ -871,9 +845,7 @@ def main() -> None:
     required_embedders = sorted(
         {item.embedder for item in configs if item.embedder is not None}
     )
-    vector_lookups: dict[
-        str, dict[tuple[str, str], np.ndarray]
-    ] = {}
+    vector_lookups: dict[str, dict[tuple[str, str], np.ndarray]] = {}
     vector_manifests: dict[str, dict[str, Any]] = {}
     for alias in required_embedders:
         assert alias is not None
@@ -883,9 +855,7 @@ def main() -> None:
             alias=alias,
         )
         if vector_manifest.get("benchmark_sha256") != prep.get("benchmark_sha256"):
-            raise RuntimeError(
-                f"Query embeddings {alias} pertencem a outro benchmark."
-            )
+            raise RuntimeError(f"Query embeddings {alias} pertencem a outro benchmark.")
         vector_lookups[alias] = lookup
         vector_manifests[alias] = vector_manifest
 
@@ -913,9 +883,7 @@ def main() -> None:
         "selection_source_key": selection_key,
         "selected_config_ids": selected_config_ids,
         "selection_method": (
-            selection_source.get("method")
-            if selection_source is not None
-            else None
+            selection_source.get("method") if selection_source is not None else None
         ),
         "expected_retrieval_executions": (
             len(split_df) * len(query_variants) * len(configs)
@@ -984,10 +952,9 @@ def main() -> None:
             rank_key = f"{shard_base}.results.parquet"
             query_key = f"{shard_base}.queries.parquet"
 
-            shard_exists = (
-                storage.object_exists(bucket, rank_key)
-                and storage.object_exists(bucket, query_key)
-            )
+            shard_exists = storage.object_exists(
+                bucket, rank_key
+            ) and storage.object_exists(bucket, query_key)
             if shard_exists and args.resume and not args.force:
                 print(
                     f"[{config_number}/{total_configs}] [resume] "
@@ -1017,7 +984,11 @@ def main() -> None:
                 warm_query = str(
                     getattr(
                         warm_row,
-                        "query_manual" if warm_variant == "manual" else "query_rewritten",
+                        (
+                            "query_manual"
+                            if warm_variant == "manual"
+                            else "query_rewritten"
+                        ),
                     )
                 )
                 for _ in range(config.retrieval_benchmark.warmup_runs):
@@ -1181,18 +1152,9 @@ def main() -> None:
         print(f"configs: {len(configs)}")
         print(f"retrieval executions: {len(queries_df)}")
         print(f"rank rows: {len(results_df)}")
-        print(
-            "results: "
-            f"s3://{bucket}/{retrieval_prefix}/results.parquet"
-        )
-        print(
-            "summary: "
-            f"s3://{bucket}/{retrieval_prefix}/summary.parquet"
-        )
-        print(
-            "manifest: "
-            f"s3://{bucket}/{existing_manifest_key}"
-        )
+        print("results: " f"s3://{bucket}/{retrieval_prefix}/results.parquet")
+        print("summary: " f"s3://{bucket}/{retrieval_prefix}/summary.parquet")
+        print("manifest: " f"s3://{bucket}/{existing_manifest_key}")
 
     except Exception as exc:
         run_manifest.update(

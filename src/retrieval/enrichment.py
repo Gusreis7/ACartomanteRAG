@@ -11,7 +11,6 @@ from src.embeddings.registry import EmbedderRegistry
 from src.storage.qdrant_manager import QdrantManager
 from src.storage.rustfs_manager import RustFSManager
 
-
 logger = logging.getLogger("acartomante.retrieval.enrichment")
 
 ENRICHMENT_INDEX_CURRENT_KEY = "enrichment/current.json"
@@ -76,17 +75,9 @@ class EnrichmentRetriever:
     ) -> None:
         self.config = config
 
-        self.rustfs = (
-            RustFSManager.from_config(
-                config.environment.rustfs
-            )
-        )
+        self.rustfs = RustFSManager.from_config(config.environment.rustfs)
 
-        self.qdrant = (
-            _make_qdrant_manager(
-                config
-            )
-        )
+        self.qdrant = _make_qdrant_manager(config)
 
         self.client = getattr(
             self.qdrant,
@@ -94,22 +85,13 @@ class EnrichmentRetriever:
             self.qdrant,
         )
 
-        self.registry = (
-            EmbedderRegistry()
-        )
+        self.registry = EmbedderRegistry()
 
-        self.indexes_bucket = (
-            config.storage
-            .embedding_indexes_bucket
-        )
+        self.indexes_bucket = config.storage.embedding_indexes_bucket
 
-        self.runtime_config = (
-            config.enrichment_retrieval
-        )
+        self.runtime_config = config.enrichment_retrieval
 
-        self._index_set = (
-            self._load_index_set()
-        )
+        self._index_set = self._load_index_set()
 
         self._embedders: dict[
             str,
@@ -149,36 +131,16 @@ class EnrichmentRetriever:
             self.rustfs.download_bytes(
                 self.indexes_bucket,
                 self.runtime_config.index_pointer_key,
-            ).decode(
-                "utf-8"
-            )
+            ).decode("utf-8")
         )
 
-        if (
-            str(
-                payload.get(
-                    "status"
-                )
-            )
-            != "success"
-        ):
-            raise RuntimeError(
-                "enrichment/current.json "
-                "não possui status=success."
-            )
+        if str(payload.get("status")) != "success":
+            raise RuntimeError("enrichment/current.json " "não possui status=success.")
 
-        indexes = (
-            payload.get(
-                "indexes"
-            )
-            or {}
-        )
+        indexes = payload.get("indexes") or {}
 
         if not indexes:
-            raise RuntimeError(
-                "enrichment/current.json "
-                "não possui indexes."
-            )
+            raise RuntimeError("enrichment/current.json " "não possui indexes.")
 
         return payload
 
@@ -188,46 +150,24 @@ class EnrichmentRetriever:
         method: str,
         textual_index_id: str | None,
     ) -> str:
-        fallback = (
-            self.runtime_config
-            .fallback_embedder
-        )
+        fallback = self.runtime_config.fallback_embedder
 
-        indexes = (
-            self._index_set.get(
-                "indexes"
-            )
-            or {}
-        )
+        indexes = self._index_set.get("indexes") or {}
 
         if method == "bm25":
-            return self._validated_alias(
-                fallback
-            )
+            return self._validated_alias(fallback)
 
-        index_id = str(
-            textual_index_id
-            or ""
-        ).strip()
+        index_id = str(textual_index_id or "").strip()
 
         if not index_id:
-            return self._validated_alias(
-                fallback
-            )
+            return self._validated_alias(fallback)
 
-        cached = (
-            self._textual_alias_cache
-            .get(
-                index_id
-            )
-        )
+        cached = self._textual_alias_cache.get(index_id)
 
         if cached:
             return cached
 
-        manifest_key = (
-            f"{index_id}/manifest.json"
-        )
+        manifest_key = f"{index_id}/manifest.json"
 
         alias = ""
 
@@ -240,27 +180,16 @@ class EnrichmentRetriever:
                     self.rustfs.download_bytes(
                         self.indexes_bucket,
                         manifest_key,
-                    ).decode(
-                        "utf-8"
-                    )
+                    ).decode("utf-8")
                 )
 
                 alias = str(
-                    (
-                        manifest.get(
-                            "embedding"
-                        )
-                        or {}
-                    ).get(
-                        "model_alias"
-                    )
-                    or ""
+                    (manifest.get("embedding") or {}).get("model_alias") or ""
                 ).strip()
 
         except Exception as exc:
             logger.warning(
-                "enrichment_textual_alias_resolution_failed "
-                "index_id=%s error=%s",
+                "enrichment_textual_alias_resolution_failed " "index_id=%s error=%s",
                 index_id,
                 exc,
             )
@@ -270,20 +199,15 @@ class EnrichmentRetriever:
 
         if alias not in indexes:
             logger.warning(
-                "enrichment_alias_not_published "
-                "requested=%s fallback=%s",
+                "enrichment_alias_not_published " "requested=%s fallback=%s",
                 alias,
                 fallback,
             )
             alias = fallback
 
-        alias = self._validated_alias(
-            alias
-        )
+        alias = self._validated_alias(alias)
 
-        self._textual_alias_cache[
-            index_id
-        ] = alias
+        self._textual_alias_cache[index_id] = alias
 
         return alias
 
@@ -293,29 +217,16 @@ class EnrichmentRetriever:
         method: str,
     ) -> str:
         if method == "bm25":
-            return self._validated_alias(
-                self.runtime_config
-                .fallback_embedder
-            )
+            return self._validated_alias(self.runtime_config.fallback_embedder)
 
-        cached = (
-            self._runtime_alias_hint
-            .get(
-                method
-            )
-        )
+        cached = self._runtime_alias_hint.get(method)
 
         if cached:
-            return self._validated_alias(
-                cached
-            )
+            return self._validated_alias(cached)
 
         # Primeiro request: usa o fallback. Depois que o textual
         # resolver seu index_id, o alias é verificado e memorizado.
-        return self._validated_alias(
-            self.runtime_config
-            .fallback_embedder
-        )
+        return self._validated_alias(self.runtime_config.fallback_embedder)
 
     def remember_runtime_alias(
         self,
@@ -323,29 +234,16 @@ class EnrichmentRetriever:
         method: str,
         alias: str,
     ) -> None:
-        self._runtime_alias_hint[
-            method
-        ] = self._validated_alias(
-            alias
-        )
+        self._runtime_alias_hint[method] = self._validated_alias(alias)
 
     def _validated_alias(
         self,
         alias: str,
     ) -> str:
-        indexes = (
-            self._index_set.get(
-                "indexes"
-            )
-            or {}
-        )
+        indexes = self._index_set.get("indexes") or {}
 
         if alias not in indexes:
-            available = ", ".join(
-                sorted(
-                    indexes
-                )
-            )
+            available = ", ".join(sorted(indexes))
 
             raise RuntimeError(
                 f"Embedder enrichment '{alias}' "
@@ -353,15 +251,9 @@ class EnrichmentRetriever:
                 f"Disponíveis: {available}."
             )
 
-        if (
-            alias
-            not in self.config
-            .embedding
-            .models
-        ):
+        if alias not in self.config.embedding.models:
             raise RuntimeError(
-                f"Embedder enrichment '{alias}' "
-                "não existe em embedding.models."
+                f"Embedder enrichment '{alias}' " "não existe em embedding.models."
             )
 
         return alias
@@ -371,54 +263,28 @@ class EnrichmentRetriever:
         alias: str,
     ) -> dict[str, Any]:
         if alias in self._index_manifests:
-            return self._index_manifests[
-                alias
-            ]
+            return self._index_manifests[alias]
 
-        item = (
-            self._index_set[
-                "indexes"
-            ][alias]
-        )
+        item = self._index_set["indexes"][alias]
 
-        manifest_key = str(
-            item.get(
-                "manifest_key"
-            )
-            or ""
-        ).strip()
+        manifest_key = str(item.get("manifest_key") or "").strip()
 
         if not manifest_key:
             raise RuntimeError(
-                "Manifest key ausente para "
-                f"enrichment alias={alias}."
+                "Manifest key ausente para " f"enrichment alias={alias}."
             )
 
         manifest = json.loads(
             self.rustfs.download_bytes(
                 self.indexes_bucket,
                 manifest_key,
-            ).decode(
-                "utf-8"
-            )
+            ).decode("utf-8")
         )
 
-        if (
-            str(
-                manifest.get(
-                    "status"
-                )
-            )
-            != "success"
-        ):
-            raise RuntimeError(
-                "Índice enrichment sem "
-                f"status=success: {alias}."
-            )
+        if str(manifest.get("status")) != "success":
+            raise RuntimeError("Índice enrichment sem " f"status=success: {alias}.")
 
-        self._index_manifests[
-            alias
-        ] = manifest
+        self._index_manifests[alias] = manifest
 
         return manifest
 
@@ -427,90 +293,44 @@ class EnrichmentRetriever:
         alias: str,
     ):
         if alias in self._embedders:
-            return self._embedders[
-                alias
-            ]
+            return self._embedders[alias]
 
-        model_config = (
-            self.config
-            .embedding
-            .models[
-                alias
-            ]
+        model_config = self.config.embedding.models[alias]
+
+        embedder = self.registry.create(
+            model_config,
+            normalize_embeddings=(self.config.embedding.index.normalize_embeddings),
+            device=(self.config.embedding.execution.device),
+            batch_size=(self.config.embedding.execution.batch_size),
         )
 
-        embedder = (
-            self.registry.create(
-                model_config,
-                normalize_embeddings=(
-                    self.config
-                    .embedding
-                    .index
-                    .normalize_embeddings
-                ),
-                device=(
-                    self.config
-                    .embedding
-                    .execution
-                    .device
-                ),
-                batch_size=(
-                    self.config
-                    .embedding
-                    .execution
-                    .batch_size
-                ),
-            )
-        )
+        manifest = self._index_manifest(alias)
 
-        manifest = (
-            self._index_manifest(
-                alias
-            )
-        )
-
-        expected = (
-            manifest.get(
-                "embedding"
-            )
-            or {}
-        )
+        expected = manifest.get("embedding") or {}
 
         info = embedder.info
 
         identity = {
             "model": (
                 info.model,
-                expected.get(
-                    "model"
-                ),
+                expected.get("model"),
             ),
             "resolved_revision": (
                 info.resolved_revision,
-                expected.get(
-                    "resolved_revision"
-                ),
+                expected.get("resolved_revision"),
             ),
             "dimension": (
                 info.dimension,
-                expected.get(
-                    "dimension"
-                ),
+                expected.get("dimension"),
             ),
             "query_prompt_name": (
                 info.query_prompt_name,
-                expected.get(
-                    "query_prompt_name"
-                ),
+                expected.get("query_prompt_name"),
             ),
         }
 
         mismatches = {
-            key: values
-            for key, values
-            in identity.items()
-            if values[0]
-            != values[1]
+            key: values for key, values in identity.items() if values[0] != values[1]
         }
 
         if mismatches:
@@ -520,9 +340,7 @@ class EnrichmentRetriever:
                 f"{alias}: {mismatches}"
             )
 
-        self._embedders[
-            alias
-        ] = embedder
+        self._embedders[alias] = embedder
 
         return embedder
 
@@ -537,23 +355,15 @@ class EnrichmentRetriever:
             None,
         )
 
-        if callable(
-            batch_method
-        ):
+        if callable(batch_method):
             vectors = np.asarray(
-                batch_method(
-                    [query]
-                ),
+                batch_method([query]),
                 dtype=np.float32,
             )
 
-            if (
-                vectors.ndim != 2
-                or vectors.shape[0] != 1
-            ):
+            if vectors.ndim != 2 or vectors.shape[0] != 1:
                 raise ValueError(
-                    "embed_queries retornou "
-                    f"shape inválido: {vectors.shape}"
+                    "embed_queries retornou " f"shape inválido: {vectors.shape}"
                 )
 
             vector = vectors[0]
@@ -565,41 +375,26 @@ class EnrichmentRetriever:
                 None,
             )
 
-            if not callable(
-                single_method
-            ):
+            if not callable(single_method):
                 raise AttributeError(
-                    "Embedder não expõe "
-                    "embed_queries() nem "
-                    "embed_query()."
+                    "Embedder não expõe " "embed_queries() nem " "embed_query()."
                 )
 
             vector = np.asarray(
-                single_method(
-                    query
-                ),
+                single_method(query),
                 dtype=np.float32,
             )
 
-            if (
-                vector.ndim == 2
-                and vector.shape[0] == 1
-            ):
+            if vector.ndim == 2 and vector.shape[0] == 1:
                 vector = vector[0]
 
             if vector.ndim != 1:
                 raise ValueError(
-                    "embed_query retornou "
-                    f"shape inválido: {vector.shape}"
+                    "embed_query retornou " f"shape inválido: {vector.shape}"
                 )
 
-        if not np.isfinite(
-            vector
-        ).all():
-            raise ValueError(
-                "Embedding da query contém "
-                "NaN ou infinito."
-            )
+        if not np.isfinite(vector).all():
+            raise ValueError("Embedding da query contém " "NaN ou infinito.")
 
         return vector
 
@@ -609,9 +404,7 @@ class EnrichmentRetriever:
         collection: str,
         vector: np.ndarray,
         limit: int,
-    ) -> list[
-        dict[str, Any]
-    ]:
+    ) -> list[dict[str, Any]]:
         query_vector = np.asarray(
             vector,
             dtype=np.float32,
@@ -623,13 +416,9 @@ class EnrichmentRetriever:
             None,
         )
 
-        if callable(
-            query_points
-        ):
+        if callable(query_points):
             response = query_points(
-                collection_name=(
-                    collection
-                ),
+                collection_name=(collection),
                 query=query_vector,
                 limit=limit,
                 with_payload=True,
@@ -649,29 +438,20 @@ class EnrichmentRetriever:
                 None,
             )
 
-            if not callable(
-                search
-            ):
+            if not callable(search):
                 raise RuntimeError(
-                    "QdrantClient não possui "
-                    "query_points nem search."
+                    "QdrantClient não possui " "query_points nem search."
                 )
 
             points = search(
-                collection_name=(
-                    collection
-                ),
-                query_vector=(
-                    query_vector
-                ),
+                collection_name=(collection),
+                query_vector=(query_vector),
                 limit=limit,
                 with_payload=True,
                 with_vectors=False,
             )
 
-        hits: list[
-            dict[str, Any]
-        ] = []
+        hits: list[dict[str, Any]] = []
 
         for point in points:
             payload = dict(
@@ -715,83 +495,39 @@ class EnrichmentRetriever:
         textual_index_id: str | None = None,
         alias_hint: str | None = None,
     ) -> EnrichmentRetrievalResponse:
-        query = str(
-            query
-        ).strip()
+        query = str(query).strip()
 
         if not query:
-            raise ValueError(
-                "Query enrichment vazia."
-            )
+            raise ValueError("Query enrichment vazia.")
 
         if alias_hint:
-            alias = self._validated_alias(
-                alias_hint
-            )
+            alias = self._validated_alias(alias_hint)
         else:
             alias = self.resolve_alias(
                 method=method,
-                textual_index_id=(
-                    textual_index_id
-                ),
+                textual_index_id=(textual_index_id),
             )
 
-        index_item = (
-            self._index_set[
-                "indexes"
-            ][alias]
-        )
+        index_item = self._index_set["indexes"][alias]
 
-        index_id = str(
-            index_item[
-                "index_id"
-            ]
-        )
+        index_id = str(index_item["index_id"])
 
-        collection = str(
-            index_item[
-                "collection"
-            ]
-        )
+        collection = str(index_item["collection"])
 
-        manifest = (
-            self._index_manifest(
-                alias
-            )
-        )
+        manifest = self._index_manifest(alias)
 
-        embedder = (
-            self._embedder(
-                alias
-            )
-        )
+        embedder = self._embedder(alias)
 
-        vector = (
-            self._embed_query(
-                embedder,
-                query,
-            )
+        vector = self._embed_query(
+            embedder,
+            query,
         )
 
         expected_dimension = int(
-            (
-                manifest.get(
-                    "embedding"
-                )
-                or {}
-            ).get(
-                "dimension"
-            )
-            or 0
+            (manifest.get("embedding") or {}).get("dimension") or 0
         )
 
-        if (
-            expected_dimension
-            and vector.shape
-            != (
-                expected_dimension,
-            )
-        ):
+        if expected_dimension and vector.shape != (expected_dimension,):
             raise ValueError(
                 "Dimensão da query incompatível "
                 "com índice enrichment. "
@@ -803,10 +539,7 @@ class EnrichmentRetriever:
         hits = self._qdrant_search(
             collection=collection,
             vector=vector,
-            limit=(
-                self.runtime_config
-                .top_k
-            ),
+            limit=(self.runtime_config.top_k),
         )
 
         return EnrichmentRetrievalResponse(

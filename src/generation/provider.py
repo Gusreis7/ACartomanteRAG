@@ -35,7 +35,15 @@ class GenerationServiceError(RuntimeError):
 
 
 class GenerationResponseError(GenerationServiceError):
-    def __init__(self, message, *, diagnostics=None, retryable=True, batch_fatal=False, response_text=None):
+    def __init__(
+        self,
+        message,
+        *,
+        diagnostics=None,
+        retryable=True,
+        batch_fatal=False,
+        response_text=None,
+    ):
         super().__init__(message, diagnostics=diagnostics, batch_fatal=batch_fatal)
         self.retryable = retryable
         # Só o serviço de enrichment persiste esta saída no S3; nunca no log.
@@ -86,6 +94,7 @@ class OllamaGenerationProvider(GenerationProvider):
         num_batch: int | None = None,
     ) -> None:
         from langchain_ollama import ChatOllama
+
         self.config = config
         self._slots = BoundedSemaphore(value=config.max_parallel)
         self._structured_clients: dict[tuple[Any, bool], Any] = {}
@@ -120,16 +129,23 @@ class OllamaGenerationProvider(GenerationProvider):
         )
 
     def _runtime_kwargs(self, *, max_tokens=None) -> dict[str, Any]:
-        kwargs = {} if self._runtime_options is None else {"options": dict(self._runtime_options)}
+        kwargs = (
+            {}
+            if self._runtime_options is None
+            else {"options": dict(self._runtime_options)}
+        )
         if max_tokens is not None:
-            kwargs["options"] = {"num_ctx": self.config.num_ctx, "temperature": self.config.temperature,
-                                 "top_p": self.config.top_p, **kwargs.get("options", {}), "num_predict": int(max_tokens)}
+            kwargs["options"] = {
+                "num_ctx": self.config.num_ctx,
+                "temperature": self.config.temperature,
+                "top_p": self.config.top_p,
+                **kwargs.get("options", {}),
+                "num_predict": int(max_tokens),
+            }
         return kwargs
 
     def _acquire(self) -> None:
-        acquired = self._slots.acquire(
-            timeout=self.config.acquire_timeout_seconds
-        )
+        acquired = self._slots.acquire(timeout=self.config.acquire_timeout_seconds)
         if not acquired:
             raise GenerationCapacityError(
                 "Serviço de geração ocupado. Tente novamente."
@@ -138,14 +154,14 @@ class OllamaGenerationProvider(GenerationProvider):
     def _translate_error(self, exc: Exception) -> None:
         if isinstance(exc, TimeoutError):
             raise exc
-        raise GenerationServiceError(
-            "Serviço de geração indisponível."
-        ) from exc
+        raise GenerationServiceError("Serviço de geração indisponível.") from exc
 
     def invoke(self, messages: list, *, max_tokens=None) -> Any:
         self._acquire()
         try:
-            return self.client.invoke(messages, **self._runtime_kwargs(max_tokens=max_tokens))
+            return self.client.invoke(
+                messages, **self._runtime_kwargs(max_tokens=max_tokens)
+            )
         except Exception as exc:
             self._translate_error(exc)
         finally:
@@ -168,30 +184,41 @@ class OllamaGenerationProvider(GenerationProvider):
                 # não encaminha options à chamada interna nesta versão.
                 structured = self.client.bind(format=schema.model_json_schema())
                 self._structured_clients[key] = structured
-            raw = structured.invoke(messages, **self._runtime_kwargs(max_tokens=max_tokens))
+            raw = structured.invoke(
+                messages, **self._runtime_kwargs(max_tokens=max_tokens)
+            )
             try:
                 parsed = PydanticOutputParser(pydantic_object=schema).invoke(raw)
             except ValueError as exc:
                 if include_raw:
                     return {"raw": raw, "parsed": None, "parsing_error": exc}
                 raise
-            return {"raw": raw, "parsed": parsed, "parsing_error": None} if include_raw else parsed
+            return (
+                {"raw": raw, "parsed": parsed, "parsing_error": None}
+                if include_raw
+                else parsed
+            )
         except Exception as exc:
             self._translate_error(exc)
         finally:
             self._slots.release()
 
     def warmup(self) -> None:
-        self.invoke([
-            ("system", "Responda somente com OK."),
-            ("human", "warmup"),
-        ])
+        self.invoke(
+            [
+                ("system", "Responda somente com OK."),
+                ("human", "warmup"),
+            ]
+        )
 
     def healthcheck(self) -> None:
         response = httpx.get(f"{self.config.base_url.rstrip('/')}/api/tags", timeout=5)
         response.raise_for_status()
         names = {item.get("name") for item in response.json().get("models", [])}
-        if self.config.model not in names and f"{self.config.model}:latest" not in names:
+        if (
+            self.config.model not in names
+            and f"{self.config.model}:latest" not in names
+        ):
             raise GenerationServiceError("Modelo Ollama não instalado.")
 
 
@@ -208,76 +235,149 @@ class _MantleClient:
         )
 
     def _request(self, method, path, payload=None):
-        body = json.dumps(payload, ensure_ascii=False).encode() if payload is not None else b""
+        body = (
+            json.dumps(payload, ensure_ascii=False).encode()
+            if payload is not None
+            else b""
+        )
         for attempt in range(self.config.retry_attempts):
             credentials = self.session.get_credentials()
             if credentials is None:
                 raise NoCredentialsError()
             request = AWSRequest(
-                method=method, url=self.url + path, data=body,
+                method=method,
+                url=self.url + path,
+                data=body,
                 headers={"Content-Type": "application/json"},
             )
             # Renova credenciais temporárias e assinatura a cada tentativa.
-            SigV4Auth(credentials.get_frozen_credentials(), "bedrock-mantle", self.config.region).add_auth(request)
+            SigV4Auth(
+                credentials.get_frozen_credentials(),
+                "bedrock-mantle",
+                self.config.region,
+            ).add_auth(request)
             try:
                 response = self.http.request(
-                    method, request.url, content=body, headers=dict(request.headers),
+                    method,
+                    request.url,
+                    content=body,
+                    headers=dict(request.headers),
                 )
             except httpx.TransportError:
                 if attempt + 1 == self.config.retry_attempts:
-                    raise GenerationServiceError("Conexão com Bedrock Mantle indisponível.", diagnostics={"reason": "network"}, batch_fatal=True) from None
-                sleep(min(2 ** attempt, 8))
+                    raise GenerationServiceError(
+                        "Conexão com Bedrock Mantle indisponível.",
+                        diagnostics={"reason": "network"},
+                        batch_fatal=True,
+                    ) from None
+                sleep(min(2**attempt, 8))
                 continue
             if response.status_code == 200:
                 try:
                     return response.json(), response.headers, attempt
                 except ValueError:
-                    raise GenerationResponseError("Bedrock Mantle retornou JSON HTTP inválido.", diagnostics={"reason": "malformed_response", "http_status": 200, "request_id": response.headers.get("x-request-id", "unknown")}) from None
+                    raise GenerationResponseError(
+                        "Bedrock Mantle retornou JSON HTTP inválido.",
+                        diagnostics={
+                            "reason": "malformed_response",
+                            "http_status": 200,
+                            "request_id": response.headers.get(
+                                "x-request-id", "unknown"
+                            ),
+                        },
+                    ) from None
             # Não incluir mensagem, payload, prompt ou headers de autenticação no erro.
             code = f"HTTP{response.status_code}"
             quota_scope = "unknown"
             try:
                 error = response.json().get("error", {})
-                candidate = error.get("code") or error.get("type") if isinstance(error, dict) else None
-                if isinstance(candidate, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", candidate):
+                candidate = (
+                    error.get("code") or error.get("type")
+                    if isinstance(error, dict)
+                    else None
+                )
+                if isinstance(candidate, str) and re.fullmatch(
+                    r"[A-Za-z0-9_.-]{1,80}", candidate
+                ):
                     code = candidate
-                message = str(error.get("message", "")).lower() if isinstance(error, dict) else ""
+                message = (
+                    str(error.get("message", "")).lower()
+                    if isinstance(error, dict)
+                    else ""
+                )
                 if "per day" in message or "daily" in message:
                     quota_scope = "daily"
                 elif "per minute" in message:
                     quota_scope = "minute"
             except (ValueError, AttributeError):
                 pass
-            if response.status_code in {429, 500, 502, 503, 504} and quota_scope != "daily" and attempt + 1 < self.config.retry_attempts:
+            if (
+                response.status_code in {429, 500, 502, 503, 504}
+                and quota_scope != "daily"
+                and attempt + 1 < self.config.retry_attempts
+            ):
                 retry_after = response.headers.get("retry-after", "")
-                delay = float(retry_after) if retry_after.isdigit() else 2 ** attempt
+                delay = float(retry_after) if retry_after.isdigit() else 2**attempt
                 if delay <= 60:
                     sleep(delay)
                     continue
-            raise ClientError({
-                "Error": {"Code": code, "Message": "Falha na API Mantle", "QuotaScope": quota_scope},
-                "ResponseMetadata": {
-                    "HTTPStatusCode": response.status_code,
-                    "RequestId": response.headers.get("x-amzn-requestid") or response.headers.get("x-request-id", "unknown"),
+            raise ClientError(
+                {
+                    "Error": {
+                        "Code": code,
+                        "Message": "Falha na API Mantle",
+                        "QuotaScope": quota_scope,
+                    },
+                    "ResponseMetadata": {
+                        "HTTPStatusCode": response.status_code,
+                        "RequestId": response.headers.get("x-amzn-requestid")
+                        or response.headers.get("x-request-id", "unknown"),
+                    },
                 },
-            }, "CreateInference" if method == "POST" else "GetModel")
+                "CreateInference" if method == "POST" else "GetModel",
+            )
 
     def get_model(self):
         self._request("GET", "/models/" + quote(self.config.model, safe=""))
 
-    def converse(self, *, modelId, system, messages, inferenceConfig, outputConfig=None):
-        chat = [{"role": "system", "content": "\n\n".join(item["text"] for item in system)}] if system else []
-        chat.extend({"role": item["role"], "content": "\n".join(block["text"] for block in item["content"])} for item in messages)
+    def converse(
+        self, *, modelId, system, messages, inferenceConfig, outputConfig=None
+    ):
+        chat = (
+            [
+                {
+                    "role": "system",
+                    "content": "\n\n".join(item["text"] for item in system),
+                }
+            ]
+            if system
+            else []
+        )
+        chat.extend(
+            {
+                "role": item["role"],
+                "content": "\n".join(block["text"] for block in item["content"]),
+            }
+            for item in messages
+        )
         payload = {
-            "model": modelId, "messages": chat, "stream": False,
+            "model": modelId,
+            "messages": chat,
+            "stream": False,
             "max_tokens": inferenceConfig["maxTokens"],
-            "temperature": inferenceConfig["temperature"], "top_p": inferenceConfig["topP"],
+            "temperature": inferenceConfig["temperature"],
+            "top_p": inferenceConfig["topP"],
         }
         if outputConfig is not None:
             specification = outputConfig["textFormat"]["structure"]["jsonSchema"]
-            payload["response_format"] = {"type": "json_schema", "json_schema": {
-                "name": specification["name"], "schema": json.loads(specification["schema"]), "strict": True,
-            }}
+            payload["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": specification["name"],
+                    "schema": json.loads(specification["schema"]),
+                    "strict": True,
+                },
+            }
         result, headers, retries = self._request("POST", "/chat/completions", payload)
         choice = result["choices"][0]
         content = choice["message"].get("content") or ""
@@ -285,12 +385,21 @@ class _MantleClient:
         usage = result.get("usage", {})
         return {
             "output": {"message": {"content": [{"text": content}]}},
-            "stopReason": {"length": "max_tokens", "stop": "end_turn"}.get(stop, stop or "unknown"),
-            "usage": {"inputTokens": usage.get("prompt_tokens", 0), "outputTokens": usage.get("completion_tokens", 0)},
+            "stopReason": {"length": "max_tokens", "stop": "end_turn"}.get(
+                stop, stop or "unknown"
+            ),
+            "usage": {
+                "inputTokens": usage.get("prompt_tokens", 0),
+                "outputTokens": usage.get("completion_tokens", 0),
+            },
             "ResponseMetadata": {
-                "RetryAttempts": retries, "RequestId": headers.get("x-amzn-requestid") or headers.get("x-request-id"),
+                "RetryAttempts": retries,
+                "RequestId": headers.get("x-amzn-requestid")
+                or headers.get("x-request-id"),
                 "FinishReason": str(stop or "unknown")[:80],
-                "ReasoningTokens": (usage.get("completion_tokens_details") or {}).get("reasoning_tokens", 0),
+                "ReasoningTokens": (usage.get("completion_tokens_details") or {}).get(
+                    "reasoning_tokens", 0
+                ),
                 "ContentChars": len(content),
             },
         }
@@ -305,12 +414,26 @@ class BedrockGenerationProvider(GenerationProvider):
         self._usage_lock = Lock()
         self._usage = {"input_tokens": 0, "output_tokens": 0, "calls": 0}
         sdk_config = AWSConfig(
-            connect_timeout=5, read_timeout=config.timeout_seconds,
+            connect_timeout=5,
+            read_timeout=config.timeout_seconds,
             retries={"mode": "standard", "total_max_attempts": config.retry_attempts},
         )
         mantle = config.provider == "bedrock-mantle"
-        self.client = client or (_MantleClient(config) if mantle else boto3.client("bedrock-runtime", region_name=config.region, config=sdk_config))
-        self.control_client = control_client if mantle else (control_client or boto3.client("bedrock", region_name=config.region, config=sdk_config))
+        self.client = client or (
+            _MantleClient(config)
+            if mantle
+            else boto3.client(
+                "bedrock-runtime", region_name=config.region, config=sdk_config
+            )
+        )
+        self.control_client = (
+            control_client
+            if mantle
+            else (
+                control_client
+                or boto3.client("bedrock", region_name=config.region, config=sdk_config)
+            )
+        )
 
     @staticmethod
     def _messages(messages: list) -> tuple[list, list]:
@@ -321,7 +444,9 @@ class BedrockGenerationProvider(GenerationProvider):
             else:
                 role, content = message.type, message.content
             if not isinstance(content, str):
-                raise ValueError("O provider Bedrock deste projeto recebe somente texto.")
+                raise ValueError(
+                    "O provider Bedrock deste projeto recebe somente texto."
+                )
             if role == "system":
                 system.append({"text": content})
                 continue
@@ -335,29 +460,51 @@ class BedrockGenerationProvider(GenerationProvider):
     def invoke(self, messages: list, *, max_tokens=None) -> AIMessage:
         return self._invoke(messages, max_tokens=max_tokens)
 
-    def _invoke(self, messages: list, *, max_tokens=None, output_config=None) -> AIMessage:
+    def _invoke(
+        self, messages: list, *, max_tokens=None, output_config=None
+    ) -> AIMessage:
         if not self._slots.acquire(timeout=self.config.acquire_timeout_seconds):
-            raise GenerationCapacityError("Serviço de geração ocupado. Tente novamente.")
+            raise GenerationCapacityError(
+                "Serviço de geração ocupado. Tente novamente."
+            )
         try:
             system, conversation = self._messages(messages)
-            if self.config.model in {"qwen.qwen3-32b-v1:0", "qwen.qwen3-32b"} and not self.config.reasoning:
+            if (
+                self.config.model in {"qwen.qwen3-32b-v1:0", "qwen.qwen3-32b"}
+                and not self.config.reasoning
+            ):
                 # Soft switch documentado pelo Qwen; não presumir um parâmetro
                 # de template privado na API Converse gerenciada.
                 system.append({"text": "/no_think"})
             request = {
-                "modelId": self.config.model, "system": system, "messages": conversation,
+                "modelId": self.config.model,
+                "system": system,
+                "messages": conversation,
                 "inferenceConfig": {
-                    "temperature": self.config.temperature, "topP": self.config.top_p,
-                    "maxTokens": self.config.max_tokens if max_tokens is None else max_tokens,
+                    "temperature": self.config.temperature,
+                    "topP": self.config.top_p,
+                    "maxTokens": (
+                        self.config.max_tokens if max_tokens is None else max_tokens
+                    ),
                 },
             }
             if output_config is not None:
                 request["outputConfig"] = output_config
             response = self.client.converse(**request)
-            text = "\n".join(item["text"] for item in response["output"]["message"]["content"] if "text" in item)
-            text = text.strip() if output_config is not None else re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
+            text = "\n".join(
+                item["text"]
+                for item in response["output"]["message"]["content"]
+                if "text" in item
+            )
+            text = (
+                text.strip()
+                if output_config is not None
+                else re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
+            )
             usage = response.get("usage", {})
-            incoming, outgoing = int(usage.get("inputTokens", 0)), int(usage.get("outputTokens", 0))
+            incoming, outgoing = int(usage.get("inputTokens", 0)), int(
+                usage.get("outputTokens", 0)
+            )
             with self._usage_lock:
                 self._usage["input_tokens"] += incoming
                 self._usage["output_tokens"] += outgoing
@@ -365,11 +512,16 @@ class BedrockGenerationProvider(GenerationProvider):
             metadata = response.get("ResponseMetadata", {})
             stop = response.get("stopReason")
             diagnostics = {
-                "provider": self.config.provider, "model": self.config.model,
-                "finish_reason": metadata.get("FinishReason", stop), "request_id": metadata.get("RequestId"),
-                "input_tokens": incoming, "output_tokens": outgoing,
+                "provider": self.config.provider,
+                "model": self.config.model,
+                "finish_reason": metadata.get("FinishReason", stop),
+                "request_id": metadata.get("RequestId"),
+                "input_tokens": incoming,
+                "output_tokens": outgoing,
                 "reasoning_tokens": metadata.get("ReasoningTokens", 0),
-                "max_tokens": self.config.max_tokens if max_tokens is None else max_tokens,
+                "max_tokens": (
+                    self.config.max_tokens if max_tokens is None else max_tokens
+                ),
             }
             reason = None
             if stop in {"max_tokens", "model_context_window_exceeded"}:
@@ -384,25 +536,45 @@ class BedrockGenerationProvider(GenerationProvider):
                 reason = "empty"
             if reason:
                 diagnostics["reason"] = reason
-                diagnostics["output_limit_reached"] = outgoing >= diagnostics["max_tokens"]
-                logger.warning("generation_response_error %s", json.dumps(diagnostics, ensure_ascii=False))
+                diagnostics["output_limit_reached"] = (
+                    outgoing >= diagnostics["max_tokens"]
+                )
+                logger.warning(
+                    "generation_response_error %s",
+                    json.dumps(diagnostics, ensure_ascii=False),
+                )
                 raise GenerationResponseError(
                     f"Resposta do modelo rejeitada: {reason}; finish_reason={diagnostics['finish_reason']}; request_id={diagnostics['request_id']}.",
-                    diagnostics=diagnostics, retryable=reason in {"empty", "truncated", "unexpected_finish_reason"}, batch_fatal=reason == "quota",
+                    diagnostics=diagnostics,
+                    retryable=reason
+                    in {"empty", "truncated", "unexpected_finish_reason"},
+                    batch_fatal=reason == "quota",
                 )
             prices = self.config.model_prices.get(self.config.model, {})
             return AIMessage(
                 content=text,
-                usage_metadata={"input_tokens": incoming, "output_tokens": outgoing, "total_tokens": incoming + outgoing},
+                usage_metadata={
+                    "input_tokens": incoming,
+                    "output_tokens": outgoing,
+                    "total_tokens": incoming + outgoing,
+                },
                 response_metadata={
-                    "provider": self.config.provider, "model": self.config.model,
-                    "region": self.config.region, "stop_reason": response.get("stopReason"),
-                    "retry_attempts": response.get("ResponseMetadata", {}).get("RetryAttempts", 0),
+                    "provider": self.config.provider,
+                    "model": self.config.model,
+                    "region": self.config.region,
+                    "stop_reason": response.get("stopReason"),
+                    "retry_attempts": response.get("ResponseMetadata", {}).get(
+                        "RetryAttempts", 0
+                    ),
                     "request_id": response.get("ResponseMetadata", {}).get("RequestId"),
                     "diagnostics": diagnostics,
                     "estimated_cost_usd": (
-                        incoming * prices.get("input", self.config.input_usd_per_million) + outgoing * prices.get("output", self.config.output_usd_per_million)
-                    ) / 1_000_000,
+                        incoming
+                        * prices.get("input", self.config.input_usd_per_million)
+                        + outgoing
+                        * prices.get("output", self.config.output_usd_per_million)
+                    )
+                    / 1_000_000,
                 },
             )
         except (GenerationCapacityError, GenerationServiceError, ValueError):
@@ -412,15 +584,42 @@ class BedrockGenerationProvider(GenerationProvider):
             error = details.get("Error", {})
             metadata = details.get("ResponseMetadata", {})
             code, status = error.get("Code", "unknown"), metadata.get("HTTPStatusCode")
-            quota = status == 429 or any(word in code.lower() for word in ("throttl", "quota", "rate_limit"))
-            permission = status in {401, 403} or "credentials" in type(exc).__name__.lower()
+            quota = status == 429 or any(
+                word in code.lower() for word in ("throttl", "quota", "rate_limit")
+            )
+            permission = (
+                status in {401, 403} or "credentials" in type(exc).__name__.lower()
+            )
             rejected_schema = output_config is not None and status == 400
-            diagnostics = {"provider": self.config.provider, "reason": "structured_output_request_rejected" if rejected_schema else "quota" if quota else "permission" if permission else "provider_error", "error_code": code, "error_type": type(exc).__name__,
-                           "http_status": status, "request_id": metadata.get("RequestId", "unknown"), "quota_scope": error.get("QuotaScope", "unknown")}
+            diagnostics = {
+                "provider": self.config.provider,
+                "reason": (
+                    "structured_output_request_rejected"
+                    if rejected_schema
+                    else (
+                        "quota"
+                        if quota
+                        else "permission" if permission else "provider_error"
+                    )
+                ),
+                "error_code": code,
+                "error_type": type(exc).__name__,
+                "http_status": status,
+                "request_id": metadata.get("RequestId", "unknown"),
+                "quota_scope": error.get("QuotaScope", "unknown"),
+            }
             logger.warning("bedrock_unavailable %s", json.dumps(diagnostics))
             if rejected_schema:
-                raise GenerationServiceError("Bedrock recusou o structured output; confira o suporte do modelo/endpoint e o schema.", diagnostics=diagnostics, batch_fatal=True) from None
-            raise GenerationServiceError("Bedrock indisponível; consulte o diagnóstico nos logs e no manifest.", diagnostics=diagnostics, batch_fatal=True) from None
+                raise GenerationServiceError(
+                    "Bedrock recusou o structured output; confira o suporte do modelo/endpoint e o schema.",
+                    diagnostics=diagnostics,
+                    batch_fatal=True,
+                ) from None
+            raise GenerationServiceError(
+                "Bedrock indisponível; consulte o diagnóstico nos logs e no manifest.",
+                diagnostics=diagnostics,
+                batch_fatal=True,
+            ) from None
         finally:
             self._slots.release()
 
@@ -428,8 +627,19 @@ class BedrockGenerationProvider(GenerationProvider):
         error.diagnostics["response_attempts"] = attempt + 1
         if not error.retryable or attempt >= self.config.response_retries:
             return False
-        delay = 10 * (2 ** attempt)
-        logger.warning("generation_retry retry=%s/%s reason=%s delay_seconds=%s next_max_tokens=%s", attempt + 1, self.config.response_retries, error.diagnostics.get("reason"), delay, next_max_tokens if next_max_tokens is not None else error.diagnostics.get("max_tokens"))
+        delay = 10 * (2**attempt)
+        logger.warning(
+            "generation_retry retry=%s/%s reason=%s delay_seconds=%s next_max_tokens=%s",
+            attempt + 1,
+            self.config.response_retries,
+            error.diagnostics.get("reason"),
+            delay,
+            (
+                next_max_tokens
+                if next_max_tokens is not None
+                else error.diagnostics.get("max_tokens")
+            ),
+        )
         sleep(delay)
         return True
 
@@ -446,58 +656,114 @@ class BedrockGenerationProvider(GenerationProvider):
                 for key in ("properties", "$defs", "definitions", "patternProperties"):
                     for child in node.get(key, {}).values():
                         strict(child)
-                for key in ("items", "additionalProperties", "not", "if", "then", "else"):
+                for key in (
+                    "items",
+                    "additionalProperties",
+                    "not",
+                    "if",
+                    "then",
+                    "else",
+                ):
                     strict(node.get(key))
                 for key in ("anyOf", "allOf", "oneOf", "prefixItems"):
                     for child in node.get(key, []):
                         strict(child)
+
         specification = schema.model_json_schema()
         strict(specification)
-        return {"textFormat": {"type": "json_schema", "structure": {"jsonSchema": {
-            "name": schema.__name__, "schema": json.dumps(specification, ensure_ascii=False),
-        }}}}
+        return {
+            "textFormat": {
+                "type": "json_schema",
+                "structure": {
+                    "jsonSchema": {
+                        "name": schema.__name__,
+                        "schema": json.dumps(specification, ensure_ascii=False),
+                    }
+                },
+            }
+        }
 
-    def invoke_structured(self, messages, schema, *, include_raw=False, max_tokens=None):
+    def invoke_structured(
+        self, messages, schema, *, include_raw=False, max_tokens=None
+    ):
         output_config = self._output_config(schema)
         last_error = None
         raw = None
-        retry_max_tokens = self.config.response_retry_max_tokens if max_tokens is None else max_tokens
+        retry_max_tokens = (
+            self.config.response_retry_max_tokens if max_tokens is None else max_tokens
+        )
         max_tokens = self.config.max_tokens if max_tokens is None else max_tokens
         for attempt in range(self.config.response_retries + 1):
             raw, parsed = None, None
             try:
-                raw = self._invoke(messages, max_tokens=max_tokens, output_config=output_config)
+                raw = self._invoke(
+                    messages, max_tokens=max_tokens, output_config=output_config
+                )
                 parsed = schema.model_validate_json(raw.content, strict=True)
                 if not any(parsed.model_dump().values()):
                     raise ValueError("Saída estruturada vazia.")
-                return {"raw": raw, "parsed": parsed, "parsing_error": None} if include_raw else parsed
+                return (
+                    {"raw": raw, "parsed": parsed, "parsing_error": None}
+                    if include_raw
+                    else parsed
+                )
             except GenerationResponseError as exc:
                 last_error = exc
             except (ValueError, TypeError) as exc:
                 if raw is None:
                     raise
-                errors = exc.errors(include_url=False, include_context=False, include_input=False) if isinstance(exc, ValidationError) else []
-                kind = "json_syntax" if any(item["type"] == "json_invalid" for item in errors) else "schema_validation" if errors else "empty_structure" if parsed is not None else "validation_error"
+                errors = (
+                    exc.errors(
+                        include_url=False, include_context=False, include_input=False
+                    )
+                    if isinstance(exc, ValidationError)
+                    else []
+                )
+                kind = (
+                    "json_syntax"
+                    if any(item["type"] == "json_invalid" for item in errors)
+                    else (
+                        "schema_validation"
+                        if errors
+                        else (
+                            "empty_structure"
+                            if parsed is not None
+                            else "validation_error"
+                        )
+                    )
+                )
                 diagnostics = {
-                    **raw.response_metadata.get("diagnostics", {}), "reason": "invalid_json",
-                    "validation_kind": kind, "schema_name": schema.__name__,
-                    "validation_errors": [{"type": item["type"], "loc": list(item["loc"])} for item in errors[:8]],
+                    **raw.response_metadata.get("diagnostics", {}),
+                    "reason": "invalid_json",
+                    "validation_kind": kind,
+                    "schema_name": schema.__name__,
+                    "validation_errors": [
+                        {"type": item["type"], "loc": list(item["loc"])}
+                        for item in errors[:8]
+                    ],
                     "response_chars": len(raw.content),
                     "response_sha256": hashlib.sha256(raw.content.encode()).hexdigest(),
                 }
                 if parsed is not None:
                     diagnostics["parsed_fields"] = list(parsed.model_dump())
-                last_error = GenerationResponseError("Modelo retornou JSON inválido ou fora do schema.", diagnostics=diagnostics, response_text=raw.content)
+                last_error = GenerationResponseError(
+                    "Modelo retornou JSON inválido ou fora do schema.",
+                    diagnostics=diagnostics,
+                    response_text=raw.content,
+                )
                 logger.warning("generation_response_error %s", json.dumps(diagnostics))
             next_max_tokens = max_tokens
             if (
                 last_error.diagnostics.get("reason") == "truncated"
                 and last_error.diagnostics.get("output_limit_reached")
-                and last_error.diagnostics.get("finish_reason") in {"length", "max_tokens"}
+                and last_error.diagnostics.get("finish_reason")
+                in {"length", "max_tokens"}
                 and retry_max_tokens > max_tokens
             ):
                 next_max_tokens = min(max_tokens * 2, retry_max_tokens)
-            if not self._retry_response(last_error, attempt, next_max_tokens=next_max_tokens):
+            if not self._retry_response(
+                last_error, attempt, next_max_tokens=next_max_tokens
+            ):
                 break
             max_tokens = next_max_tokens
         if include_raw:
@@ -513,7 +779,9 @@ class BedrockGenerationProvider(GenerationProvider):
         if self.config.provider == "bedrock-mantle":
             self.client.get_model()
         elif self.config.model.startswith(("us.", "eu.", "apac.")):
-            self.control_client.get_inference_profile(inferenceProfileIdentifier=self.config.model)
+            self.control_client.get_inference_profile(
+                inferenceProfileIdentifier=self.config.model
+            )
         else:
             self.control_client.get_foundation_model(modelIdentifier=self.config.model)
 

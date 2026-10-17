@@ -149,9 +149,7 @@ def main() -> None:
         key=BRONZE_CURRENT_KEY,
     )
 
-    bronze_current = json.loads(
-        bronze_current_bytes.decode("utf-8")
-    )
+    bronze_current = json.loads(bronze_current_bytes.decode("utf-8"))
 
     bronze_artifact_id = str(
         bronze_current.get(
@@ -167,10 +165,7 @@ def main() -> None:
         )
     ).strip()
 
-    if (
-        not bronze_artifact_id
-        or not bronze_manifest_key
-    ):
+    if not bronze_artifact_id or not bronze_manifest_key:
         raise RuntimeError(
             "current.json da Bronze inválido: "
             "bronze_artifact_id/manifest_key ausentes."
@@ -182,9 +177,7 @@ def main() -> None:
     )
 
     # SHA é só verificação de integridade.
-    bronze_manifest_sha256 = hashlib.sha256(
-        bronze_manifest_bytes
-    ).hexdigest()
+    bronze_manifest_sha256 = hashlib.sha256(bronze_manifest_bytes).hexdigest()
 
     expected_bronze_sha = str(
         bronze_current.get(
@@ -193,31 +186,20 @@ def main() -> None:
         )
     ).strip()
 
-    if (
-        expected_bronze_sha
-        and bronze_manifest_sha256
-        != expected_bronze_sha
-    ):
+    if expected_bronze_sha and bronze_manifest_sha256 != expected_bronze_sha:
         raise RuntimeError(
             "Falha de integridade no manifest Bronze. "
             f"Esperado={expected_bronze_sha}; "
             f"obtido={bronze_manifest_sha256}."
         )
 
-    bronze_manifest = pd.read_parquet(
-        io.BytesIO(bronze_manifest_bytes)
-    )
+    bronze_manifest = pd.read_parquet(io.BytesIO(bronze_manifest_bytes))
 
     manifest_artifact_ids = set(
-        bronze_manifest["bronze_artifact_id"]
-        .dropna()
-        .astype(str)
-        .unique()
+        bronze_manifest["bronze_artifact_id"].dropna().astype(str).unique()
     )
 
-    if manifest_artifact_ids != {
-        bronze_artifact_id
-    }:
+    if manifest_artifact_ids != {bronze_artifact_id}:
         raise RuntimeError(
             "bronze_artifact_id do manifest "
             "não corresponde ao current.json. "
@@ -456,10 +438,19 @@ def main() -> None:
         df=manifest,
     )
 
-    storage.upload_bytes(silver_bucket, config.storage.silver_current_key, json.dumps({
-        "silver_dataset_id": dataset_id, "manifest_key": manifest_key,
-        "chunks_key": chunks_key, "source_bronze_artifact_id": bronze_artifact_id,
-    }).encode(), "application/json")
+    storage.upload_bytes(
+        silver_bucket,
+        config.storage.silver_current_key,
+        json.dumps(
+            {
+                "silver_dataset_id": dataset_id,
+                "manifest_key": manifest_key,
+                "chunks_key": chunks_key,
+                "source_bronze_artifact_id": bronze_artifact_id,
+            }
+        ).encode(),
+        "application/json",
+    )
 
     print()
     print("[OK] Camada Silver criada.")

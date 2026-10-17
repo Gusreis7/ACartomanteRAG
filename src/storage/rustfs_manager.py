@@ -25,7 +25,11 @@ class RustFSManager:
         self.region = region
         kwargs = {}
         if endpoint:
-            kwargs = {"endpoint_url": endpoint, "aws_access_key_id": access_key, "aws_secret_access_key": secret_key}
+            kwargs = {
+                "endpoint_url": endpoint,
+                "aws_access_key_id": access_key,
+                "aws_secret_access_key": secret_key,
+            }
         self.client = boto3.client(
             "s3",
             **kwargs,

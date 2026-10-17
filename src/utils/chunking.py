@@ -5,7 +5,6 @@ from statistics import median
 
 from transformers import AutoTokenizer
 
-
 PADRAO_CAPITULO = re.compile(
     r"""
     ^[ \t]*
@@ -102,8 +101,7 @@ class HuggingFaceChunkTokenizer:
             )
 
         self.resolved_revision = (
-            self.tokenizer.init_kwargs.get("_commit_hash")
-            or revision
+            self.tokenizer.init_kwargs.get("_commit_hash") or revision
         )
 
     def split(
@@ -113,9 +111,7 @@ class HuggingFaceChunkTokenizer:
         overlap: int,
     ) -> list[dict]:
         if overlap >= chunk_size:
-            raise ValueError(
-                "overlap deve ser menor que chunk_size."
-            )
+            raise ValueError("overlap deve ser menor que chunk_size.")
 
         encoded = self.tokenizer(
             text,
@@ -145,8 +141,7 @@ class HuggingFaceChunkTokenizer:
 
             valid_offsets = [
                 (start, end)
-                for start, end
-                in offsets[token_start:token_end]
+                for start, end in offsets[token_start:token_end]
                 if end > start
             ]
 
@@ -156,17 +151,13 @@ class HuggingFaceChunkTokenizer:
             char_start = valid_offsets[0][0]
             char_end = valid_offsets[-1][1]
 
-            chunk_text = text[
-                char_start:char_end
-            ]
+            chunk_text = text[char_start:char_end]
 
             if chunk_text.strip():
                 chunks.append(
                     {
                         "text": chunk_text,
-                        "token_count": (
-                            token_end - token_start
-                        ),
+                        "token_count": (token_end - token_start),
                         "token_start": token_start,
                         "token_end": token_end,
                         "char_start": char_start,
@@ -201,13 +192,7 @@ def encontrar_titulo_apos_capitulo(
     Heurística V4 consolidada no notebook para títulos na linha
     seguinte ao marcador de capítulo.
     """
-    titulo_obra_norm = (
-        str(titulo_obra)
-        .strip()
-        .casefold()
-        if titulo_obra
-        else ""
-    )
+    titulo_obra_norm = str(titulo_obra).strip().casefold() if titulo_obra else ""
 
     for i in range(
         indice_capitulo + 1,
@@ -222,16 +207,12 @@ def encontrar_titulo_apos_capitulo(
         if not linha:
             continue
 
-        if linha_e_numero_pagina(
-            linha
-        ):
+        if linha_e_numero_pagina(linha):
             continue
 
-        titulos_bloqueados = (
-            TITULOS_EDGE_CASE_BLOQUEADOS.get(
-                titulo_obra_norm,
-                set(),
-            )
+        titulos_bloqueados = TITULOS_EDGE_CASE_BLOQUEADOS.get(
+            titulo_obra_norm,
+            set(),
         )
 
         if linha in titulos_bloqueados:
@@ -247,28 +228,21 @@ def encontrar_titulo_apos_capitulo(
                 "regra_titulo": None,
             }
 
-        if (
-            len(linha.split())
-            > max_palavras_titulo
-        ):
+        if len(linha.split()) > max_palavras_titulo:
             return {
                 "titulo": None,
                 "regra_titulo": None,
             }
 
         # Fala/prosa.
-        if linha.startswith(
-            ("-", "–", "—")
-        ):
+        if linha.startswith(("-", "–", "—")):
             return {
                 "titulo": None,
                 "regra_titulo": None,
             }
 
         # Padrões que se mostraram continuação de prosa.
-        if linha.endswith(
-            (",", ":")
-        ):
+        if linha.endswith((",", ":")):
             return {
                 "titulo": None,
                 "regra_titulo": None,
@@ -276,32 +250,16 @@ def encontrar_titulo_apos_capitulo(
 
         # Ponto simples normalmente é prosa.
         # Mantém títulos em caixa alta, como "O FINAL DO § 4º.".
-        termina_ponto_simples = (
-            linha.endswith(".")
-            and not linha.endswith("...")
-        )
+        termina_ponto_simples = linha.endswith(".") and not linha.endswith("...")
 
         if termina_ponto_simples:
-            letras = [
-                char
-                for char in linha
-                if char.isalpha()
-            ]
+            letras = [char for char in linha if char.isalpha()]
 
             proporcao_maiusculas = (
-                sum(
-                    char.isupper()
-                    for char in letras
-                )
-                / len(letras)
-                if letras
-                else 0
+                sum(char.isupper() for char in letras) / len(letras) if letras else 0
             )
 
-            if (
-                proporcao_maiusculas
-                < 0.80
-            ):
+            if proporcao_maiusculas < 0.80:
                 return {
                     "titulo": None,
                     "regra_titulo": None,
@@ -318,30 +276,21 @@ def encontrar_titulo_apos_capitulo(
                 len(linhas),
             ),
         ):
-            candidata = (
-                linhas[j].strip()
-            )
+            candidata = linhas[j].strip()
 
             if not candidata:
                 continue
 
-            if linha_e_numero_pagina(
-                candidata
-            ):
+            if linha_e_numero_pagina(candidata):
                 continue
 
             proxima_linha = candidata
             break
 
         if proxima_linha:
-            primeiro_char = (
-                proxima_linha[0]
-            )
+            primeiro_char = proxima_linha[0]
 
-            if (
-                primeiro_char.isalpha()
-                and primeiro_char.islower()
-            ):
+            if primeiro_char.isalpha() and primeiro_char.islower():
                 return {
                     "titulo": None,
                     "regra_titulo": None,
@@ -349,9 +298,7 @@ def encontrar_titulo_apos_capitulo(
 
         return {
             "titulo": linha,
-            "regra_titulo": (
-                "proxima_linha"
-            ),
+            "regra_titulo": ("proxima_linha"),
         }
 
     return {
@@ -367,87 +314,51 @@ def extrair_capitulos_com_padrao(
     titulo_obra: str,
     buscar_titulo: bool = True,
 ) -> list[dict]:
-    linhas = text.splitlines(
-        keepends=True
-    )
+    linhas = text.splitlines(keepends=True)
 
     capitulos = []
     posicao = 0
 
-    for indice_linha, linha_original in enumerate(
-        linhas
-    ):
+    for indice_linha, linha_original in enumerate(linhas):
         linha = linha_original.strip()
-        match = pattern.match(
-            linha
-        )
+        match = pattern.match(linha)
 
         if not match:
-            posicao += len(
-                linha_original
-            )
+            posicao += len(linha_original)
             continue
 
-        titulo_inline = (
-            match.groupdict().get(
-                "titulo_inline"
-            )
-        )
+        titulo_inline = match.groupdict().get("titulo_inline")
 
         titulo = None
         regra_titulo = None
 
         if buscar_titulo:
             if titulo_inline:
-                titulo = (
-                    titulo_inline.strip()
-                )
+                titulo = titulo_inline.strip()
                 regra_titulo = "inline"
             else:
-                resultado_titulo = (
-                    encontrar_titulo_apos_capitulo(
-                        linhas=linhas,
-                        indice_capitulo=(
-                            indice_linha
-                        ),
-                        titulo_obra=(
-                            titulo_obra
-                        ),
-                    )
+                resultado_titulo = encontrar_titulo_apos_capitulo(
+                    linhas=linhas,
+                    indice_capitulo=(indice_linha),
+                    titulo_obra=(titulo_obra),
                 )
 
-                titulo = (
-                    resultado_titulo[
-                        "titulo"
-                    ]
-                )
-                regra_titulo = (
-                    resultado_titulo[
-                        "regra_titulo"
-                    ]
-                )
+                titulo = resultado_titulo["titulo"]
+                regra_titulo = resultado_titulo["regra_titulo"]
 
         capitulos.append(
             {
-                "numero": match.group(
-                    "numero"
-                ),
+                "numero": match.group("numero"),
                 "cabecalho": linha,
                 "titulo": titulo,
-                "regra_titulo": (
-                    regra_titulo
-                ),
-                "regra_capitulo": (
-                    regra_capitulo
-                ),
+                "regra_titulo": (regra_titulo),
+                "regra_capitulo": (regra_capitulo),
                 "linha": indice_linha,
                 "inicio": posicao,
             }
         )
 
-        posicao += len(
-            linha_original
-        )
+        posicao += len(linha_original)
 
     return capitulos
 
@@ -457,40 +368,24 @@ def validar_estrutura_capitulos(
     min_capitulos: int,
     min_mediana_chars: int,
 ) -> tuple[bool, float]:
-    if (
-        len(capitulos)
-        < min_capitulos
-    ):
+    if len(capitulos) < min_capitulos:
         return False, 0.0
 
     distancias = [
-        atual["inicio"]
-        - anterior["inicio"]
-        for anterior, atual
-        in zip(
+        atual["inicio"] - anterior["inicio"]
+        for anterior, atual in zip(
             capitulos,
             capitulos[1:],
         )
     ]
 
-    mediana_distancia = (
-        median(distancias)
-        if distancias
-        else 0.0
-    )
+    mediana_distancia = median(distancias) if distancias else 0.0
 
-    valido = (
-        len(capitulos)
-        >= min_capitulos
-        and mediana_distancia
-        >= min_mediana_chars
-    )
+    valido = len(capitulos) >= min_capitulos and mediana_distancia >= min_mediana_chars
 
     return (
         valido,
-        float(
-            mediana_distancia
-        ),
+        float(mediana_distancia),
     )
 
 
@@ -509,110 +404,62 @@ def detectar_capitulos(
 
     A detecção é aplicada independentemente da categoria Bronze.
     """
-    titulo_norm = (
-        str(title)
-        .strip()
-        .casefold()
+    titulo_norm = str(title).strip().casefold()
+
+    capitulos = extrair_capitulos_com_padrao(
+        text=text,
+        pattern=PADRAO_CAPITULO,
+        regra_capitulo=("capitulo_explicito"),
+        titulo_obra=titulo_norm,
+        buscar_titulo=True,
     )
 
-    capitulos = (
-        extrair_capitulos_com_padrao(
-            text=text,
-            pattern=PADRAO_CAPITULO,
-            regra_capitulo=(
-                "capitulo_explicito"
-            ),
-            titulo_obra=titulo_norm,
-            buscar_titulo=True,
-        )
-    )
-
-    valido, _ = (
-        validar_estrutura_capitulos(
-            capitulos=capitulos,
-            min_capitulos=min_capitulos,
-            min_mediana_chars=(
-                min_mediana_chars
-            ),
-        )
+    valido, _ = validar_estrutura_capitulos(
+        capitulos=capitulos,
+        min_capitulos=min_capitulos,
+        min_mediana_chars=(min_mediana_chars),
     )
 
     # Edge case confirmado manualmente:
     # "Na Arca" usa CAPÍTULO A/B/C.
-    if (
-        not valido
-        and titulo_norm
-        in {
-            "na arca",
-            "na arca.txt",
-        }
-    ):
-        capitulos = (
-            extrair_capitulos_com_padrao(
-                text=text,
-                pattern=(
-                    PADRAO_CAPITULO_NA_ARCA
-                ),
-                regra_capitulo=(
-                    "capitulo_letra"
-                ),
-                titulo_obra=titulo_norm,
-                buscar_titulo=True,
-            )
+    if not valido and titulo_norm in {
+        "na arca",
+        "na arca.txt",
+    }:
+        capitulos = extrair_capitulos_com_padrao(
+            text=text,
+            pattern=(PADRAO_CAPITULO_NA_ARCA),
+            regra_capitulo=("capitulo_letra"),
+            titulo_obra=titulo_norm,
+            buscar_titulo=True,
         )
 
-        valido, _ = (
-            validar_estrutura_capitulos(
-                capitulos=capitulos,
-                min_capitulos=(
-                    min_capitulos
-                ),
-                min_mediana_chars=(
-                    min_mediana_chars
-                ),
-            )
+        valido, _ = validar_estrutura_capitulos(
+            capitulos=capitulos,
+            min_capitulos=(min_capitulos),
+            min_mediana_chars=(min_mediana_chars),
         )
 
     if not valido:
-        capitulos_romanos = (
-            extrair_capitulos_com_padrao(
-                text=text,
-                pattern=(
-                    PADRAO_ROMANO_ISOLADO
-                ),
-                regra_capitulo=(
-                    "romano_isolado"
-                ),
-                titulo_obra=titulo_norm,
-                buscar_titulo=False,
-            )
+        capitulos_romanos = extrair_capitulos_com_padrao(
+            text=text,
+            pattern=(PADRAO_ROMANO_ISOLADO),
+            regra_capitulo=("romano_isolado"),
+            titulo_obra=titulo_norm,
+            buscar_titulo=False,
         )
 
-        valido_romano, _ = (
-            validar_estrutura_capitulos(
-                capitulos=(
-                    capitulos_romanos
-                ),
-                min_capitulos=(
-                    min_capitulos
-                ),
-                min_mediana_chars=(
-                    min_mediana_chars
-                ),
-            )
+        valido_romano, _ = validar_estrutura_capitulos(
+            capitulos=(capitulos_romanos),
+            min_capitulos=(min_capitulos),
+            min_mediana_chars=(min_mediana_chars),
         )
 
         if valido_romano:
-            capitulos = (
-                capitulos_romanos
-            )
+            capitulos = capitulos_romanos
             valido = True
 
-    return (
-        capitulos
-        if valido
-        else []
-    )
+    return capitulos if valido else []
 
 
 def build_sections(
@@ -656,9 +503,7 @@ def build_sections(
         text=text,
         title=title,
         min_capitulos=min_capitulos,
-        min_mediana_chars=(
-            min_mediana_chars
-        ),
+        min_mediana_chars=(min_mediana_chars),
     )
 
     if not capitulos:
@@ -670,19 +515,13 @@ def build_sections(
     sections = []
     section_index = 0
 
-    first_start = (
-        capitulos[0]["inicio"]
-    )
+    first_start = capitulos[0]["inicio"]
 
     if text[:first_start].strip():
         sections.append(
             {
-                "section_index": (
-                    section_index
-                ),
-                "section_type": (
-                    "preamble"
-                ),
+                "section_index": (section_index),
+                "section_type": ("preamble"),
                 "section_number": None,
                 "section_header": None,
                 "section_title": None,
@@ -690,56 +529,29 @@ def build_sections(
                 "chapter_rule": None,
                 "start_char": 0,
                 "end_char": first_start,
-                "text": (
-                    text[:first_start]
-                ),
+                "text": (text[:first_start]),
             }
         )
 
         section_index += 1
 
-    for index, capitulo in enumerate(
-        capitulos
-    ):
+    for index, capitulo in enumerate(capitulos):
         start = capitulo["inicio"]
 
-        if (
-            index + 1
-            < len(capitulos)
-        ):
-            end = capitulos[
-                index + 1
-            ]["inicio"]
+        if index + 1 < len(capitulos):
+            end = capitulos[index + 1]["inicio"]
         else:
             end = len(text)
 
         sections.append(
             {
-                "section_index": (
-                    section_index
-                ),
-                "section_type": (
-                    "chapter"
-                ),
-                "section_number": (
-                    capitulo["numero"]
-                ),
-                "section_header": (
-                    capitulo["cabecalho"]
-                ),
-                "section_title": (
-                    capitulo["titulo"]
-                ),
-                "section_title_rule": (
-                    capitulo[
-                        "regra_titulo"
-                    ]
-                ),
-                "chapter_rule": (
-                    capitulo[
-                        "regra_capitulo"
-                    ]
-                ),
+                "section_index": (section_index),
+                "section_type": ("chapter"),
+                "section_number": (capitulo["numero"]),
+                "section_header": (capitulo["cabecalho"]),
+                "section_title": (capitulo["titulo"]),
+                "section_title_rule": (capitulo["regra_titulo"]),
+                "chapter_rule": (capitulo["regra_capitulo"]),
                 "start_char": start,
                 "end_char": end,
                 "text": text[start:end],

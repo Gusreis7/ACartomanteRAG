@@ -11,7 +11,6 @@ from src.services.recommendations import (
     WorkRecommendationService,
 )
 
-
 router = APIRouter(prefix="/api/v1", tags=["recommendations"])
 _service_lock = Lock()
 

@@ -29,17 +29,13 @@ def run_retrieval_benchmark(
     evidence_matches = build_evidence_matches(
         benchmark,
         service.chunks,
-        min_coverage=float(
-            config.retrieval_benchmark.evidence_min_coverage
-        ),
+        min_coverage=float(config.retrieval_benchmark.evidence_min_coverage),
     )
 
     relevant_by_query = {}
     valid_matches = evidence_matches[evidence_matches["chunk_id"].notna()]
     for query_id, group in valid_matches.groupby("query_id"):
-        relevant_by_query[str(query_id)] = set(
-            group["chunk_id"].astype(str)
-        )
+        relevant_by_query[str(query_id)] = set(group["chunk_id"].astype(str))
 
     warmup = service.warmup()
     print(
@@ -54,10 +50,7 @@ def run_retrieval_benchmark(
         relevant = relevant_by_query.get(query_id, set())
 
         if not relevant:
-            print(
-                "[AVISO] Evidência não mapeada para a Silver: "
-                f"{query_id}"
-            )
+            print("[AVISO] Evidência não mapeada para a Silver: " f"{query_id}")
 
         for method in methods:
             response = service.search(query, method=method)

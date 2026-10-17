@@ -18,23 +18,16 @@ class DenseRetriever:
         embedding = resolved_index.manifest.get("embedding") or {}
         model_name = embedding.get("model") or resolved_index.model
         resolved_revision = (
-            embedding.get("resolved_revision")
-            or resolved_index.resolved_revision
+            embedding.get("resolved_revision") or resolved_index.resolved_revision
         )
 
         if not model_name:
             raise ValueError("Manifest do índice sem embedding.model.")
         if not resolved_revision:
-            raise ValueError(
-                "Manifest do índice sem embedding.resolved_revision."
-            )
+            raise ValueError("Manifest do índice sem embedding.resolved_revision.")
 
         configured_device = config.embedding.execution.device
-        device = (
-            None
-            if configured_device in {None, "", "auto"}
-            else configured_device
-        )
+        device = None if configured_device in {None, "", "auto"} else configured_device
 
         truncate_dim = embedding.get("truncate_dim")
         model_kwargs: dict[str, Any] = {
@@ -46,9 +39,7 @@ class DenseRetriever:
 
         self.model = SentenceTransformer(model_name, **model_kwargs)
         self.query_prompt_name = embedding.get("query_prompt_name")
-        self.normalize_embeddings = bool(
-            embedding.get("normalize_embeddings", False)
-        )
+        self.normalize_embeddings = bool(embedding.get("normalize_embeddings", False))
         self.expected_dimension = int(
             embedding.get("dimension") or resolved_index.dimension
         )
@@ -113,9 +104,7 @@ class DenseRetriever:
                     score=float(point.score),
                     text=text,
                     metadata={
-                        key: value
-                        for key, value in payload.items()
-                        if key != "text"
+                        key: value for key, value in payload.items() if key != "text"
                     },
                 )
             )

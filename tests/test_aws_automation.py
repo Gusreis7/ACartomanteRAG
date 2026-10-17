@@ -1,4 +1,5 @@
 """Contratos de bootstrap, publicação imutável e execução cloud sem chamadas reais."""
+
 import importlib.util
 import json
 import os
@@ -40,7 +41,12 @@ def aws(monkeypatch):
 
 
 def private_file(tmp_path, **changes):
-    values = {"QDRANT_URL": "https://cluster.example.org:6333", "QDRANT_READ_API_KEY": "read-key", "QDRANT_WRITE_API_KEY": "write-key", **changes}
+    values = {
+        "QDRANT_URL": "https://cluster.example.org:6333",
+        "QDRANT_READ_API_KEY": "read-key",
+        "QDRANT_WRITE_API_KEY": "write-key",
+        **changes,
+    }
     path = tmp_path / "private.env"
     path.write_text("\n".join(f"{key}={value}" for key, value in values.items()))
     path.chmod(0o600)
@@ -48,7 +54,11 @@ def private_file(tmp_path, **changes):
 
 
 def test_private_env_is_not_executed_or_interpolated(tmp_path, cloud, monkeypatch):
-    path = private_file(tmp_path, EXTRA="$(touch SHOULD_NOT_EXIST)", AWS_SECRET_ACCESS_KEY="must-not-upload")
+    path = private_file(
+        tmp_path,
+        EXTRA="$(touch SHOULD_NOT_EXIST)",
+        AWS_SECRET_ACCESS_KEY="must-not-upload",
+    )
     result = cloud.read_secret_file(path)
     assert set(result) == {"QDRANT_URL", "QDRANT_READ_API_KEY", "QDRANT_WRITE_API_KEY"}
     assert not (tmp_path / "SHOULD_NOT_EXIST").exists()
@@ -58,11 +68,14 @@ def test_private_env_is_not_executed_or_interpolated(tmp_path, cloud, monkeypatc
         cloud.read_secret_file(path)
 
 
-@pytest.mark.parametrize("values", [
-    {"QDRANT_URL": "http://local.example.org"},
-    {"QDRANT_URL": "https://user:secret@example.org"},
-    {"QDRANT_WRITE_API_KEY": ""},
-])
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"QDRANT_URL": "http://local.example.org"},
+        {"QDRANT_URL": "https://user:secret@example.org"},
+        {"QDRANT_WRITE_API_KEY": ""},
+    ],
+)
 def test_invalid_secrets_rejected_without_exposing_values(tmp_path, cloud, values):
     with pytest.raises(ValueError) as error:
         cloud.read_secret_file(private_file(tmp_path, **values))
@@ -80,20 +93,30 @@ def test_check_secrets_does_not_initialize_aws(tmp_path, cloud, monkeypatch):
     path = private_file(tmp_path)
     client = Mock(side_effect=AssertionError("não deve consultar AWS"))
     monkeypatch.setattr(cloud.boto3, "client", client)
-    monkeypatch.setattr("sys.argv", ["cloud.py", "secrets", "--check", "--env-file", str(path)])
+    monkeypatch.setattr(
+        "sys.argv", ["cloud.py", "secrets", "--check", "--env-file", str(path)]
+    )
     cloud.main()
     client.assert_not_called()
 
 
 def test_secret_import_preserves_passwords_and_role_separation(tmp_path, cloud, aws):
     ssm = boto3.client("ssm", region_name="us-east-1")
-    out = {"app_settings_parameter": "/project/app", "etl_settings_parameter": "/project/etl"}
+    out = {
+        "app_settings_parameter": "/project/app",
+        "etl_settings_parameter": "/project/etl",
+    }
     values = cloud.read_secret_file(private_file(tmp_path))
     cloud.configure_secrets(ssm, out, values)
-    read = lambda name: json.loads(ssm.get_parameter(Name=name, WithDecryption=True)["Parameter"]["Value"])
+    read = lambda name: json.loads(
+        ssm.get_parameter(Name=name, WithDecryption=True)["Parameter"]["Value"]
+    )
     original = read("/project/app")
     assert original["QDRANT_API_KEY"] == "read-key"
-    assert read("/project/etl") == {"QDRANT_URL": values["QDRANT_URL"], "QDRANT_API_KEY": "write-key"}
+    assert read("/project/etl") == {
+        "QDRANT_URL": values["QDRANT_URL"],
+        "QDRANT_API_KEY": "write-key",
+    }
     cloud.configure_secrets(ssm, out, {**values, "QDRANT_READ_API_KEY": "new-read"})
     current = read("/project/app")
     assert current["REDIS_PASSWORD"] == original["REDIS_PASSWORD"]
@@ -103,9 +126,15 @@ def test_secret_import_preserves_passwords_and_role_separation(tmp_path, cloud, 
 
 def test_bad_existing_password_does_not_rotate_or_partially_write(tmp_path, cloud, aws):
     ssm = boto3.client("ssm", region_name="us-east-1")
-    ssm.put_parameter(Name="/app", Type="SecureString", Value=json.dumps({"REDIS_PASSWORD": "legacy"}))
+    ssm.put_parameter(
+        Name="/app", Type="SecureString", Value=json.dumps({"REDIS_PASSWORD": "legacy"})
+    )
     with pytest.raises(ValueError, match="rotação"):
-        cloud.configure_secrets(ssm, {"app_settings_parameter": "/app", "etl_settings_parameter": "/etl"}, cloud.read_secret_file(private_file(tmp_path)))
+        cloud.configure_secrets(
+            ssm,
+            {"app_settings_parameter": "/app", "etl_settings_parameter": "/etl"},
+            cloud.read_secret_file(private_file(tmp_path)),
+        )
     assert ssm.get_parameter(Name="/app")["Parameter"]["Version"] == 1
     with pytest.raises(ssm.exceptions.ParameterNotFound):
         ssm.get_parameter(Name="/etl")
@@ -117,7 +146,9 @@ def make_bundle(directory, cloud):
         (directory / name).write_bytes(name.encode())
 
 
-def test_bundle_publication_reuses_complete_revision_and_refuses_tampering(tmp_path, cloud, aws):
+def test_bundle_publication_reuses_complete_revision_and_refuses_tampering(
+    tmp_path, cloud, aws
+):
     s3 = boto3.client("s3", region_name="us-east-1")
     s3.create_bucket(Bucket="automation-ops")
     revision = "a" * 40
@@ -128,7 +159,9 @@ def test_bundle_publication_reuses_complete_revision_and_refuses_tampering(tmp_p
     (directory / "source.zip").write_bytes(b"repacked-with-different-timestamps")
     assert not cloud.publish_glue(s3, "automation-ops", revision, directory)
     assert cloud.bundle_manifest(s3, "automation-ops", revision) == manifest
-    s3.put_object(Bucket="automation-ops", Key=f"glue/{revision}/source.zip", Body=b"tampered")
+    s3.put_object(
+        Bucket="automation-ops", Key=f"glue/{revision}/source.zip", Body=b"tampered"
+    )
     with pytest.raises(ValueError, match="alterado"):
         cloud.bundle_manifest(s3, "automation-ops", revision)
 
@@ -138,47 +171,81 @@ def test_partial_bundle_resumes_without_overwrite(tmp_path, cloud, aws):
     s3.create_bucket(Bucket="automation-ops")
     revision = "b" * 40
     key = f"glue/{revision}/job.py"
-    s3.put_object(Bucket="automation-ops", Key=key, Body=b"old-valid-job", Metadata={"revision": revision, "sha256": "c" * 64})
+    s3.put_object(
+        Bucket="automation-ops",
+        Key=key,
+        Body=b"old-valid-job",
+        Metadata={"revision": revision, "sha256": "c" * 64},
+    )
     assert cloud.bundle_manifest(s3, "automation-ops", revision) is None
     make_bundle(tmp_path / "bundle", cloud)
     assert cloud.publish_glue(s3, "automation-ops", revision, tmp_path / "bundle")
-    assert s3.get_object(Bucket="automation-ops", Key=key)["Body"].read() == b"old-valid-job"
+    assert (
+        s3.get_object(Bucket="automation-ops", Key=key)["Body"].read()
+        == b"old-valid-job"
+    )
 
 
 def test_legacy_bundle_is_not_silently_overwritten(tmp_path, cloud, aws):
     s3 = boto3.client("s3", region_name="us-east-1")
     s3.create_bucket(Bucket="automation-ops")
     revision = "c" * 40
-    s3.put_object(Bucket="automation-ops", Key=f"glue/{revision}/job.py", Body=b"legacy")
+    s3.put_object(
+        Bucket="automation-ops", Key=f"glue/{revision}/job.py", Body=b"legacy"
+    )
     make_bundle(tmp_path / "bundle", cloud)
     with pytest.raises(ValueError, match="sem identidade"):
         cloud.publish_glue(s3, "automation-ops", revision, tmp_path / "bundle")
-    assert s3.get_object(Bucket="automation-ops", Key=f"glue/{revision}/job.py")["Body"].read() == b"legacy"
+    assert (
+        s3.get_object(Bucket="automation-ops", Key=f"glue/{revision}/job.py")[
+            "Body"
+        ].read()
+        == b"legacy"
+    )
 
 
 def test_glue_arguments_pin_all_assets_without_changing_job(cloud):
-    args = cloud.glue_arguments("d" * 40, "ops", "corpus-v1", ",".join(cloud.ETL_STEPS), promote=True)
+    args = cloud.glue_arguments(
+        "d" * 40, "ops", "corpus-v1", ",".join(cloud.ETL_STEPS), promote=True
+    )
     assert args["--scriptLocation"] == "s3://ops/glue/" + "d" * 40 + "/job.py"
-    assert args["--additional-python-modules"].endswith("/" + "d" * 40 + "/dependencies.gluewheels.zip")
+    assert args["--additional-python-modules"].endswith(
+        "/" + "d" * 40 + "/dependencies.gluewheels.zip"
+    )
     assert args["--bundle-prefix"] == "glue/" + "d" * 40
     assert args["--steps"].startswith("crawl,bronze,silver")
     assert args["--promote"] == "true"
 
 
 @pytest.mark.parametrize("smoke", [False, True])
-@pytest.mark.parametrize("reuse_options", [[], ["--reuse-index-id", ""], ["--reuse-index-id", "corpus-v1"]])
-def test_glue_start_omits_empty_optional_value_and_accepts_glue_argv(cloud, monkeypatch, smoke, reuse_options):
+@pytest.mark.parametrize(
+    "reuse_options", [[], ["--reuse-index-id", ""], ["--reuse-index-id", "corpus-v1"]]
+)
+def test_glue_start_omits_empty_optional_value_and_accepts_glue_argv(
+    cloud, monkeypatch, smoke, reuse_options
+):
     revision = "d" * 40
     clients = {name: Mock() for name in ("ssm", "s3", "glue")}
     clients["s3"].list_objects_v2.return_value = {}
     clients["glue"].start_job_run.return_value = {"JobRunId": "jr-test"}
     monkeypatch.setattr(cloud.boto3, "client", lambda name, **kwargs: clients[name])
-    monkeypatch.setattr(cloud, "outputs", lambda path: {"ops_bucket": "ops", "glue_job": "etl-job"})
+    monkeypatch.setattr(
+        cloud, "outputs", lambda path: {"ops_bucket": "ops", "glue_job": "etl-job"}
+    )
     monkeypatch.setattr(cloud, "bundle_manifest", lambda *args: {"revision": revision})
-    monkeypatch.setattr("sys.argv", [
-        "cloud.py", "glue", "--revision", revision, "--run-id", "smoke-v1",
-        *reuse_options, *(["--smoke"] if smoke else []),
-    ])
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "cloud.py",
+            "glue",
+            "--revision",
+            revision,
+            "--run-id",
+            "smoke-v1",
+            *reuse_options,
+            *(["--smoke"] if smoke else []),
+        ],
+    )
     cloud.main()
 
     clients["glue"].start_job_run.assert_called_once()
@@ -196,8 +263,11 @@ def test_glue_start_omits_empty_optional_value_and_accepts_glue_argv(cloud, monk
     # Verifica o parser real do job com o mesmo formato de transporte.
     job = module("glue_optional_argument", "infra/glue/job.py")
     parameters = {
-        "--assets-bucket": "ops", "--settings-parameter": "/project/etl",
-        "--JOB_NAME": "etl-job", "--JOB_RUN_ID": "jr-test", **arguments,
+        "--assets-bucket": "ops",
+        "--settings-parameter": "/project/etl",
+        "--JOB_NAME": "etl-job",
+        "--JOB_RUN_ID": "jr-test",
+        **arguments,
     }
     argv = ["job.py"]
     for name, value in parameters.items():
@@ -212,27 +282,48 @@ def test_glue_start_omits_empty_optional_value_and_accepts_glue_argv(cloud, monk
     clients["ssm"].get_parameter.side_effect = ParsedArguments
     with pytest.raises(ParsedArguments):
         job.main()
-    clients["ssm"].get_parameter.assert_called_once_with(Name="/project/etl", WithDecryption=True)
+    clients["ssm"].get_parameter.assert_called_once_with(
+        Name="/project/etl", WithDecryption=True
+    )
 
 
-@pytest.mark.parametrize("kwargs", [
-    {"revision": "main"}, {"run_id": "../../bad"}, {"steps": "silver,crawl"},
-    {"steps": "crawl,crawl"}, {"steps": ""}, {"smoke": True, "promote": True},
-])
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"revision": "main"},
+        {"run_id": "../../bad"},
+        {"steps": "silver,crawl"},
+        {"steps": "crawl,crawl"},
+        {"steps": ""},
+        {"smoke": True, "promote": True},
+    ],
+)
 def test_invalid_job_inputs_are_rejected_before_start(cloud, kwargs):
-    base = dict(revision="e" * 40, bucket="ops", run_id="corpus-v1", steps=",".join(cloud.ETL_STEPS))
+    base = dict(
+        revision="e" * 40,
+        bucket="ops",
+        run_id="corpus-v1",
+        steps=",".join(cloud.ETL_STEPS),
+    )
     with pytest.raises(ValueError):
         cloud.glue_arguments(**{**base, **kwargs})
 
 
 def test_ssm_new_host_retry_does_not_hide_permission_errors(cloud, monkeypatch):
     client = Mock()
-    invalid = ClientError({"Error": {"Code": "InvalidInstanceId", "Message": "pending"}}, "SendCommand")
+    invalid = ClientError(
+        {"Error": {"Code": "InvalidInstanceId", "Message": "pending"}}, "SendCommand"
+    )
     client.send_command.side_effect = [invalid, {"Command": {"CommandId": "ok"}}]
     monkeypatch.setattr(cloud.time, "sleep", lambda _: None)
-    assert cloud.send_when_ready(client, InstanceIds=["i-test"])["Command"]["CommandId"] == "ok"
+    assert (
+        cloud.send_when_ready(client, InstanceIds=["i-test"])["Command"]["CommandId"]
+        == "ok"
+    )
     assert client.send_command.call_count == 2
-    client.send_command.side_effect = ClientError({"Error": {"Code": "AccessDenied", "Message": "denied"}}, "SendCommand")
+    client.send_command.side_effect = ClientError(
+        {"Error": {"Code": "AccessDenied", "Message": "denied"}}, "SendCommand"
+    )
     with pytest.raises(ClientError):
         cloud.send_when_ready(client, InstanceIds=["i-test"])
 
@@ -241,7 +332,11 @@ def test_saved_plan_guard_prevents_account_repo_and_source_changes():
     bootstrap = module("bootstrap_automation", "scripts/bootstrap_aws.py")
     record = {"account": "123", "repo": "owner/repo", "fingerprint": "same"}
     bootstrap.validate_record(record, "123", "owner/repo", "same")
-    for account, repo, signature in [("456", "owner/repo", "same"), ("123", "other/repo", "same"), ("123", "owner/repo", "changed")]:
+    for account, repo, signature in [
+        ("456", "owner/repo", "same"),
+        ("123", "other/repo", "same"),
+        ("123", "owner/repo", "changed"),
+    ]:
         with pytest.raises(ValueError, match="plan novamente"):
             bootstrap.validate_record(record, account, repo, signature)
 
@@ -284,19 +379,42 @@ def bootstrap_fixture(tmp_path, monkeypatch, cloud):
         (tf / name).write_bytes((ROOT / "infra/aws" / name).read_bytes())
     (tf / ".terraform.lock.hcl").write_text("fixture-lock")
     config = tf / "production.tfvars.json"
-    config.write_text(json.dumps({"project": "acartomanterag", "region": "us-east-1", "acme_email": "test@example.org", "budget_email": "test@example.org", "github_repository_id": "42", "ami_id": "ami-123abc"}))
+    config.write_text(
+        json.dumps(
+            {
+                "project": "acartomanterag",
+                "region": "us-east-1",
+                "acme_email": "test@example.org",
+                "budget_email": "test@example.org",
+                "github_repository_id": "42",
+                "ami_id": "ami-123abc",
+            }
+        )
+    )
     private = private_file(tmp_path)
-    for name, value in {"ROOT": tmp_path, "TF": tf, "PLAN": tf / "bootstrap.tfplan", "RECORD": tf / "bootstrap-plan.local.json", "OUTPUTS": tf / "outputs.local.json"}.items():
+    for name, value in {
+        "ROOT": tmp_path,
+        "TF": tf,
+        "PLAN": tf / "bootstrap.tfplan",
+        "RECORD": tf / "bootstrap-plan.local.json",
+        "OUTPUTS": tf / "outputs.local.json",
+    }.items():
         monkeypatch.setattr(bootstrap, name, value)
     aws = Mock()
-    aws.get_caller_identity.return_value = {"Account": "123456789012", "Arn": "arn:aws:iam::123456789012:user/terraform"}
+    aws.get_caller_identity.return_value = {
+        "Account": "123456789012",
+        "Arn": "arn:aws:iam::123456789012:user/terraform",
+    }
     monkeypatch.setattr(bootstrap.boto3, "client", lambda *a, **k: aws)
     calls = []
     output = {
         "github_oidc_subject": {"value": "repository_id:42:ref:refs/heads/main"},
-        "github_role_arn": {"value": "arn:aws:iam::123456789012:role/acartomanterag-github-deploy"},
+        "github_role_arn": {
+            "value": "arn:aws:iam::123456789012:role/acartomanterag-github-deploy"
+        },
         "region": {"value": "us-east-1"},
     }
+
     def execute(*arguments, capture=False):
         arguments = [str(value) for value in arguments]
         calls.append(arguments)
@@ -309,10 +427,25 @@ def bootstrap_fixture(tmp_path, monkeypatch, cloud):
         if "--check" in arguments:
             cloud.read_secret_file(private)
         return SimpleNamespace(stdout="")
+
     monkeypatch.setattr(bootstrap, "run", execute)
+
     def invoke(operation):
-        monkeypatch.setattr("sys.argv", ["bootstrap_aws.py", operation, "--repo", "owner/repo", "--env-file", str(private), "--config", str(config)])
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "bootstrap_aws.py",
+                operation,
+                "--repo",
+                "owner/repo",
+                "--env-file",
+                str(private),
+                "--config",
+                str(config),
+            ],
+        )
         bootstrap.main()
+
     return bootstrap, config, private, calls, output, invoke
 
 
@@ -326,8 +459,13 @@ def test_bootstrap_plan_then_apply_uses_saved_plan_and_file_path(bootstrap_fixtu
     assert apply[-1] == str(bootstrap.PLAN)
     assert any("--mirror-source" in args for args in calls)
     assert any("--terraform-config" in args and str(config) in args for args in calls)
-    assert any("--env-file" in args and str(private) in args and "--check" not in args for args in calls)
-    assert not any("read-key" in arg or "write-key" in arg for args in calls for arg in args)
+    assert any(
+        "--env-file" in args and str(private) in args and "--check" not in args
+        for args in calls
+    )
+    assert not any(
+        "read-key" in arg or "write-key" in arg for args in calls for arg in args
+    )
 
 
 def test_bootstrap_source_change_blocks_apply(bootstrap_fixture):
@@ -339,7 +477,9 @@ def test_bootstrap_source_change_blocks_apply(bootstrap_fixture):
     assert not any("apply" in args for args in calls)
 
 
-def test_configure_refuses_outputs_from_another_account_before_sending_secrets(bootstrap_fixture):
+def test_configure_refuses_outputs_from_another_account_before_sending_secrets(
+    bootstrap_fixture,
+):
     bootstrap, config, private, calls, output, invoke = bootstrap_fixture
     output["github_role_arn"]["value"] = "arn:aws:iam::999999999999:role/wrong"
     with pytest.raises(ValueError, match="nenhum segredo"):
@@ -355,9 +495,24 @@ def test_packager_uses_requested_archive_and_excludes_secrets(tmp_path, monkeypa
     (source / "src/example.py").write_text("VALUE = 'selected-revision'\n")
     (source / "config/config.yaml").write_text("example: true\n")
     (source / "config/config.aws.yaml").write_text("extends: config.yaml\n")
-    (source / "config/aws-bootstrap.env").write_text("QDRANT_WRITE_API_KEY=never-package\n")
+    (source / "config/aws-bootstrap.env").write_text(
+        "QDRANT_WRITE_API_KEY=never-package\n"
+    )
     (source / "infra/glue/job.py").write_text("print('selected-job')\n")
-    monkeypatch.setattr("sys.argv", ["package_release.py", "--source-root", str(source), "--sha", "f" * 40, "--only", "glue", "--output", str(tmp_path / "dist")])
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "package_release.py",
+            "--source-root",
+            str(source),
+            "--sha",
+            "f" * 40,
+            "--only",
+            "glue",
+            "--output",
+            str(tmp_path / "dist"),
+        ],
+    )
     package.main()
     assert not (tmp_path / "dist/bundle.tar.gz").exists()
     with zipfile.ZipFile(tmp_path / "dist/glue/source.zip") as archive:
@@ -367,15 +522,27 @@ def test_packager_uses_requested_archive_and_excludes_secrets(tmp_path, monkeypa
 
 
 def test_workflow_contract_orders_infra_before_api_and_separates_etl():
-    load = lambda name: yaml.load((ROOT / ".github/workflows" / name).read_text(), Loader=yaml.BaseLoader)
-    ci, infrastructure, etl = load("ci-cd.yml"), load("infrastructure.yml"), load("etl.yml")
+    load = lambda name: yaml.load(
+        (ROOT / ".github/workflows" / name).read_text(), Loader=yaml.BaseLoader
+    )
+    ci, infrastructure, etl = (
+        load("ci-cd.yml"),
+        load("infrastructure.yml"),
+        load("etl.yml"),
+    )
     assert ci["jobs"]["deploy"]["needs"] == ["validate", "infrastructure"]
     assert "AWS_APP_DEPLOY_ENABLED" in ci["jobs"]["deploy"]["if"]
     assert set(etl["on"]) == {"workflow_dispatch"}
     assert "workflow_call" in infrastructure["on"]
     for job in (ci["jobs"]["deploy"], infrastructure["jobs"]["terraform"]):
-        assert job["concurrency"] == {"group": "aws-production", "cancel-in-progress": "false"}
-    assert etl["concurrency"] == {"group": "aws-production", "cancel-in-progress": "false"}
+        assert job["concurrency"] == {
+            "group": "aws-production",
+            "cancel-in-progress": "false",
+        }
+    assert etl["concurrency"] == {
+        "group": "aws-production",
+        "cancel-in-progress": "false",
+    }
     assert all("concurrency" not in job for job in etl["jobs"].values())
     app_runs = "\n".join(step.get("run", "") for step in ci["jobs"]["deploy"]["steps"])
     assert "Dockerfile.wheels" not in app_runs and " cloud.py glue" not in app_runs
@@ -383,8 +550,15 @@ def test_workflow_contract_orders_infra_before_api_and_separates_etl():
 
 
 def private_tfvars_step():
-    workflow = yaml.load((ROOT / ".github/workflows/infrastructure.yml").read_text(), Loader=yaml.BaseLoader)
-    return workflow, next(step for step in workflow["jobs"]["terraform"]["steps"] if step.get("name") == "Validate operation and configuration")
+    workflow = yaml.load(
+        (ROOT / ".github/workflows/infrastructure.yml").read_text(),
+        Loader=yaml.BaseLoader,
+    )
+    return workflow, next(
+        step
+        for step in workflow["jobs"]["terraform"]["steps"]
+        if step.get("name") == "Validate operation and configuration"
+    )
 
 
 def run_private_tfvars_step(tmp_path, payload, **changes):
@@ -393,23 +567,54 @@ def run_private_tfvars_step(tmp_path, payload, **changes):
     (infra / "variables.tf").write_bytes((ROOT / "infra/aws/variables.tf").read_bytes())
     _, step = private_tfvars_step()
     environment = {
-        **os.environ, "OPERATION": "apply", "STATE_BUCKET": "private-state", "STATE_KEY": "production.tfstate",
-        "AWS_REGION": "us-east-1", "EXPECTED_REPOSITORY_ID": "42", "PRODUCTION_TFVARS_JSON": payload, **changes,
+        **os.environ,
+        "OPERATION": "apply",
+        "STATE_BUCKET": "private-state",
+        "STATE_KEY": "production.tfstate",
+        "AWS_REGION": "us-east-1",
+        "EXPECTED_REPOSITORY_ID": "42",
+        "PRODUCTION_TFVARS_JSON": payload,
+        **changes,
     }
-    return subprocess.run(["bash", "-e", "-o", "pipefail", "-c", step["run"]], cwd=tmp_path, env=environment, capture_output=True, text=True)
+    return subprocess.run(
+        ["bash", "-e", "-o", "pipefail", "-c", step["run"]],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+    )
 
 
 def test_private_tfvars_reaches_reusable_workflow_only():
-    ci = yaml.load((ROOT / ".github/workflows/ci-cd.yml").read_text(), Loader=yaml.BaseLoader)
+    ci = yaml.load(
+        (ROOT / ".github/workflows/ci-cd.yml").read_text(), Loader=yaml.BaseLoader
+    )
     workflow, step = private_tfvars_step()
-    assert workflow["on"]["workflow_call"]["secrets"] == {"TF_PRODUCTION_TFVARS_JSON": {"required": "true"}}
-    assert ci["jobs"]["infrastructure"]["secrets"] == {"TF_PRODUCTION_TFVARS_JSON": "${{ secrets.TF_PRODUCTION_TFVARS_JSON }}"}
-    assert step["env"]["PRODUCTION_TFVARS_JSON"] == "${{ secrets.TF_PRODUCTION_TFVARS_JSON }}"
-    assert all("TF_PRODUCTION_TFVARS_JSON" not in json.dumps(ci["jobs"][job]) for job in ("validate", "deploy"))
+    assert workflow["on"]["workflow_call"]["secrets"] == {
+        "TF_PRODUCTION_TFVARS_JSON": {"required": "true"}
+    }
+    assert ci["jobs"]["infrastructure"]["secrets"] == {
+        "TF_PRODUCTION_TFVARS_JSON": "${{ secrets.TF_PRODUCTION_TFVARS_JSON }}"
+    }
+    assert (
+        step["env"]["PRODUCTION_TFVARS_JSON"]
+        == "${{ secrets.TF_PRODUCTION_TFVARS_JSON }}"
+    )
+    assert all(
+        "TF_PRODUCTION_TFVARS_JSON" not in json.dumps(ci["jobs"][job])
+        for job in ("validate", "deploy")
+    )
 
 
-def test_private_tfvars_materializes_exact_payload_and_cleans_up_after_failure(tmp_path):
-    config = {"region": "us-east-1", "github_repository_id": "42", "ami_id": "ami-123abc", "domain": "example.test\n::error::$(touch injected)%"}
+def test_private_tfvars_materializes_exact_payload_and_cleans_up_after_failure(
+    tmp_path,
+):
+    config = {
+        "region": "us-east-1",
+        "github_repository_id": "42",
+        "ami_id": "ami-123abc",
+        "domain": "example.test\n::error::$(touch injected)%",
+    }
     payload = json.dumps(config, indent=2) + "\n"
     result = run_private_tfvars_step(tmp_path, payload)
     assert result.returncode == 0, result.stderr
@@ -419,27 +624,68 @@ def test_private_tfvars_materializes_exact_payload_and_cleans_up_after_failure(t
     assert not (tmp_path / "injected").exists()
     assert "\n::error::" not in result.stdout
     assert "example.test%0A::error::$(touch injected)%25" in result.stdout
-    assert all(line.startswith("::add-mask::") or line == "Configuração privada preparada; conteúdo omitido." for line in result.stdout.splitlines())
+    assert all(
+        line.startswith("::add-mask::")
+        or line == "Configuração privada preparada; conteúdo omitido."
+        for line in result.stdout.splitlines()
+    )
     plan = tmp_path / "deployment.tfplan"
     plan.write_text("private-plan")
     workflow, _ = private_tfvars_step()
     cleanup = workflow["jobs"]["terraform"]["steps"][-1]
     assert cleanup["if"] == "always()"
-    subprocess.run(["bash", "-e", "-c", cleanup["run"]], cwd=tmp_path, env={**os.environ, "RUNNER_TEMP": str(tmp_path)}, check=True)
+    subprocess.run(
+        ["bash", "-e", "-c", cleanup["run"]],
+        cwd=tmp_path,
+        env={**os.environ, "RUNNER_TEMP": str(tmp_path)},
+        check=True,
+    )
     assert not target.exists() and not plan.exists()
 
 
-@pytest.mark.parametrize("payload,changes,error", [
-    ("", {}, "cadastre o Secret"),
-    ('{"private-marker":', {}, "não contém JSON válido"),
-    ('["private-marker"]', {}, "apenas as variáveis"),
-    (json.dumps({"github_repository_id": "42", "AWS_SECRET_ACCESS_KEY": "private-marker"}), {}, "apenas as variáveis"),
-    (json.dumps({"github_repository_id": "99", "ami_id": "ami-123abc"}), {}, "ID do repositório"),
-    (json.dumps({"github_repository_id": "42", "region": "eu-west-1", "ami_id": "ami-123abc"}), {}, "região"),
-    (json.dumps({"github_repository_id": "42", "ami_id": None}), {}, "AMI fixada"),
-    (json.dumps({"github_repository_id": "42", "ami_id": "ami-123abc"}), {"OPERATION": "destroy"}, None),
-])
-def test_private_tfvars_refuses_invalid_configuration_without_logging_payload(tmp_path, payload, changes, error):
+@pytest.mark.parametrize(
+    "payload,changes,error",
+    [
+        ("", {}, "cadastre o Secret"),
+        ('{"private-marker":', {}, "não contém JSON válido"),
+        ('["private-marker"]', {}, "apenas as variáveis"),
+        (
+            json.dumps(
+                {
+                    "github_repository_id": "42",
+                    "AWS_SECRET_ACCESS_KEY": "private-marker",
+                }
+            ),
+            {},
+            "apenas as variáveis",
+        ),
+        (
+            json.dumps({"github_repository_id": "99", "ami_id": "ami-123abc"}),
+            {},
+            "ID do repositório",
+        ),
+        (
+            json.dumps(
+                {
+                    "github_repository_id": "42",
+                    "region": "eu-west-1",
+                    "ami_id": "ami-123abc",
+                }
+            ),
+            {},
+            "região",
+        ),
+        (json.dumps({"github_repository_id": "42", "ami_id": None}), {}, "AMI fixada"),
+        (
+            json.dumps({"github_repository_id": "42", "ami_id": "ami-123abc"}),
+            {"OPERATION": "destroy"},
+            None,
+        ),
+    ],
+)
+def test_private_tfvars_refuses_invalid_configuration_without_logging_payload(
+    tmp_path, payload, changes, error
+):
     result = run_private_tfvars_step(tmp_path, payload, **changes)
     assert result.returncode != 0
     assert not (tmp_path / "infra/aws/production.tfvars.json").exists()
@@ -454,25 +700,35 @@ def test_private_tfvars_refuses_symlink_destination(tmp_path):
     outside = tmp_path / "private-original.json"
     outside.write_text("preserve-original")
     (infra / "production.tfvars.json").symlink_to(outside)
-    result = run_private_tfvars_step(tmp_path, json.dumps({"github_repository_id": "42", "ami_id": "ami-123abc"}))
+    result = run_private_tfvars_step(
+        tmp_path, json.dumps({"github_repository_id": "42", "ami_id": "ami-123abc"})
+    )
     assert result.returncode != 0
     assert outside.read_text() == "preserve-original"
 
 
-@pytest.mark.parametrize("terminal", ["FAILED", "ERROR", "TIMEOUT", "STOPPED", "EXPIRED"])
+@pytest.mark.parametrize(
+    "terminal", ["FAILED", "ERROR", "TIMEOUT", "STOPPED", "EXPIRED"]
+)
 def test_glue_monitor_propagates_terminal_failures(cloud, terminal):
     client = Mock()
-    client.get_job_run.return_value = {"JobRun": {"JobRunState": terminal, "ErrorMessage": "diagnóstico"}}
+    client.get_job_run.return_value = {
+        "JobRun": {"JobRunState": terminal, "ErrorMessage": "diagnóstico"}
+    }
     with pytest.raises(RuntimeError, match=f"Glue {terminal}: diagnóstico"):
         cloud.wait_job(client, "etl-job", "jr_existing", wait_seconds=1)
     client.start_job_run.assert_not_called()
     client.batch_stop_job_run.assert_not_called()
 
 
-def test_glue_monitor_window_keeps_running_job_and_reports_heartbeat(cloud, monkeypatch, capsys):
+def test_glue_monitor_window_keeps_running_job_and_reports_heartbeat(
+    cloud, monkeypatch, capsys
+):
     clock = SimpleNamespace(now=0.0)
     monkeypatch.setattr(cloud.time, "monotonic", lambda: clock.now)
-    monkeypatch.setattr(cloud.time, "sleep", lambda seconds: setattr(clock, "now", clock.now + seconds))
+    monkeypatch.setattr(
+        cloud.time, "sleep", lambda seconds: setattr(clock, "now", clock.now + seconds)
+    )
     client = Mock()
     client.get_job_run.return_value = {"JobRun": {"JobRunState": "RUNNING"}}
     assert cloud.wait_job(client, "etl-job", "jr_existing", wait_seconds=305) is False
@@ -482,13 +738,18 @@ def test_glue_monitor_window_keeps_running_job_and_reports_heartbeat(cloud, monk
     assert "continua ativo" in log
     client.start_job_run.assert_not_called()
     client.batch_stop_job_run.assert_not_called()
-    assert all(call.kwargs == {"JobName": "etl-job", "RunId": "jr_existing"} for call in client.get_job_run.call_args_list)
+    assert all(
+        call.kwargs == {"JobName": "etl-job", "RunId": "jr_existing"}
+        for call in client.get_job_run.call_args_list
+    )
 
 
 def test_glue_monitor_recognizes_success_at_window_boundary(cloud, monkeypatch):
     clock = SimpleNamespace(now=0.0)
     monkeypatch.setattr(cloud.time, "monotonic", lambda: clock.now)
-    monkeypatch.setattr(cloud.time, "sleep", lambda seconds: setattr(clock, "now", clock.now + seconds))
+    monkeypatch.setattr(
+        cloud.time, "sleep", lambda seconds: setattr(clock, "now", clock.now + seconds)
+    )
     client = Mock()
     client.get_job_run.side_effect = [
         {"JobRun": {"JobRunState": "RUNNING"}},
@@ -500,15 +761,22 @@ def test_glue_monitor_recognizes_success_at_window_boundary(cloud, monkeypatch):
 
 
 @pytest.mark.parametrize("status, expected_exit", [("SUCCEEDED", None), ("RUNNING", 3)])
-def test_wait_glue_cli_only_observes_existing_execution(cloud, monkeypatch, status, expected_exit):
+def test_wait_glue_cli_only_observes_existing_execution(
+    cloud, monkeypatch, status, expected_exit
+):
     clients = {name: Mock() for name in ("ssm", "s3", "glue")}
     clients["glue"].get_job_run.return_value = {"JobRun": {"JobRunState": status}}
     clock = SimpleNamespace(now=0.0)
     monkeypatch.setattr(cloud.time, "monotonic", lambda: clock.now)
-    monkeypatch.setattr(cloud.time, "sleep", lambda seconds: setattr(clock, "now", clock.now + seconds))
+    monkeypatch.setattr(
+        cloud.time, "sleep", lambda seconds: setattr(clock, "now", clock.now + seconds)
+    )
     monkeypatch.setattr(cloud.boto3, "client", lambda name, **kwargs: clients[name])
     monkeypatch.setattr(cloud, "outputs", lambda path: {"glue_job": "etl-job"})
-    monkeypatch.setattr("sys.argv", ["cloud.py", "wait-glue", "--job-run-id", "jr_existing", "--wait-seconds", "1"])
+    monkeypatch.setattr(
+        "sys.argv",
+        ["cloud.py", "wait-glue", "--job-run-id", "jr_existing", "--wait-seconds", "1"],
+    )
     if expected_exit:
         with pytest.raises(SystemExit) as error:
             cloud.main()
@@ -521,12 +789,17 @@ def test_wait_glue_cli_only_observes_existing_execution(cloud, monkeypatch, stat
     assert not clients["ssm"].mock_calls
 
 
-@pytest.mark.parametrize("arguments", [
-    ["--job-run-id", "corpus-raw-v1"],
-    ["--job-run-id", "jr_existing", "--wait-seconds", "0"],
-    ["--job-run-id", "jr_existing", "--wait-seconds", "8101"],
-])
-def test_wait_glue_rejects_invalid_identity_and_window_before_aws(cloud, monkeypatch, arguments):
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["--job-run-id", "corpus-raw-v1"],
+        ["--job-run-id", "jr_existing", "--wait-seconds", "0"],
+        ["--job-run-id", "jr_existing", "--wait-seconds", "8101"],
+    ],
+)
+def test_wait_glue_rejects_invalid_identity_and_window_before_aws(
+    cloud, monkeypatch, arguments
+):
     client = Mock(side_effect=AssertionError("não deve consultar AWS"))
     monkeypatch.setattr(cloud.boto3, "client", client)
     monkeypatch.setattr("sys.argv", ["cloud.py", "wait-glue", *arguments])
@@ -537,17 +810,33 @@ def test_wait_glue_rejects_invalid_identity_and_window_before_aws(cloud, monkeyp
 
 
 @pytest.mark.parametrize("already_exists", [False, True])
-def test_glue_start_exports_only_created_run_id_and_preserves_existing_file(tmp_path, cloud, monkeypatch, already_exists):
+def test_glue_start_exports_only_created_run_id_and_preserves_existing_file(
+    tmp_path, cloud, monkeypatch, already_exists
+):
     clients = {name: Mock() for name in ("ssm", "s3", "glue")}
     clients["s3"].list_objects_v2.return_value = {}
     clients["glue"].start_job_run.return_value = {"JobRunId": "jr_created"}
     monkeypatch.setattr(cloud.boto3, "client", lambda name, **kwargs: clients[name])
-    monkeypatch.setattr(cloud, "outputs", lambda path: {"ops_bucket": "ops", "glue_job": "etl-job"})
+    monkeypatch.setattr(
+        cloud, "outputs", lambda path: {"ops_bucket": "ops", "glue_job": "etl-job"}
+    )
     monkeypatch.setattr(cloud, "bundle_manifest", lambda *args: {"revision": "d" * 40})
     path = tmp_path / "glue-run-id"
     if already_exists:
         path.write_text("jr_previous\n")
-    monkeypatch.setattr("sys.argv", ["cloud.py", "glue", "--revision", "d" * 40, "--run-id", "corpus-v1", "--run-id-file", str(path)])
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "cloud.py",
+            "glue",
+            "--revision",
+            "d" * 40,
+            "--run-id",
+            "corpus-v1",
+            "--run-id-file",
+            str(path),
+        ],
+    )
     if already_exists:
         with pytest.raises(SystemExit) as error:
             cloud.main()
@@ -562,42 +851,80 @@ def test_glue_start_exports_only_created_run_id_and_preserves_existing_file(tmp_
 
 
 def test_etl_workflow_keeps_one_glue_run_and_requires_success_after_all_windows():
-    workflow = yaml.load((ROOT / ".github/workflows/etl.yml").read_text(), Loader=yaml.BaseLoader)
+    workflow = yaml.load(
+        (ROOT / ".github/workflows/etl.yml").read_text(), Loader=yaml.BaseLoader
+    )
     jobs = workflow["jobs"]
-    commands = lambda name: "\n".join(step.get("run", "") for step in jobs[name]["steps"])
+    commands = lambda name: "\n".join(
+        step.get("run", "") for step in jobs[name]["steps"]
+    )
     assert "--run-id-file" in commands("etl") and "--wait " not in commands("etl")
     assert "--expected-timeout-minutes 600" in commands("etl")
-    assert jobs["etl"]["outputs"]["glue_run_id"] == "${{ steps.start.outputs.glue_run_id }}"
+    assert (
+        jobs["etl"]["outputs"]["glue_run_id"]
+        == "${{ steps.start.outputs.glue_run_id }}"
+    )
     monitor = jobs["monitor"]
     assert monitor["needs"] == "etl"
     assert monitor["strategy"]["max-parallel"] == "1"
     assert len(monitor["strategy"]["matrix"]["window"]) * 135 > 600
-    assert "wait-glue" in commands("monitor") and '"$result" -ne 3' in commands("monitor")
+    assert "wait-glue" in commands("monitor") and '"$result" -ne 3' in commands(
+        "monitor"
+    )
     assert jobs["finish"]["needs"] == ["etl", "monitor"]
     final_steps = jobs["finish"]["steps"]
-    confirmation = next(i for i, step in enumerate(final_steps) if "Require Glue success" in step.get("name", ""))
-    reload = next(i for i, step in enumerate(final_steps) if "Reload application" in step.get("name", ""))
+    confirmation = next(
+        i
+        for i, step in enumerate(final_steps)
+        if "Require Glue success" in step.get("name", "")
+    )
+    reload = next(
+        i
+        for i, step in enumerate(final_steps)
+        if "Reload application" in step.get("name", "")
+    )
     assert confirmation < reload
     assert "||" not in final_steps[confirmation]["run"]
     for name in ("monitor", "finish"):
-        assert jobs[name]["env"]["GLUE_RUN_ID"] == "${{ needs.etl.outputs.glue_run_id }}"
+        assert (
+            jobs[name]["env"]["GLUE_RUN_ID"] == "${{ needs.etl.outputs.glue_run_id }}"
+        )
         assert "--run-id-file" not in commands(name)
         assert "promote" not in commands(name)
     for job in jobs.values():
         assert int(job["timeout-minutes"]) < 180
-        assert any("configure-aws-credentials@" in step.get("uses", "") for step in job["steps"])
+        assert any(
+            "configure-aws-credentials@" in step.get("uses", "")
+            for step in job["steps"]
+        )
 
 
 @pytest.mark.parametrize("provisioned_timeout", [120, 600, None])
-def test_glue_requires_provisioned_timeout_before_start(cloud, monkeypatch, provisioned_timeout):
+def test_glue_requires_provisioned_timeout_before_start(
+    cloud, monkeypatch, provisioned_timeout
+):
     clients = {name: Mock() for name in ("ssm", "s3", "glue")}
     clients["s3"].list_objects_v2.return_value = {}
     clients["glue"].get_job.return_value = {"Job": {"Timeout": provisioned_timeout}}
     clients["glue"].start_job_run.return_value = {"JobRunId": "jr_created"}
     monkeypatch.setattr(cloud.boto3, "client", lambda name, **kwargs: clients[name])
-    monkeypatch.setattr(cloud, "outputs", lambda path: {"ops_bucket": "ops", "glue_job": "etl-job"})
+    monkeypatch.setattr(
+        cloud, "outputs", lambda path: {"ops_bucket": "ops", "glue_job": "etl-job"}
+    )
     monkeypatch.setattr(cloud, "bundle_manifest", lambda *args: {"revision": "d" * 40})
-    monkeypatch.setattr("sys.argv", ["cloud.py", "glue", "--revision", "d" * 40, "--run-id", "corpus-v1", "--expected-timeout-minutes", "600"])
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "cloud.py",
+            "glue",
+            "--revision",
+            "d" * 40,
+            "--run-id",
+            "corpus-v1",
+            "--expected-timeout-minutes",
+            "600",
+        ],
+    )
     if provisioned_timeout == 600:
         cloud.main()
         clients["glue"].start_job_run.assert_called_once()

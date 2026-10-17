@@ -1,5 +1,5 @@
 # Fonte única de dependências. Python 3.11+; API 3.12 e Glue 5.1/3.11.
-# python scripts/dependencies.py install runtime|glue|ci|crawler|ops|tools
+# python scripts/dependencies.py install runtime|glue|ci|crawler|ops|tools|format
 # Pins de runtime/Glue migrados sem atualização; diferenças 3.11/3.12 usam markers PEP 508.
 [dependency-groups]
 runtime = [
@@ -123,6 +123,7 @@ crawler = [
 
 ci = [
     {include-group = "crawler"},
+    {include-group = "format"},
     "langchain-core", "langchain-ollama", "langgraph", "transformers",
     "fastapi", "redis", "qdrant-client", "httpx", "pydantic", "PyYAML",
     "python-dotenv", "markdown-it-py",
@@ -135,6 +136,28 @@ tools = [
     {include-group = "glue"},
     "spacy", "plotly", "statsmodels", "pytest>=8,<10",
 ]
+
+format = ["black==26.10.1", "pre-commit==4.7.0"]
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+# Também vale para nomes explícitos recebidos pelo hook.
+force-exclude = '''
+/(
+    \.git
+  | \.terraform
+  | \.venv[^/]*
+  | venv
+  | __pycache__
+  | node_modules
+  | site-packages
+  | Dataset
+  | Volumes
+  | build
+  | dist
+)/
+'''
 
 [tool.acartomante.dependencies]
 # Os pins de produção também restringem os perfis leves ao instalar.

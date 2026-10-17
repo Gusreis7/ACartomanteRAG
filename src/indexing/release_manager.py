@@ -29,10 +29,14 @@ class ReleaseManager:
         key = f"releases/{release}.json"
         if not self.rustfs.object_exists(bucket=bucket, key=key):
             raise FileNotFoundError(f"Release não publicada: s3://{bucket}/{key}")
-        payload = json.loads(self.rustfs.download_bytes(bucket=bucket, key=key).decode("utf-8"))
+        payload = json.loads(
+            self.rustfs.download_bytes(bucket=bucket, key=key).decode("utf-8")
+        )
         if payload.get("release_version") != self.RELEASE_VERSION:
             raise ValueError("Versão de release não suportada.")
-        return ReleasePointer(release, str(payload["index_id"]), str(payload["published_at_utc"]))
+        return ReleasePointer(
+            release, str(payload["index_id"]), str(payload["published_at_utc"])
+        )
 
     def publish(self, index_id: str, release: str) -> ReleasePointer:
         release = self._validate_name(release)
@@ -45,9 +49,19 @@ class ReleaseManager:
         if not str(manifest.get("qdrant", {}).get("collection", "")).strip():
             raise ValueError("Manifest não possui qdrant.collection.")
         now = datetime.now(timezone.utc).isoformat()
-        payload = {"release_version": 1, "release": release, "index_id": index_id, "published_at_utc": now}
+        payload = {
+            "release_version": 1,
+            "release": release,
+            "index_id": index_id,
+            "published_at_utc": now,
+        }
         bucket = self.config.storage.embedding_indexes_bucket
-        self.rustfs.upload_bytes(bucket=bucket, key=f"releases/{release}.json", data=json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8"), content_type="application/json")
+        self.rustfs.upload_bytes(
+            bucket=bucket,
+            key=f"releases/{release}.json",
+            data=json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8"),
+            content_type="application/json",
+        )
         return ReleasePointer(release, index_id, now)
 
     def load_index_manifest(self, index_id: str) -> dict[str, Any]:
@@ -55,24 +69,19 @@ class ReleaseManager:
         key = f"{index_id}/manifest.json"
         if not self.rustfs.object_exists(bucket=bucket, key=key):
             raise FileNotFoundError(f"Manifest não encontrado: s3://{bucket}/{key}")
-        return json.loads(self.rustfs.download_bytes(bucket=bucket, key=key).decode("utf-8"))
+        return json.loads(
+            self.rustfs.download_bytes(bucket=bucket, key=key).decode("utf-8")
+        )
 
     def exists(
         self,
         release: str = "default",
     ) -> bool:
-        release = self._validate_name(
-            release
-        )
+        release = self._validate_name(release)
 
-        bucket = (
-            self.config.storage
-            .embedding_indexes_bucket
-        )
+        bucket = self.config.storage.embedding_indexes_bucket
 
-        key = (
-            f"releases/{release}.json"
-        )
+        key = f"releases/{release}.json"
 
         return self.rustfs.object_exists(
             bucket=bucket,
@@ -85,9 +94,7 @@ class ReleaseManager:
         release: str = "default",
     ) -> bool:
         """Publica somente se a release ainda não existir."""
-        release = self._validate_name(
-            release
-        )
+        release = self._validate_name(release)
 
         if self.exists(release):
             return False
@@ -102,7 +109,9 @@ class ReleaseManager:
     @staticmethod
     def _validate_name(name: str) -> str:
         name = str(name).strip()
-        allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")
+        allowed = set(
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+        )
         if not name or any(char not in allowed for char in name):
             raise ValueError("Nome de release inválido.")
         return name

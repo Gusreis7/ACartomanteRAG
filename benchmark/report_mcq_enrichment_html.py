@@ -16,7 +16,6 @@ from benchmark.matrix import BENCHMARK_PREFIX
 from src.config.config_manager import ConfigManager
 from src.storage.rustfs_manager import RustFSManager
 
-
 PAIR_KEYS = ["query_id", "config_id", "model"]
 REPORT_NAME = "mcq_enrichment_vs_baseline.html"
 
@@ -82,14 +81,10 @@ def load_run(
     )
 
     if str(manifest.get("status")) != "success":
-        raise RuntimeError(
-            f"Run {run_id} não está com status=success."
-        )
+        raise RuntimeError(f"Run {run_id} não está com status=success.")
 
     if str(config.get("phase")) != "mcq":
-        raise RuntimeError(
-            f"Run {run_id} não pertence à fase MCQ."
-        )
+        raise RuntimeError(f"Run {run_id} não pertence à fase MCQ.")
 
     results = read_parquet(
         storage,
@@ -132,10 +127,7 @@ def scalar(value: Any) -> Any:
         except Exception:
             pass
 
-    if (
-        isinstance(value, float)
-        and not math.isfinite(value)
-    ):
+    if isinstance(value, float) and not math.isfinite(value):
         return None
 
     return value
@@ -181,11 +173,7 @@ def numeric_p95(
         errors="coerce",
     ).dropna()
 
-    return (
-        float(values.quantile(0.95))
-        if len(values)
-        else 0.0
-    )
+    return float(values.quantile(0.95)) if len(values) else 0.0
 
 
 def rate(
@@ -195,11 +183,7 @@ def rate(
     if column not in frame.columns or frame.empty:
         return 0.0
 
-    return float(
-        frame[column]
-        .astype(float)
-        .mean()
-    )
+    return float(frame[column].astype(float).mean())
 
 
 def bootstrap_delta(
@@ -217,11 +201,7 @@ def bootstrap_delta(
         .astype(float)
     )
 
-    observed = (
-        float(values.mean())
-        if len(values)
-        else 0.0
-    )
+    observed = float(values.mean()) if len(values) else 0.0
 
     if runs <= 0 or len(values) <= 1:
         return {
@@ -296,9 +276,7 @@ def aggregate(
 
     return {
         "rows": int(len(frame)),
-        "queries": int(
-            frame["query_id"].nunique()
-        ),
+        "queries": int(frame["query_id"].nunique()),
         "baseline_accuracy": rate(
             frame,
             "is_correct_baseline",
@@ -310,24 +288,9 @@ def aggregate(
         "accuracy_delta": boot["delta"],
         "ci95_low": boot["low"],
         "ci95_high": boot["high"],
-        "improved_rows": int(
-            (
-                frame["accuracy_delta"]
-                > 0
-            ).sum()
-        ),
-        "regressed_rows": int(
-            (
-                frame["accuracy_delta"]
-                < 0
-            ).sum()
-        ),
-        "unchanged_rows": int(
-            (
-                frame["accuracy_delta"]
-                == 0
-            ).sum()
-        ),
+        "improved_rows": int((frame["accuracy_delta"] > 0).sum()),
+        "regressed_rows": int((frame["accuracy_delta"] < 0).sum()),
+        "unchanged_rows": int((frame["accuracy_delta"] == 0).sum()),
         "baseline_ambiguous": rate(
             frame,
             "is_ambiguous_baseline",
@@ -354,10 +317,7 @@ def aggregate(
         ),
         "baseline_latency_mean_ms": base_latency,
         "enriched_latency_mean_ms": enr_latency,
-        "latency_delta_ms": (
-            enr_latency
-            - base_latency
-        ),
+        "latency_delta_ms": (enr_latency - base_latency),
         "baseline_latency_p95_ms": numeric_p95(
             frame,
             "generation_latency_ms_baseline",
@@ -368,10 +328,7 @@ def aggregate(
         ),
         "baseline_input_tokens_mean": base_tokens,
         "enriched_input_tokens_mean": enr_tokens,
-        "input_tokens_delta": (
-            enr_tokens
-            - base_tokens
-        ),
+        "input_tokens_delta": (enr_tokens - base_tokens),
         "enrichment_context_chars_mean": numeric_mean(
             frame,
             "enrichment_context_chars_enriched",
@@ -442,30 +399,15 @@ def load_config_labels(
         start=1,
     ):
         row = dict(item)
-        config_id = str(
-            row.get("config_id")
-            or ""
-        ).strip()
+        config_id = str(row.get("config_id") or "").strip()
 
         if not config_id:
             continue
 
-        strategy = str(
-            row.get("chunk_strategy")
-            or ""
-        )
-        size = str(
-            row.get("chunk_size")
-            or ""
-        )
-        retrieval = str(
-            row.get("retrieval_strategy")
-            or ""
-        )
-        embedder = str(
-            row.get("embedder")
-            or ""
-        )
+        strategy = str(row.get("chunk_strategy") or "")
+        size = str(row.get("chunk_size") or "")
+        retrieval = str(row.get("retrieval_strategy") or "")
+        embedder = str(row.get("embedder") or "")
 
         head = "/".join(
             value
@@ -488,14 +430,8 @@ def load_config_labels(
 
         output[config_id] = {
             **row,
-            "selection_rank": int(
-                row.get("selection_rank")
-                or index
-            ),
-            "label": (
-                label
-                or config_id
-            ),
+            "selection_rank": int(row.get("selection_rank") or index),
+            "label": (label or config_id),
         }
 
     return output
@@ -566,28 +502,10 @@ def build_question_rows(
                 ),
                 "baseline_accuracy": baseline,
                 "enriched_accuracy": enriched,
-                "accuracy_delta": (
-                    enriched
-                    - baseline
-                ),
-                "improved_rows": int(
-                    (
-                        group["accuracy_delta"]
-                        > 0
-                    ).sum()
-                ),
-                "regressed_rows": int(
-                    (
-                        group["accuracy_delta"]
-                        < 0
-                    ).sum()
-                ),
-                "unchanged_rows": int(
-                    (
-                        group["accuracy_delta"]
-                        == 0
-                    ).sum()
-                ),
+                "accuracy_delta": (enriched - baseline),
+                "improved_rows": int((group["accuracy_delta"] > 0).sum()),
+                "regressed_rows": int((group["accuracy_delta"] < 0).sum()),
+                "unchanged_rows": int((group["accuracy_delta"] == 0).sum()),
                 "enrichment_context_chars_mean": numeric_mean(
                     group,
                     "enrichment_context_chars_enriched",
@@ -597,9 +515,7 @@ def build_question_rows(
 
     rows.sort(
         key=lambda item: (
-            -float(
-                item["accuracy_delta"]
-            ),
+            -float(item["accuracy_delta"]),
             item["query_id"],
         )
     )
@@ -612,11 +528,7 @@ def parse_hits(value: Any) -> list[dict[str, Any]]:
         return []
 
     if isinstance(value, list):
-        return [
-            dict(item)
-            for item in value
-            if isinstance(item, dict)
-        ]
+        return [dict(item) for item in value if isinstance(item, dict)]
 
     text = str(value).strip()
 
@@ -631,11 +543,7 @@ def parse_hits(value: Any) -> list[dict[str, Any]]:
     if not isinstance(payload, list):
         return []
 
-    return [
-        dict(item)
-        for item in payload
-        if isinstance(item, dict)
-    ]
+    return [dict(item) for item in payload if isinstance(item, dict)]
 
 
 def build_hit_samples(
@@ -648,35 +556,22 @@ def build_hit_samples(
     if (
         contexts is None
         or contexts.empty
-        or (
-            "enrichment_hits_json"
-            not in contexts.columns
-        )
+        or ("enrichment_hits_json" not in contexts.columns)
     ):
         return []
 
-    unique = (
-        contexts
-        .drop_duplicates(
-            [
-                "query_id",
-                "config_id",
-            ]
-        )
-        .head(limit)
-    )
+    unique = contexts.drop_duplicates(
+        [
+            "query_id",
+            "config_id",
+        ]
+    ).head(limit)
 
     rows = []
 
     for _, row in unique.iterrows():
-        query_id = str(
-            row.get("query_id")
-            or ""
-        )
-        config_id = str(
-            row.get("config_id")
-            or ""
-        )
+        query_id = str(row.get("query_id") or "")
+        config_id = str(row.get("config_id") or "")
 
         question = question_lookup.get(
             query_id,
@@ -704,38 +599,12 @@ def build_hit_samples(
                     "label",
                     config_id,
                 ),
-                "embedder": scalar(
-                    row.get(
-                        "enrichment_embedder"
-                    )
-                ),
-                "index_id": scalar(
-                    row.get(
-                        "enrichment_index_id"
-                    )
-                ),
-                "collection": scalar(
-                    row.get(
-                        "enrichment_collection"
-                    )
-                ),
-                "context_chars": int(
-                    row.get(
-                        "enrichment_context_chars"
-                    )
-                    or 0
-                ),
-                "hit_count": int(
-                    row.get(
-                        "enrichment_hit_count"
-                    )
-                    or 0
-                ),
-                "hits": parse_hits(
-                    row.get(
-                        "enrichment_hits_json"
-                    )
-                ),
+                "embedder": scalar(row.get("enrichment_embedder")),
+                "index_id": scalar(row.get("enrichment_index_id")),
+                "collection": scalar(row.get("enrichment_collection")),
+                "context_chars": int(row.get("enrichment_context_chars") or 0),
+                "hit_count": int(row.get("enrichment_hit_count") or 0),
+                "hits": parse_hits(row.get("enrichment_hits_json")),
             }
         )
 
@@ -746,8 +615,7 @@ def build_transitions(
     paired: pd.DataFrame,
 ) -> list[dict[str, Any]]:
     grouped = (
-        paired
-        .groupby(
+        paired.groupby(
             [
                 "selected_class_baseline",
                 "selected_class_enriched",
@@ -755,9 +623,7 @@ def build_transitions(
             dropna=False,
         )
         .size()
-        .reset_index(
-            name="n"
-        )
+        .reset_index(name="n")
     )
 
     rows = []
@@ -765,16 +631,8 @@ def build_transitions(
     for _, row in grouped.iterrows():
         rows.append(
             {
-                "baseline": str(
-                    row[
-                        "selected_class_baseline"
-                    ]
-                ),
-                "enriched": str(
-                    row[
-                        "selected_class_enriched"
-                    ]
-                ),
+                "baseline": str(row["selected_class_baseline"]),
+                "enriched": str(row["selected_class_enriched"]),
                 "n": int(row["n"]),
             }
         )
@@ -793,7 +651,7 @@ def build_transitions(
 def render_html(
     payload: dict[str, Any],
 ) -> str:
-    template = r'''<!doctype html>
+    template = r"""<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
@@ -1118,7 +976,7 @@ function init(){
 init();
 </script>
 </body>
-</html>'''
+</html>"""
 
     return template.replace(
         "__DATA__",
@@ -1130,14 +988,10 @@ def main() -> None:
     args = parse_args()
 
     if args.bootstrap_runs < 0:
-        raise ValueError(
-            "--bootstrap-runs deve ser >= 0."
-        )
+        raise ValueError("--bootstrap-runs deve ser >= 0.")
 
     config = ConfigManager.load()
-    storage = RustFSManager.from_config(
-        config.environment.rustfs
-    )
+    storage = RustFSManager.from_config(config.environment.rustfs)
     bucket = config.storage.benchmarks_bucket
 
     (
@@ -1162,25 +1016,11 @@ def main() -> None:
         args.enriched_run_id,
     )
 
-    if bool(
-        (
-            base_cfg.get("enrichment")
-            or {}
-        ).get("enabled", False)
-    ):
-        raise RuntimeError(
-            "O baseline informado já possui enrichment."
-        )
+    if bool((base_cfg.get("enrichment") or {}).get("enabled", False)):
+        raise RuntimeError("O baseline informado já possui enrichment.")
 
-    if not bool(
-        (
-            enr_cfg.get("enrichment")
-            or {}
-        ).get("enabled", False)
-    ):
-        raise RuntimeError(
-            "O run enriched informado não possui enrichment."
-        )
+    if not bool((enr_cfg.get("enrichment") or {}).get("enabled", False)):
+        raise RuntimeError("O run enriched informado não possui enrichment.")
 
     source_retrieval = str(
         base_cfg.get("source_retrieval_run_id")
@@ -1194,21 +1034,11 @@ def main() -> None:
         or ""
     )
 
-    if (
-        source_retrieval
-        != enriched_source_retrieval
-    ):
-        raise RuntimeError(
-            "Os runs usam source_retrieval_run_id diferentes."
-        )
+    if source_retrieval != enriched_source_retrieval:
+        raise RuntimeError("Os runs usam source_retrieval_run_id diferentes.")
 
-    if (
-        base_cfg.get("benchmark_sha256")
-        != enr_cfg.get("benchmark_sha256")
-    ):
-        raise RuntimeError(
-            "Os runs usam benchmark_sha256 diferentes."
-        )
+    if base_cfg.get("benchmark_sha256") != enr_cfg.get("benchmark_sha256"):
+        raise RuntimeError("Os runs usam benchmark_sha256 diferentes.")
 
     required = set(
         PAIR_KEYS
@@ -1225,22 +1055,13 @@ def main() -> None:
         ("baseline", baseline),
         ("enriched", enriched),
     ):
-        missing = sorted(
-            required
-            - set(frame.columns)
-        )
+        missing = sorted(required - set(frame.columns))
 
         if missing:
-            raise RuntimeError(
-                f"{label} sem colunas obrigatórias: {missing}"
-            )
+            raise RuntimeError(f"{label} sem colunas obrigatórias: {missing}")
 
-        if frame.duplicated(
-            PAIR_KEYS
-        ).any():
-            raise RuntimeError(
-                f"{label} possui pares duplicados."
-            )
+        if frame.duplicated(PAIR_KEYS).any():
+            raise RuntimeError(f"{label} possui pares duplicados.")
 
     paired = baseline.merge(
         enriched,
@@ -1253,10 +1074,7 @@ def main() -> None:
         validate="one_to_one",
     )
 
-    if (
-        len(paired) != len(baseline)
-        or len(paired) != len(enriched)
-    ):
+    if len(paired) != len(baseline) or len(paired) != len(enriched):
         raise RuntimeError(
             "Baseline e enriched não possuem o mesmo escopo. "
             f"baseline={len(baseline)} "
@@ -1264,10 +1082,9 @@ def main() -> None:
             f"paired={len(paired)}"
         )
 
-    paired["accuracy_delta"] = (
-        paired["is_correct_enriched"].astype(int)
-        - paired["is_correct_baseline"].astype(int)
-    )
+    paired["accuracy_delta"] = paired["is_correct_enriched"].astype(int) - paired[
+        "is_correct_baseline"
+    ].astype(int)
 
     overall = aggregate(
         paired,
@@ -1302,85 +1119,43 @@ def main() -> None:
             row["config_id"],
             {},
         )
-        row["label"] = (
-            meta.get("label")
-            or row["config_id"]
-        )
-        row["selection_rank"] = (
-            meta.get("selection_rank")
-        )
-        row["embedder"] = (
-            meta.get("embedder")
-        )
-        row["retrieval_strategy"] = (
-            meta.get("retrieval_strategy")
-        )
-        row["chunk_strategy"] = (
-            meta.get("chunk_strategy")
-        )
-        row["chunk_size"] = (
-            meta.get("chunk_size")
-        )
+        row["label"] = meta.get("label") or row["config_id"]
+        row["selection_rank"] = meta.get("selection_rank")
+        row["embedder"] = meta.get("embedder")
+        row["retrieval_strategy"] = meta.get("retrieval_strategy")
+        row["chunk_strategy"] = meta.get("chunk_strategy")
+        row["chunk_size"] = meta.get("chunk_size")
 
     configs.sort(
         key=lambda item: (
-            int(
-                item.get("selection_rank")
-                or 999
-            ),
+            int(item.get("selection_rank") or 999),
             item["config_id"],
         )
     )
 
-    questions = build_question_rows(
-        paired
-    )
+    questions = build_question_rows(paired)
 
-    question_lookup = {
-        item["query_id"]: item
-        for item in questions
-    }
+    question_lookup = {item["query_id"]: item for item in questions}
 
     payload = {
-        "baseline_run_id": (
-            args.baseline_run_id
-        ),
-        "enriched_run_id": (
-            args.enriched_run_id
-        ),
-        "source_retrieval_run_id": (
-            source_retrieval
-        ),
+        "baseline_run_id": (args.baseline_run_id),
+        "enriched_run_id": (args.enriched_run_id),
+        "source_retrieval_run_id": (source_retrieval),
         "bootstrap": {
             "unit": "query_id",
             "runs": args.bootstrap_runs,
             "seed": args.seed,
         },
-        "enrichment": (
-            enr_cfg.get("enrichment")
-            or {}
-        ),
+        "enrichment": (enr_cfg.get("enrichment") or {}),
         "overall": overall,
         "models": [
-            {
-                key: scalar(value)
-                for key, value
-                in row.items()
-            }
-            for row in models
+            {key: scalar(value) for key, value in row.items()} for row in models
         ],
         "configs": [
-            {
-                key: scalar(value)
-                for key, value
-                in row.items()
-            }
-            for row in configs
+            {key: scalar(value) for key, value in row.items()} for row in configs
         ],
         "questions": questions,
-        "transitions": build_transitions(
-            paired
-        ),
+        "transitions": build_transitions(paired),
         "enrichment_samples": build_hit_samples(
             enr_contexts,
             question_lookup,
@@ -1388,19 +1163,10 @@ def main() -> None:
         ),
     }
 
-    html = render_html(
-        payload
-    )
+    html = render_html(payload)
 
-    output = (
-        args.output
-        or (
-            Path("reports")
-            / (
-                "mcq_enrichment_"
-                f"{args.enriched_run_id}.html"
-            )
-        )
+    output = args.output or (
+        Path("reports") / ("mcq_enrichment_" f"{args.enriched_run_id}.html")
     )
 
     output.parent.mkdir(
@@ -1413,29 +1179,13 @@ def main() -> None:
         encoding="utf-8",
     )
 
-    print(
-        "=== MCQ ENRICHMENT REPORT OK ==="
-    )
-    print(
-        f"baseline: {args.baseline_run_id}"
-    )
-    print(
-        f"enriched: {args.enriched_run_id}"
-    )
-    print(
-        f"paired rows: {overall['rows']}"
-    )
-    print(
-        f"queries: {overall['queries']}"
-    )
-    print(
-        "baseline accuracy: "
-        f"{overall['baseline_accuracy']:.3f}"
-    )
-    print(
-        "enriched accuracy: "
-        f"{overall['enriched_accuracy']:.3f}"
-    )
+    print("=== MCQ ENRICHMENT REPORT OK ===")
+    print(f"baseline: {args.baseline_run_id}")
+    print(f"enriched: {args.enriched_run_id}")
+    print(f"paired rows: {overall['rows']}")
+    print(f"queries: {overall['queries']}")
+    print("baseline accuracy: " f"{overall['baseline_accuracy']:.3f}")
+    print("enriched accuracy: " f"{overall['enriched_accuracy']:.3f}")
     print(
         "delta: "
         f"{overall['accuracy_delta']:+.3f} "
@@ -1443,9 +1193,7 @@ def main() -> None:
         f"{overall['ci95_low']:+.3f}, "
         f"{overall['ci95_high']:+.3f}]"
     )
-    print(
-        f"local: {output.resolve()}"
-    )
+    print(f"local: {output.resolve()}")
 
     if not args.no_upload:
         key = (
@@ -1458,19 +1206,13 @@ def main() -> None:
             bucket,
             key,
             html.encode("utf-8"),
-            content_type=(
-                "text/html; charset=utf-8"
-            ),
+            content_type=("text/html; charset=utf-8"),
         )
 
-        print(
-            f"rustfs: s3://{bucket}/{key}"
-        )
+        print(f"rustfs: s3://{bucket}/{key}")
 
     if args.open:
-        webbrowser.open(
-            output.resolve().as_uri()
-        )
+        webbrowser.open(output.resolve().as_uri())
 
 
 if __name__ == "__main__":

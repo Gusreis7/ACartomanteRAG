@@ -39,28 +39,14 @@ import pymupdf
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 DEFAULT_INPUT_METADATA = (
-    PROJECT_ROOT
-    / "Dataset"
-    / "metadata"
-    / "obras_machado_assis_deduplicadas.csv"
+    PROJECT_ROOT / "Dataset" / "metadata" / "obras_machado_assis_deduplicadas.csv"
 )
 
-DEFAULT_BRONZE_DIR = (
-    PROJECT_ROOT
-    / "Dataset"
-    / "bronze"
-)
+DEFAULT_BRONZE_DIR = PROJECT_ROOT / "Dataset" / "bronze"
 
-DEFAULT_BRONZE_METADATA_DIR = (
-    PROJECT_ROOT
-    / "Dataset"
-    / "metadata"
-    / "bronze"
-)
+DEFAULT_BRONZE_METADATA_DIR = PROJECT_ROOT / "Dataset" / "metadata" / "bronze"
 
-DEFAULT_OUTPUT_METADATA_NAME = (
-    "obras_machado_assis_bronze.csv"
-)
+DEFAULT_OUTPUT_METADATA_NAME = "obras_machado_assis_bronze.csv"
 
 DEFAULT_SIMILARIDADE_THRESHOLD = 0.1
 DEFAULT_QTD_TITULOS_COLETANEA = 2
@@ -98,30 +84,21 @@ PALAVRAS_ESTRUTURA_TEATRO = {
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=(
-            "Prepara a camada bronze do corpus "
-            "de Machado de Assis."
-        )
+        description=("Prepara a camada bronze do corpus " "de Machado de Assis.")
     )
 
     parser.add_argument(
         "--input-metadata",
         type=Path,
         default=DEFAULT_INPUT_METADATA,
-        help=(
-            "CSV de metadata de entrada. "
-            f"Padrão: {DEFAULT_INPUT_METADATA}"
-        ),
+        help=("CSV de metadata de entrada. " f"Padrão: {DEFAULT_INPUT_METADATA}"),
     )
 
     parser.add_argument(
         "--bronze-dir",
         type=Path,
         default=DEFAULT_BRONZE_DIR,
-        help=(
-            "Diretório raiz da camada bronze. "
-            f"Padrão: {DEFAULT_BRONZE_DIR}"
-        ),
+        help=("Diretório raiz da camada bronze. " f"Padrão: {DEFAULT_BRONZE_DIR}"),
     )
 
     parser.add_argument(
@@ -471,11 +448,7 @@ def avaliar_estrutura_poetica(
     max_palavras_linha: int = DEFAULT_MAX_PALAVRAS_LINHA_POEMA,
     min_pct_linhas_curtas: float = DEFAULT_MIN_PCT_LINHAS_CURTAS_POEMA,
 ) -> dict:
-    linhas = [
-        linha.strip()
-        for linha in texto.splitlines()
-        if linha.strip()
-    ]
+    linhas = [linha.strip() for linha in texto.splitlines() if linha.strip()]
 
     if not linhas:
         return {
@@ -486,8 +459,7 @@ def avaliar_estrutura_poetica(
         }
 
     qtd_linhas_curtas = sum(
-        len(linha.split()) <= max_palavras_linha
-        for linha in linhas
+        len(linha.split()) <= max_palavras_linha for linha in linhas
     )
 
     pct_linhas_curtas = qtd_linhas_curtas / len(linhas)
@@ -526,11 +498,7 @@ def linha_parece_locutor(
     if len(palavras) > max_palavras:
         return False
 
-    primeira_palavra = (
-        palavras[0]
-        .strip(".,;:!?\"'()[]{}—–-")
-        .casefold()
-    )
+    primeira_palavra = palavras[0].strip(".,;:!?\"'()[]{}—–-").casefold()
 
     if primeira_palavra in PALAVRAS_ESTRUTURA_TEATRO:
         return False
@@ -540,10 +508,7 @@ def linha_parece_locutor(
     if not letras:
         return False
 
-    proporcao_maiusculas = (
-        sum(char.isupper() for char in letras)
-        / len(letras)
-    )
+    proporcao_maiusculas = sum(char.isupper() for char in letras) / len(letras)
 
     return proporcao_maiusculas >= 0.90
 
@@ -598,11 +563,7 @@ def avaliar_estrutura_teatral(
     min_turnos: int = DEFAULT_MIN_TURNOS_TEATRO,
     min_pct_locutores_recorrentes: float = DEFAULT_MIN_PCT_LOCUTORES_TEATRO,
 ) -> dict:
-    linhas = [
-        linha.strip()
-        for linha in texto.splitlines()
-        if linha.strip()
-    ]
+    linhas = [linha.strip() for linha in texto.splitlines() if linha.strip()]
 
     candidatos = []
 
@@ -620,15 +581,10 @@ def avaliar_estrutura_teatral(
             }
         )
 
-    contagem = Counter(
-        candidato["locutor"]
-        for candidato in candidatos
-    )
+    contagem = Counter(candidato["locutor"] for candidato in candidatos)
 
     locutores_recorrentes = {
-        locutor
-        for locutor, qtd in contagem.items()
-        if qtd >= min_repeticoes_locutor
+        locutor for locutor, qtd in contagem.items() if qtd >= min_repeticoes_locutor
     }
 
     turnos_recorrentes = [
@@ -639,17 +595,12 @@ def avaliar_estrutura_teatral(
 
     qtd_turnos = len(turnos_recorrentes)
 
-    pct_locutores_recorrentes = (
-        qtd_turnos / len(candidatos)
-        if candidatos
-        else 0.0
-    )
+    pct_locutores_recorrentes = qtd_turnos / len(candidatos) if candidatos else 0.0
 
     is_teatro = (
         len(locutores_recorrentes) >= min_locutores
         and qtd_turnos >= min_turnos
-        and pct_locutores_recorrentes
-        >= min_pct_locutores_recorrentes
+        and pct_locutores_recorrentes >= min_pct_locutores_recorrentes
     )
 
     return {
@@ -660,8 +611,7 @@ def avaliar_estrutura_teatral(
         "pct_locutores_recorrentes": pct_locutores_recorrentes,
         "locutores": sorted(locutores_recorrentes),
         "contagem_locutores": {
-            locutor: contagem[locutor]
-            for locutor in sorted(locutores_recorrentes)
+            locutor: contagem[locutor] for locutor in sorted(locutores_recorrentes)
         },
     }
 
@@ -713,8 +663,6 @@ def encontrar_assinaturas_machado(
         )
 
     return assinaturas
-
-
 
 
 def avaliar_carta(
@@ -934,21 +882,14 @@ def avaliar_coletanea(
             }
         )
 
-    similares = [
-        r
-        for r in resultados
-        if r["similaridade"] > similaridade_threshold
-    ]
+    similares = [r for r in resultados if r["similaridade"] > similaridade_threshold]
 
     titulos_similares = [r["titulo"] for r in similares]
 
     return {
         "qtd_titulos_similares": len(titulos_similares),
         "titulos_similares": titulos_similares,
-        "is_coletanea": (
-            len(titulos_similares)
-            >= qtd_titulos_coletanea
-        ),
+        "is_coletanea": (len(titulos_similares) >= qtd_titulos_coletanea),
     }
 
 
@@ -972,10 +913,7 @@ def caminho_txt_bronze(
     pdf_path: Path,
     bronze_dir: Path,
 ) -> Path:
-    return (
-        bronze_dir
-        / f"{pdf_path.stem}.txt"
-    )
+    return bronze_dir / f"{pdf_path.stem}.txt"
 
 
 def caminho_relativo_projeto(
@@ -1001,10 +939,7 @@ def main() -> None:
     output_metadata = (
         args.output_metadata
         if args.output_metadata is not None
-        else (
-            DEFAULT_BRONZE_METADATA_DIR
-            / DEFAULT_OUTPUT_METADATA_NAME
-        )
+        else (DEFAULT_BRONZE_METADATA_DIR / DEFAULT_OUTPUT_METADATA_NAME)
     )
 
     # A camada bronze contém apenas os arquivos TXT.
@@ -1098,16 +1033,11 @@ def main() -> None:
         titulo = str(row["titulo"])
         texto = row["_texto_bronze"]
 
-        is_critica = (
-            titulo.strip().casefold()
-            in CRITICAS_MANUAIS
-        )
+        is_critica = titulo.strip().casefold() in CRITICAS_MANUAIS
 
         resultado_carta = avaliar_carta(
             texto=texto,
-            qtd_assinaturas_minima=(
-                args.min_assinaturas_carta
-            ),
+            qtd_assinaturas_minima=(args.min_assinaturas_carta),
         )
 
         resultado_coletanea = avaliar_coletanea(
@@ -1115,35 +1045,21 @@ def main() -> None:
             titulo_atual=titulo,
             titulos_normalizados=titulos_normalizados,
             titulos_info=titulos_info,
-            similaridade_threshold=(
-                args.similaridade_threshold
-            ),
-            qtd_titulos_coletanea=(
-                args.qtd_titulos_coletanea
-            ),
-            tamanho_fragmento=(
-                args.tamanho_fragmento
-            ),
-            tamanho_minimo_fragmento=(
-                args.tamanho_minimo_fragmento
-            ),
+            similaridade_threshold=(args.similaridade_threshold),
+            qtd_titulos_coletanea=(args.qtd_titulos_coletanea),
+            tamanho_fragmento=(args.tamanho_fragmento),
+            tamanho_minimo_fragmento=(args.tamanho_minimo_fragmento),
         )
 
         resultado_teatro = avaliar_estrutura_teatral(
             texto=texto,
-            min_pct_locutores_recorrentes=(
-                args.min_pct_locutores_teatro
-            ),
+            min_pct_locutores_recorrentes=(args.min_pct_locutores_teatro),
         )
 
         resultado_poema = avaliar_estrutura_poetica(
             texto=texto,
-            max_palavras_linha=(
-                args.max_palavras_linha_poema
-            ),
-            min_pct_linhas_curtas=(
-                args.min_pct_linhas_curtas_poema
-            ),
+            max_palavras_linha=(args.max_palavras_linha_poema),
+            min_pct_linhas_curtas=(args.min_pct_linhas_curtas_poema),
         )
 
         # As heurísticas não são mutuamente exclusivas.
@@ -1194,11 +1110,7 @@ def main() -> None:
         "categoria",
     ]
 
-    colunas_metadata = [
-        coluna
-        for coluna in colunas_metadata
-        if coluna in df.columns
-    ]
+    colunas_metadata = [coluna for coluna in colunas_metadata if coluna in df.columns]
 
     df = df[colunas_metadata].copy()
 
@@ -1220,10 +1132,7 @@ def main() -> None:
     for categoria, quantidade in distribuicao.items():
         percentual = quantidade / len(df) * 100
 
-        print(
-            f"     {categoria}: "
-            f"{quantidade} ({percentual:.2f}%)"
-        )
+        print(f"     {categoria}: " f"{quantidade} ({percentual:.2f}%)")
 
 
 if __name__ == "__main__":

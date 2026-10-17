@@ -13,7 +13,13 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-from src.etl.raw_dataset import crawl_lock, load_raw_dataset, pdf_metadata, raw_prefix, validate_raw_manifest
+from src.etl.raw_dataset import (
+    crawl_lock,
+    load_raw_dataset,
+    pdf_metadata,
+    raw_prefix,
+    validate_raw_manifest,
+)
 from src.storage.rustfs_manager import RustFSManager
 
 BASE_URL = "https://dominiopublico.mec.gov.br/"
@@ -419,8 +425,11 @@ def processar_obra(
     object_key = registro_anterior.get("raw_object_key") if registro_anterior else None
 
     if not object_key:
-        object_key = (f"{object_prefix}/{hashlib.sha256(obra['url_detalhe'].encode()).hexdigest()}.pdf"
-                      if object_prefix else f"documents/{filename}")
+        object_key = (
+            f"{object_prefix}/{hashlib.sha256(obra['url_detalhe'].encode()).hexdigest()}.pdf"
+            if object_prefix
+            else f"documents/{filename}"
+        )
 
     registro = {
         **obra,
@@ -436,7 +445,9 @@ def processar_obra(
         "crawled_at_utc": utc_now(),
         "erro_ingestao": None,
         "attempt_count": attempt_count(registro_anterior) if registro_anterior else 0,
-        "last_attempt_at_utc": registro_anterior.get("last_attempt_at_utc") if registro_anterior else None,
+        "last_attempt_at_utc": (
+            registro_anterior.get("last_attempt_at_utc") if registro_anterior else None
+        ),
     }
 
     if registro_anterior:
@@ -458,7 +469,12 @@ def processar_obra(
         # Uma interrupção pode ocorrer entre o upload e o checkpoint.
         if object_prefix and not registro["sha256"]:
             checksum, size = pdf_metadata(storage, bucket, object_key)
-            registro.update(sha256=checksum, size_bytes=size, content_type="application/pdf", ingested_at_utc=utc_now())
+            registro.update(
+                sha256=checksum,
+                size_bytes=size,
+                content_type="application/pdf",
+                ingested_at_utc=utc_now(),
+            )
         registro["status_ingestao"] = "existing"
 
         print(f"[SKIP] {object_key}")
@@ -515,13 +531,32 @@ def processar_obra(
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--strict", action="store_true", help="Produção: falha se alguma página ou download tiver erro.")
-    parser.add_argument("--raw-bucket", help="Bucket AWS existente; coleta somente Raw, usando o perfil AWS do notebook.")
-    parser.add_argument("--raw-id", help="Snapshot único, por exemplo machado-v1; obrigatório com --raw-bucket.")
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Produção: falha se alguma página ou download tiver erro.",
+    )
+    parser.add_argument(
+        "--raw-bucket",
+        help="Bucket AWS existente; coleta somente Raw, usando o perfil AWS do notebook.",
+    )
+    parser.add_argument(
+        "--raw-id",
+        help="Snapshot único, por exemplo machado-v1; obrigatório com --raw-bucket.",
+    )
     parser.add_argument("--region", default="us-east-1")
     actions = parser.add_mutually_exclusive_group()
-    actions.add_argument("--retry", action="store_true", help="Retenta apenas erro/sem_download do manifest, preservando os PDFs concluídos.")
-    actions.add_argument("--mark-unavailable", nargs="+", metavar="ID", help="Registra indisponibilidade confirmada para IDs pendentes, sem baixar arquivos.")
+    actions.add_argument(
+        "--retry",
+        action="store_true",
+        help="Retenta apenas erro/sem_download do manifest, preservando os PDFs concluídos.",
+    )
+    actions.add_argument(
+        "--mark-unavailable",
+        nargs="+",
+        metavar="ID",
+        help="Registra indisponibilidade confirmada para IDs pendentes, sem baixar arquivos.",
+    )
     parser.add_argument("--reason", help="Motivo obrigatório para --mark-unavailable.")
 
     parser.add_argument(
@@ -566,7 +601,12 @@ def main():
     )
 
     args = parser.parse_args()
-    if args.pagina_inicial < 1 or args.pagina_final < args.pagina_inicial or not math.isfinite(args.delay) or args.delay < 0:
+    if (
+        args.pagina_inicial < 1
+        or args.pagina_final < args.pagina_inicial
+        or not math.isfinite(args.delay)
+        or args.delay < 0
+    ):
         parser.error("Intervalo de páginas ou delay inválido.")
     if bool(args.raw_bucket) != bool(args.raw_id):
         parser.error("Informe --raw-bucket e --raw-id juntos.")
@@ -577,29 +617,61 @@ def main():
     if args.raw_id:
         prefix = raw_prefix(args.raw_id)
         if args.env_file or args.config_file:
-            parser.error("O modo S3 Raw usa o perfil AWS; não aceita configurações de serviços locais.")
+            parser.error(
+                "O modo S3 Raw usa o perfil AWS; não aceita configurações de serviços locais."
+            )
         storage = RustFSManager(region=args.region)
         if not storage.bucket_exists(args.raw_bucket):
-            raise ValueError("Bucket Raw inexistente; use o bucket já criado pelo Terraform.")
+            raise ValueError(
+                "Bucket Raw inexistente; use o bucket já criado pelo Terraform."
+            )
         with crawl_lock(storage, args.raw_bucket, args.raw_id):
-            request = {"raw_id": args.raw_id, "source_query": LIST_URL,
-                       "first_page": args.pagina_inicial, "last_page": args.pagina_final}
+            request = {
+                "raw_id": args.raw_id,
+                "source_query": LIST_URL,
+                "first_page": args.pagina_inicial,
+                "last_page": args.pagina_final,
+            }
             request_key = prefix + "/request.json"
-            if (args.retry or args.mark_unavailable) and (not storage.object_exists(args.raw_bucket, request_key) or not storage.object_exists(args.raw_bucket, prefix + "/manifest.parquet")):
-                parser.error("Este raw-id não tem consulta e manifest para retomar. Execute primeiro a coleta normal.")
+            if (args.retry or args.mark_unavailable) and (
+                not storage.object_exists(args.raw_bucket, request_key)
+                or not storage.object_exists(
+                    args.raw_bucket, prefix + "/manifest.parquet"
+                )
+            ):
+                parser.error(
+                    "Este raw-id não tem consulta e manifest para retomar. Execute primeiro a coleta normal."
+                )
             if storage.object_exists(args.raw_bucket, request_key):
-                if json.loads(storage.download_bytes(args.raw_bucket, request_key)) != request:
-                    raise ValueError("Este raw-id já tem outra consulta ou intervalo. Use um novo raw-id.")
+                if (
+                    json.loads(storage.download_bytes(args.raw_bucket, request_key))
+                    != request
+                ):
+                    raise ValueError(
+                        "Este raw-id já tem outra consulta ou intervalo. Use um novo raw-id."
+                    )
             else:
-                storage.client.put_object(Bucket=args.raw_bucket, Key=request_key,
-                                          Body=json.dumps(request).encode(), ContentType="application/json", IfNoneMatch="*")
+                storage.client.put_object(
+                    Bucket=args.raw_bucket,
+                    Key=request_key,
+                    Body=json.dumps(request).encode(),
+                    ContentType="application/json",
+                    IfNoneMatch="*",
+                )
             if storage.object_exists(args.raw_bucket, prefix + "/ready.json"):
                 if args.mark_unavailable:
                     parser.error("Raw já concluído; alterações exigem um novo raw-id.")
                 receipt, _ = load_raw_dataset(storage, args.raw_bucket, args.raw_id)
-                if (receipt["first_page"], receipt["last_page"]) != (args.pagina_inicial, args.pagina_final):
-                    raise ValueError("Este raw-id já tem outro intervalo. Use um novo raw-id.")
-                print(f"[ok] Raw já concluído: {args.raw_id}; {receipt['documents']} PDFs. Nenhuma coleta repetida.")
+                if (receipt["first_page"], receipt["last_page"]) != (
+                    args.pagina_inicial,
+                    args.pagina_final,
+                ):
+                    raise ValueError(
+                        "Este raw-id já tem outro intervalo. Use um novo raw-id."
+                    )
+                print(
+                    f"[ok] Raw já concluído: {args.raw_id}; {receipt['documents']} PDFs. Nenhuma coleta repetida."
+                )
                 return
             if args.retry or args.mark_unavailable:
                 try:
@@ -607,7 +679,13 @@ def main():
                 except ValueError as exc:
                     parser.error(str(exc))
             else:
-                code = collect(args, storage, args.raw_bucket, prefix + "/manifest.parquet", prefix + "/documents")
+                code = collect(
+                    args,
+                    storage,
+                    args.raw_bucket,
+                    prefix + "/manifest.parquet",
+                    prefix + "/documents",
+                )
             if code:
                 raise SystemExit(code)
         return
@@ -917,7 +995,11 @@ def collect(args, storage, bucket, manifest_key=MANIFEST_KEY, object_prefix=None
             document_id = f"{next_id:06d}"
             next_id += 1
 
-        if object_prefix and anterior and anterior.get("status_ingestao") == "unavailable":
+        if (
+            object_prefix
+            and anterior
+            and anterior.get("status_ingestao") == "unavailable"
+        ):
             registro = anterior
         else:
             registro = processar_obra(
@@ -932,8 +1014,13 @@ def collect(args, storage, bucket, manifest_key=MANIFEST_KEY, object_prefix=None
         registros.append(registro)
         if object_prefix:
             # O checkpoint inclui também registros da tentativa anterior ainda não revisitados.
-            checkpoint = {**anteriores_por_url, **{row["url_detalhe"]: row for row in registros}}
-            salvar_manifest(storage, bucket, list(checkpoint.values()), manifest_key, quiet=True)
+            checkpoint = {
+                **anteriores_por_url,
+                **{row["url_detalhe"]: row for row in registros},
+            }
+            salvar_manifest(
+                storage, bucket, list(checkpoint.values()), manifest_key, quiet=True
+            )
             time.sleep(args.delay)
 
     #
@@ -959,9 +1046,20 @@ def collect(args, storage, bucket, manifest_key=MANIFEST_KEY, object_prefix=None
         manifest_key=manifest_key,
     )
 
-    listing_ok = (listing_matches(args, report, registros) if object_prefix
-                  else bool(obras) and all(page["status"] == "ok" for page in pages))
-    return finish_collection(args, storage, bucket, manifest_key, registros, listing_ok, raw_mode=bool(object_prefix))
+    listing_ok = (
+        listing_matches(args, report, registros)
+        if object_prefix
+        else bool(obras) and all(page["status"] == "ok" for page in pages)
+    )
+    return finish_collection(
+        args,
+        storage,
+        bucket,
+        manifest_key,
+        registros,
+        listing_ok,
+        raw_mode=bool(object_prefix),
+    )
 
 
 if __name__ == "__main__":

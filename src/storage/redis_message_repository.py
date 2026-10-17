@@ -9,7 +9,6 @@ from redis import Redis
 
 from src.storage.redis_chat_repository import REDIS_NAMESPACE
 
-
 MessageRole = Literal["user", "assistant"]
 
 
@@ -95,10 +94,7 @@ class RedisMessageRepository:
         session_id: UUID,
         chat_id: UUID,
     ) -> str:
-        return (
-            f"{REDIS_NAMESPACE}:session:{session_id}:"
-            f"chat:{chat_id}:messages"
-        )
+        return f"{REDIS_NAMESPACE}:session:{session_id}:" f"chat:{chat_id}:messages"
 
     @staticmethod
     def _serialize_message(
@@ -112,11 +108,11 @@ class RedisMessageRepository:
         return {
             "turn_id": str(turn_id),
             "role": role,
-            "metadata": json.dumps(metadata or {}, ensure_ascii=False, separators=(",", ":")),
+            "metadata": json.dumps(
+                metadata or {}, ensure_ascii=False, separators=(",", ":")
+            ),
             "content": content,
-            "created_at": datetime.now(
-                timezone.utc
-            ).isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "evidences": json.dumps(
                 evidences,
                 ensure_ascii=False,
@@ -131,9 +127,7 @@ class RedisMessageRepository:
         data: dict,
     ) -> dict:
         try:
-            evidences = json.loads(
-                data.get("evidences", "[]")
-            )
+            evidences = json.loads(data.get("evidences", "[]"))
         except json.JSONDecodeError:
             evidences = []
 
@@ -142,9 +136,7 @@ class RedisMessageRepository:
             "turn_id": UUID(data["turn_id"]),
             "role": data["role"],
             "content": data["content"],
-            "created_at": datetime.fromisoformat(
-                data["created_at"]
-            ),
+            "created_at": datetime.fromisoformat(data["created_at"]),
             "evidences": evidences,
         }
 
