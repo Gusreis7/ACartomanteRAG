@@ -167,7 +167,7 @@ As roles OIDC exigem o ID imutável do repositório e `refs/heads/main`. Não h�
 
 ## Primeira preparação, por código
 
-Uso o perfil temporário do usuário terraform. A configuração pública fica em `infra/aws/production.tfvars.json` e é versionada. O arquivo privado `config/aws-bootstrap.env` contém o endpoint e as chaves Qdrant de produção e fica fora do Git. A EC2 e o Glue usam suas próprias roles AWS.
+Uso o perfil temporário do usuário terraform. Os valores de produção ficam em `infra/aws/production.tfvars.json`, fora do Git; o exemplo e os arquivos `.tf` são versionados. O bootstrap envia uma cópia ao Secret `TF_PRODUCTION_TFVARS_JSON`, reconstruído temporariamente pelo runner de infraestrutura. O arquivo privado `config/aws-bootstrap.env` contém o endpoint e as chaves Qdrant, enviados ao SSM. O GitHub continua autenticando na AWS por OIDC, e a EC2 e o Glue usam suas próprias roles.
 
 O bootstrap tem operações separadas para gerar a política IAM inicial, produzir o plano, aplicar o plano salvo e repetir apenas o cadastro dos segredos/variáveis quando necessário:
 

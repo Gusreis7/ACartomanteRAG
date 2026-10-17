@@ -81,3 +81,41 @@ def test_github_script_refuses_wrong_terraform_repo_for_variables(tmp_path, monk
         with pytest.raises(ValueError,match="outro repositório"):
             setup.main()
         subprocess_call.assert_not_called()
+
+
+def test_github_script_sends_private_tfvars_through_stdin(tmp_path, monkeypatch, capsys):
+    setup = module("github_private_tfvars", "scripts/configure_github.py")
+    config = tmp_path / "private.json"
+    payload = json.dumps({"github_repository_id": "42", "acme_email": "private-marker@example.org", "ami_id": "ami-123abc"})
+    config.write_text(payload)
+    monkeypatch.setattr(setup, "gh", Mock(side_effect=[
+        {"id": 42}, None, {"object": {"sha": "a" * 40}}, [{"ref": "refs/heads/develop"}], None, None,
+    ]))
+    monkeypatch.setattr("sys.argv", ["configure_github.py", "--repo", "owner/repo", "--mirror-source", "--terraform-config", str(config)])
+    with patch.object(setup.subprocess, "run") as execute:
+        setup.main()
+    execute.assert_called_once_with(
+        ["gh", "secret", "set", "TF_PRODUCTION_TFVARS_JSON", "--repo", "owner/repo"],
+        input=payload, text=True, check=True, capture_output=True,
+    )
+    assert "private-marker" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("payload,error", [
+    ('{"private-marker":', "inválido"),
+    ('["private-marker"]', "objeto JSON"),
+    ('{"github_repository_id":"99","acme_email":"private-marker"}', "outro repositório"),
+])
+def test_github_script_refuses_bad_private_tfvars_before_mutations(tmp_path, monkeypatch, payload, error):
+    setup = module("github_private_bad_tfvars", "scripts/configure_github.py")
+    config = tmp_path / "private.json"
+    config.write_text(payload)
+    inspect = Mock(return_value={"id": 42})
+    monkeypatch.setattr(setup, "gh", inspect)
+    monkeypatch.setattr("sys.argv", ["configure_github.py", "--repo", "owner/repo", "--terraform-config", str(config)])
+    with patch.object(setup.subprocess, "run") as execute:
+        with pytest.raises(ValueError, match=error) as caught:
+            setup.main()
+    assert "private-marker" not in str(caught.value)
+    inspect.assert_called_once_with("repos/owner/repo")
+    execute.assert_not_called()
