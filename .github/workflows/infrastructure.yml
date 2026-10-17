@@ -12,6 +12,9 @@ on:
       operation:
         required: true
         type: string
+    secrets:
+      TF_PRODUCTION_TFVARS_JSON:
+        required: true
 permissions:
   contents: read
 jobs:
@@ -36,11 +39,45 @@ jobs:
         with:
           persist-credentials: false
       - name: Validate operation and configuration
+        env:
+          PRODUCTION_TFVARS_JSON: ${{ secrets.TF_PRODUCTION_TFVARS_JSON }}
+          EXPECTED_REPOSITORY_ID: ${{ github.repository_id }}
         run: |
           case "$OPERATION" in plan|apply) ;; *) exit 1 ;; esac
-          test -f infra/aws/production.tfvars.json
           : "${STATE_BUCKET:?Execute o bootstrap inicial}"
           : "${STATE_KEY:?Execute o bootstrap inicial}"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import re
+
+          payload = os.environ.get("PRODUCTION_TFVARS_JSON", "")
+          if not payload.strip():
+              raise SystemExit("Erro: cadastre o Secret TF_PRODUCTION_TFVARS_JSON com o JSON usado no bootstrap.")
+          try:
+              config = json.loads(payload)
+          except json.JSONDecodeError:
+              raise SystemExit("Erro: TF_PRODUCTION_TFVARS_JSON não contém JSON válido; conteúdo omitido.") from None
+          declared = set(re.findall(r'variable\s+"([^"\n]+)"', Path("infra/aws/variables.tf").read_text()))
+          if not isinstance(config, dict) or set(config) - declared:
+              raise SystemExit("Erro: tfvars deve ser um objeto com apenas as variáveis Terraform declaradas.")
+          if str(config.get("github_repository_id", "")) != os.environ["EXPECTED_REPOSITORY_ID"]:
+              raise SystemExit("Erro: o ID do repositório nos tfvars não corresponde a esta execução.")
+          if config.get("region", "us-east-1") != os.environ["AWS_REGION"]:
+              raise SystemExit("Erro: a região dos tfvars diverge da variável AWS_REGION.")
+          if not re.fullmatch(r"ami-[0-9a-f]+", str(config.get("ami_id", ""))):
+              raise SystemExit("Erro: use a AMI fixada no arquivo gerado pelo bootstrap.")
+          for value in config.values():
+              if isinstance(value, str) and value:
+                  masked = value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                  print(f"::add-mask::{masked}", flush=True)
+          descriptor = os.open("infra/aws/production.tfvars.json", os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+          with os.fdopen(descriptor, "w", encoding="utf-8") as output:
+              os.fchmod(output.fileno(), 0o600)
+              output.write(payload)
+          print("Configuração privada preparada; conteúdo omitido.")
+          PY
       - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
         with:
           terraform_version: 1.11.4
@@ -64,3 +101,6 @@ jobs:
       - name: Apply
         if: inputs.operation == 'apply'
         run: terraform -chdir=infra/aws apply -input=false "$RUNNER_TEMP/deployment.tfplan"
+      - name: Remove private Terraform inputs and plan
+        if: always()
+        run: rm -f -- infra/aws/production.tfvars.json "$RUNNER_TEMP/deployment.tfplan"

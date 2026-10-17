@@ -8,13 +8,14 @@ O Terraform define rede, EC2, discos, buckets, ECR, IAM, SSM, Glue, DNS e alerta
 
 | Configuração | Local | Uso |
 |---|---|---|
-| Região, domínio, e-mails, ID do GitHub, EC2, discos e AMI | `infra/aws/production.tfvars.json` | Configuração pública versionada |
+| Região, domínio, e-mails, ID do GitHub, EC2, discos e AMI | `infra/aws/production.tfvars.json` | Arquivo privado, fora do Git |
+| Cópia dos tfvars para a infraestrutura na CI | GitHub Actions → Secret `TF_PRODUCTION_TFVARS_JSON` | Runner reconstrói o JSON temporariamente |
 | Sessão do usuário `terraform` | Perfis locais `terraform-login` e `terraform` | Bootstrap, coleta e administração |
 | Endpoint e chaves Qdrant | `config/aws-bootstrap.env` | Arquivo privado importado no bootstrap |
 | Segredos de execução | SSM Parameter Store | EC2 e Glue acessam pelas próprias roles |
 | Roles e identificadores públicos | GitHub Actions → Variables | Cadastrados pelo bootstrap |
 
-O GitHub usa OIDC para obter credenciais AWS temporárias; as chaves Qdrant ficam no SSM. As roles de infraestrutura, deploy e ETL têm funções separadas. O perfil local e a role de infraestrutura possuem acesso administrativo amplo; a revisão da `main` no Gitea controla o código publicado pelo espelho.
+O GitHub usa OIDC para obter credenciais AWS temporárias; as chaves Qdrant ficam no SSM. O Secret dos tfvars guarda escolhas de infraestrutura, sem access keys. As roles de infraestrutura, deploy e ETL têm funções separadas. O perfil local e a role de infraestrutura possuem acesso administrativo amplo; a revisão da `main` no Gitea controla o código publicado pelo espelho.
 
 ## 1. Preparar um ambiente novo
 
@@ -40,13 +41,13 @@ Crie os arquivos apenas se ainda não existirem:
 ```bash
 test -f infra/aws/production.tfvars.json || cp infra/aws/production.tfvars.json.example infra/aws/production.tfvars.json
 test -f config/aws-bootstrap.env || cp config/aws-bootstrap.env.example config/aws-bootstrap.env
-chmod 600 config/aws-bootstrap.env
+chmod 600 infra/aws/production.tfvars.json config/aws-bootstrap.env
 
 github_repo="Gusreis7/ACartomanteRAG"
 gh api "repos/$github_repo" --jq '.id'
 ```
 
-Preencha o arquivo público com os valores da tabela e o ID retornado. Em infraestrutura existente, preserve a AMI, as escolhas do state e os IDs de zona/OIDC usados. O bootstrap fixa a AMI inicial quando necessário; versionar esse valor evita trocas involuntárias. Ele recusa arquivos `terraform.tfvars` ou `*.auto.tfvars*` concorrentes no checkout.
+Preencha os tfvars com os valores da tabela e o ID retornado. Em infraestrutura existente, preserve a AMI, as escolhas do state e os IDs de zona/OIDC usados. O bootstrap fixa a AMI inicial quando necessário; conservar esse valor evita trocas involuntárias. Ele recusa arquivos `terraform.tfvars` ou `*.auto.tfvars*` concorrentes no checkout.
 
 No arquivo privado, preencha:
 
@@ -80,9 +81,17 @@ Revise os recursos e os custos previstos. Depois, aplique o plano salvo:
 python scripts/bootstrap_aws.py apply --repo "$github_repo"
 ```
 
-O comando prepara o SSM e as variáveis/OIDC do GitHub após o apply. Se essa configuração final falhar, corrija a causa e execute `python scripts/bootstrap_aws.py configure --repo "$github_repo"`. Alterações de conta, repositório, infraestrutura ou configuração após o plano exigem novo `plan`.
+O comando prepara o SSM, as variáveis/OIDC e o Secret dos tfvars no GitHub após o apply. Se essa configuração final falhar, corrija a causa e execute `python scripts/bootstrap_aws.py configure --repo "$github_repo"`. Alterações de conta, repositório, infraestrutura ou configuração após o plano exigem novo `plan`.
 
-Versione o código, `production.tfvars.json` e `infra/aws/.terraform.lock.hcl`; mantenha segredos, state, planos, `backend.hcl` e outputs locais fora do Git. Confira a mesma revisão na `main` do GitHub após o push ao Gitea. O deploy da API começa desabilitado por `AWS_APP_DEPLOY_ENABLED=false`.
+Versione o código, o exemplo dos tfvars e `infra/aws/.terraform.lock.hcl`. Guarde os tfvars reais, segredos, state, planos, `backend.hcl` e outputs locais fora do Git. Conserve uma cópia privada do JSON para reproduzir o ambiente. Confira a mesma revisão na `main` do GitHub após o push ao Gitea. O deploy da API começa desabilitado por `AWS_APP_DEPLOY_ENABLED=false`.
+
+Para uma infraestrutura já criada, cadastre ou atualize somente a cópia privada antes de publicar este ajuste:
+
+```bash
+gh secret set TF_PRODUCTION_TFVARS_JSON --repo "$github_repo" < infra/aws/production.tfvars.json
+```
+
+O workflow recebe esse Secret explicitamente, valida repositório/região/AMI e grava o JSON com permissão `600`. Ao terminar, remove o arquivo e o plano. Strings da configuração são mascaradas nos logs; identificadores e IPs gerados pelo Terraform ainda podem aparecer. O state continua privado no S3. Se o JSON já estiver versionado, use `git rm --cached -- infra/aws/production.tfvars.json` para parar de acompanhá-lo sem apagar a cópia local; commits antigos conservam o conteúdo.
 
 ## 4. Preparar os dados
 
@@ -179,7 +188,7 @@ Com DNS resolvendo e dados promovidos:
 | Alteração | Procedimento |
 |---|---|
 | Feature da aplicação | Gitea → espelho GitHub → testes → Terraform → imagem ECR → deploy SSM. O ETL é separado. |
-| Infraestrutura | Atualizar `.tf`/configuração pública e publicar; ou usar **AWS infrastructure → plan/apply**. |
+| Infraestrutura | Publicar mudanças nos `.tf`; para mudar os valores privados, atualizar o JSON e o Secret, depois executar **AWS infrastructure → plan/apply**. |
 | Reprocessamento de dados | AWS ETL `run-from-raw`, mesmo Raw e novo `run_id` para outra revisão/configuração. |
 | Rotação Qdrant | Atualizar o arquivo privado, executar `bootstrap_aws.py configure` e publicar novamente a API. |
 

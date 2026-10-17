@@ -50,15 +50,15 @@ def load_config(path, policy_only=False):
     if not path.is_file():
         if policy_only:
             return {"project": "acartomanterag", "region": "us-east-1"}
-        raise ValueError("Copie infra/aws/production.tfvars.json.example para production.tfvars.json e preencha os campos públicos.")
+        raise ValueError("Copie infra/aws/production.tfvars.json.example para production.tfvars.json e preencha a configuração privada de produção.")
     config = json.loads(path.read_text())
     if not isinstance(config, dict):
         raise ValueError("A configuração de produção deve ser um objeto JSON.")
     if any(re.search(r"secret|password|token|api_key|access_key", key, re.I) for key in config):
-        raise ValueError("Configuração pública não pode conter segredos; use config/aws-bootstrap.env.")
+        raise ValueError("Tfvars não deve conter credenciais de execução; use config/aws-bootstrap.env.")
     declared = set(re.findall(r'variable\s+"([^"\n]+)"', (TF / "variables.tf").read_text()))
     if set(config) - declared:
-        raise ValueError("Configuração pública contém campos que não são variáveis Terraform.")
+        raise ValueError("Configuração de produção contém campos que não são variáveis Terraform.")
     config.setdefault("project", "acartomanterag")
     config.setdefault("region", "us-east-1")
     if not re.fullmatch(r"[a-z][a-z0-9-]{2,25}", config["project"]):
@@ -67,7 +67,7 @@ def load_config(path, policy_only=False):
         if not re.fullmatch(r"[1-9][0-9]*", str(config.get("github_repository_id", ""))):
             raise ValueError("Preencha github_repository_id com o ID numérico real.")
         if any(not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", str(config.get(key, ""))) for key in ("acme_email", "budget_email")):
-            raise ValueError("Preencha acme_email e budget_email na configuração pública.")
+            raise ValueError("Preencha acme_email e budget_email na configuração de produção.")
     return config
 
 
@@ -109,7 +109,7 @@ def main():
     run(sys.executable, ROOT / "scripts/cloud.py", "secrets", "--env-file", args.env_file, "--check")
     repo = json.loads(run("gh", "api", f"repos/{args.repo}", capture=True).stdout)
     if str(repo["id"]) != str(config["github_repository_id"]):
-        raise ValueError("O ID no arquivo público não corresponde ao repositório GitHub informado.")
+        raise ValueError("O ID nos tfvars não corresponde ao repositório GitHub informado.")
     os.environ["AWS_REGION"] = region
     state_bucket = f'{config["project"]}-tfstate-{account}-{region}'
     state_key = f'{config["project"]}/production.tfstate'
@@ -125,7 +125,7 @@ def main():
                     Name="/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
                 )["Parameter"]["Value"]
             args.config.write_text(json.dumps(config, indent=2) + "\n")
-            print("AMI inicial fixada na configuração pública; versione esse arquivo e o lock do provider.")
+            print("AMI inicial fixada nos tfvars privados; preserve o arquivo e versione o lock do provider.")
         run(*terraform, "fmt", "-check")
         run(*terraform, "validate")
         run(*terraform, "plan", "-input=false", "-lock-timeout=5m", f"-var-file={args.config}", f"-out={PLAN}")
@@ -143,6 +143,7 @@ def main():
         raise ValueError("Os outputs não correspondem à conta, região ou repositório configurados; nenhum segredo foi enviado.")
     run(sys.executable, ROOT / "scripts/cloud.py", "--outputs", OUTPUTS, "secrets", "--env-file", args.env_file)
     setup = [sys.executable, ROOT / "scripts/configure_github.py", "--repo", args.repo, "--terraform-output", OUTPUTS,
+             "--terraform-config", args.config,
              "--state-bucket", state_bucket, "--state-key", state_key]
     if not args.protect_main:
         setup.append("--mirror-source")

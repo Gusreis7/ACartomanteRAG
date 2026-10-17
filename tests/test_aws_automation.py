@@ -1,7 +1,9 @@
 """Contratos de bootstrap, publicação imutável e execução cloud sem chamadas reais."""
 import importlib.util
 import json
+import os
 from pathlib import Path
+import subprocess
 from types import SimpleNamespace
 from unittest.mock import Mock
 import zipfile
@@ -322,6 +324,7 @@ def test_bootstrap_plan_then_apply_uses_saved_plan_and_file_path(bootstrap_fixtu
     apply = next(args for args in calls if "apply" in args)
     assert apply[-1] == str(bootstrap.PLAN)
     assert any("--mirror-source" in args for args in calls)
+    assert any("--terraform-config" in args and str(config) in args for args in calls)
     assert any("--env-file" in args and str(private) in args and "--check" not in args for args in calls)
     assert not any("read-key" in arg or "write-key" in arg for args in calls for arg in args)
 
@@ -376,6 +379,83 @@ def test_workflow_contract_orders_infra_before_api_and_separates_etl():
     app_runs = "\n".join(step.get("run", "") for step in ci["jobs"]["deploy"]["steps"])
     assert "Dockerfile.wheels" not in app_runs and " cloud.py glue" not in app_runs
     assert "config/deployment.json" in app_runs
+
+
+def private_tfvars_step():
+    workflow = yaml.load((ROOT / ".github/workflows/infrastructure.yml").read_text(), Loader=yaml.BaseLoader)
+    return workflow, next(step for step in workflow["jobs"]["terraform"]["steps"] if step.get("name") == "Validate operation and configuration")
+
+
+def run_private_tfvars_step(tmp_path, payload, **changes):
+    infra = tmp_path / "infra/aws"
+    infra.mkdir(parents=True, exist_ok=True)
+    (infra / "variables.tf").write_bytes((ROOT / "infra/aws/variables.tf").read_bytes())
+    _, step = private_tfvars_step()
+    environment = {
+        **os.environ, "OPERATION": "apply", "STATE_BUCKET": "private-state", "STATE_KEY": "production.tfstate",
+        "AWS_REGION": "us-east-1", "EXPECTED_REPOSITORY_ID": "42", "PRODUCTION_TFVARS_JSON": payload, **changes,
+    }
+    return subprocess.run(["bash", "-e", "-o", "pipefail", "-c", step["run"]], cwd=tmp_path, env=environment, capture_output=True, text=True)
+
+
+def test_private_tfvars_reaches_reusable_workflow_only():
+    ci = yaml.load((ROOT / ".github/workflows/ci-cd.yml").read_text(), Loader=yaml.BaseLoader)
+    workflow, step = private_tfvars_step()
+    assert workflow["on"]["workflow_call"]["secrets"] == {"TF_PRODUCTION_TFVARS_JSON": {"required": "true"}}
+    assert ci["jobs"]["infrastructure"]["secrets"] == {"TF_PRODUCTION_TFVARS_JSON": "${{ secrets.TF_PRODUCTION_TFVARS_JSON }}"}
+    assert step["env"]["PRODUCTION_TFVARS_JSON"] == "${{ secrets.TF_PRODUCTION_TFVARS_JSON }}"
+    assert all("TF_PRODUCTION_TFVARS_JSON" not in json.dumps(ci["jobs"][job]) for job in ("validate", "deploy"))
+
+
+def test_private_tfvars_materializes_exact_payload_and_cleans_up_after_failure(tmp_path):
+    config = {"region": "us-east-1", "github_repository_id": "42", "ami_id": "ami-123abc", "domain": "example.test\n::error::$(touch injected)%"}
+    payload = json.dumps(config, indent=2) + "\n"
+    result = run_private_tfvars_step(tmp_path, payload)
+    assert result.returncode == 0, result.stderr
+    target = tmp_path / "infra/aws/production.tfvars.json"
+    assert target.read_text() == payload
+    assert target.stat().st_mode & 0o777 == 0o600
+    assert not (tmp_path / "injected").exists()
+    assert "\n::error::" not in result.stdout
+    assert "example.test%0A::error::$(touch injected)%25" in result.stdout
+    assert all(line.startswith("::add-mask::") or line == "Configuração privada preparada; conteúdo omitido." for line in result.stdout.splitlines())
+    plan = tmp_path / "deployment.tfplan"
+    plan.write_text("private-plan")
+    workflow, _ = private_tfvars_step()
+    cleanup = workflow["jobs"]["terraform"]["steps"][-1]
+    assert cleanup["if"] == "always()"
+    subprocess.run(["bash", "-e", "-c", cleanup["run"]], cwd=tmp_path, env={**os.environ, "RUNNER_TEMP": str(tmp_path)}, check=True)
+    assert not target.exists() and not plan.exists()
+
+
+@pytest.mark.parametrize("payload,changes,error", [
+    ("", {}, "cadastre o Secret"),
+    ('{"private-marker":', {}, "não contém JSON válido"),
+    ('["private-marker"]', {}, "apenas as variáveis"),
+    (json.dumps({"github_repository_id": "42", "AWS_SECRET_ACCESS_KEY": "private-marker"}), {}, "apenas as variáveis"),
+    (json.dumps({"github_repository_id": "99", "ami_id": "ami-123abc"}), {}, "ID do repositório"),
+    (json.dumps({"github_repository_id": "42", "region": "eu-west-1", "ami_id": "ami-123abc"}), {}, "região"),
+    (json.dumps({"github_repository_id": "42", "ami_id": None}), {}, "AMI fixada"),
+    (json.dumps({"github_repository_id": "42", "ami_id": "ami-123abc"}), {"OPERATION": "destroy"}, None),
+])
+def test_private_tfvars_refuses_invalid_configuration_without_logging_payload(tmp_path, payload, changes, error):
+    result = run_private_tfvars_step(tmp_path, payload, **changes)
+    assert result.returncode != 0
+    assert not (tmp_path / "infra/aws/production.tfvars.json").exists()
+    assert "private-marker" not in result.stdout + result.stderr
+    if error:
+        assert error in result.stderr
+
+
+def test_private_tfvars_refuses_symlink_destination(tmp_path):
+    infra = tmp_path / "infra/aws"
+    infra.mkdir(parents=True)
+    outside = tmp_path / "private-original.json"
+    outside.write_text("preserve-original")
+    (infra / "production.tfvars.json").symlink_to(outside)
+    result = run_private_tfvars_step(tmp_path, json.dumps({"github_repository_id": "42", "ami_id": "ami-123abc"}))
+    assert result.returncode != 0
+    assert outside.read_text() == "preserve-original"
 
 
 @pytest.mark.parametrize("terminal", ["FAILED", "ERROR", "TIMEOUT", "STOPPED", "EXPIRED"])

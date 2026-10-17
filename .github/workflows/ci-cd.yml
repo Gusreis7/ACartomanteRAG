@@ -54,6 +54,8 @@ jobs:
     uses: ./.github/workflows/infrastructure.yml
     with:
       operation: apply
+    secrets:
+      TF_PRODUCTION_TFVARS_JSON: ${{ secrets.TF_PRODUCTION_TFVARS_JSON }}
   deploy:
     if: always() && needs.validate.result == 'success' && (needs.infrastructure.result == 'success' || needs.infrastructure.result == 'skipped') && github.ref == 'refs/heads/main' && vars.AWS_APP_DEPLOY_ENABLED == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: [validate, infrastructure]
