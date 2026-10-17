@@ -38,7 +38,6 @@ jobs:
       REQUESTED_RUN_ID: ${{ inputs.run_id }}
       TOKENIZERS_PARALLELISM: 'false'
       OMP_NUM_THREADS: '2'
-      HF_HOME: ${{ runner.temp }}/hf-cache
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
@@ -71,6 +70,8 @@ jobs:
       - name: Check emergency stop
         run: python scripts/cloud.py check-emergency --bucket "$OPS_BUCKET"
       - name: Run MCQ with the current AWS configuration
+        env:
+          HF_HOME: ${{ runner.temp }}/hf-cache
         run: |
           python -u -m benchmark.run_current_mcq \
             --deployment-file "$RUNNER_TEMP/deployment.local.json" \
