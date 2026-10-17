@@ -1,8 +1,8 @@
 # A identidade de operações de dados também executa o MCQ manual.
 # Escrita limitada aos resultados; corpus, índices e releases são somente leitura.
 resource "aws_iam_role_policy" "github_mcq" {
-  name   = "${var.project}-mcq"
-  role   = aws_iam_role.github_etl.id
+  name = "${var.project}-mcq"
+  role = aws_iam_role.github_etl.id
   policy = jsonencode({ Version = "2012-10-17", Statement = [
     { Effect = "Allow", Action = ["s3:ListBucket"], Resource = [for name in local.read_buckets : aws_s3_bucket.data[name].arn] },
     { Effect = "Allow", Action = ["s3:GetObject"], Resource = [for name in local.read_buckets : "${aws_s3_bucket.data[name].arn}/*"] },
