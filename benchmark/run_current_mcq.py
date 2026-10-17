@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-from html import escape
 import io
 import json
 import os
@@ -15,9 +14,11 @@ from datetime import datetime, timezone
 
 import boto3
 import pandas as pd
+from botocore.exceptions import ClientError
 
-from benchmark.matrix import SPLIT_SEED
+from benchmark.matrix import AWS_MCQ_MODELS, SPLIT_SEED
 from benchmark.prepare import build_split, validate_benchmark
+from benchmark import report_mcq_html as dashboard
 from benchmark.run_mcq import (
     MCQ_PROMPT_VERSION,
     MCQ_SYSTEM_PROMPT,
@@ -127,6 +128,160 @@ def public_config(config):
             "generation",
         )
     } | {"retrieval_strategy": config.retrieval_strategy}
+
+
+def select_model(config, choice):
+    if choice is None:
+        return config
+    if choice not in AWS_MCQ_MODELS:
+        raise ValueError("Selecione qwen3-32b ou llama4-scout.")
+    preset = AWS_MCQ_MODELS[choice]
+    selected = config.model_copy(deep=True)
+    selected.generation = type(config.generation).model_validate(
+        config.generation.model_dump()
+        | {key: preset[key] for key in ("provider", "model")}
+    )
+    return selected
+
+
+def run_metadata(config, state):
+    generation = config["effective_config"]["generation"]
+    model = generation["model"]
+    label = next(
+        (item["label"] for item in AWS_MCQ_MODELS.values() if item["model"] == model),
+        model,
+    )
+    revision = str(config["revision"])
+    comparable = {
+        key: value
+        for key, value in config.items()
+        if key not in {"revision", "effective_config"}
+    }
+    comparable["effective_config"] = json.loads(json.dumps(config["effective_config"]))
+    comparable["effective_config"]["generation"] = {
+        key: value
+        for key, value in generation.items()
+        if key
+        not in {
+            "model",
+            "provider",
+            "base_url",
+            "model_prices",
+            "input_usd_per_million",
+            "output_usd_per_million",
+        }
+    }
+    release = config["data_release_key"].rsplit("/", 1)[-1].removesuffix(".json")
+    return {
+        "run_id": state["run_id"],
+        "revision": revision,
+        "model": model,
+        "model_label": label,
+        "provider": generation["provider"],
+        "split": config["split"],
+        "run_label": f'Benchmark {label} · commit {revision[:8]} · {config["split"].upper()}',
+        "comparison_id": digest(comparable),
+        "comparison_label": f'{release} · {state["summary"]["expected"]} questões · {config["effective_config"]["retrieval_strategy"]}',
+        "status": state["status"],
+        "updated_at": state["updated_at"],
+        "summary": state["summary"],
+    }
+
+
+def report_frame(config, state, records, questions):
+    """Adapta o checkpoint AWS ao contrato do dashboard original, sem perder colunas."""
+    question_map = {str(row.query_id): row for row in questions.itertuples(index=False)}
+    generation = config["effective_config"]["generation"]
+    config_id = "aws-current"
+    rows = []
+    for row in records.values():
+        question = question_map.get(str(row["query_id"]))
+        incoming = row.get("total_input_tokens", row["input_tokens"])
+        outgoing = row.get("total_output_tokens", row["output_tokens"])
+        generation_ms = row.get("generation_ms")
+        attempts = row.get("attempts", [])
+        flat = {
+            key: value
+            for key, value in row.items()
+            if not isinstance(value, (dict, list))
+        }
+        rows.append(
+            flat
+            | {
+                "run_id": state["run_id"],
+                "revision": config["revision"],
+                "config_id": config_id,
+                "selection_rank": 1,
+                "consensus_score": None,
+                "context_id": str(row["query_id"]),
+                "model": generation["model"],
+                "query_type": getattr(question, "query_type", ""),
+                "answer_text": row["answer"],
+                "is_correct": row["selected_class"] == "correct",
+                "is_ambiguous": row["selected_class"] == "ambiguous",
+                "is_wrong": row["selected_class"] == "wrong",
+                "is_invalid": row["selected_class"] == "invalid",
+                "generation_latency_ms": generation_ms,
+                "input_tokens": incoming,
+                "output_tokens": outgoing,
+                "total_tokens": incoming + outgoing,
+                "tokens_per_second": (
+                    row["output_tokens"] / (generation_ms / 1000)
+                    if generation_ms
+                    else None
+                ),
+                "generation_attempts": sum(item["calls"] for item in attempts),
+                "context_chars": len(row.get("context", "")),
+                "used_evidence_count": len(row.get("evidence_ids", [])),
+                "generation_error_type": row.get("error_type", ""),
+                "generation_error_message": row.get("diagnostics", {}).get(
+                    "reason", ""
+                ),
+            }
+        )
+    return pd.DataFrame(rows).reindex(
+        columns=list(
+            dict.fromkeys(
+                [
+                    *dashboard.RESULT_COLUMNS,
+                    "run_id",
+                    "revision",
+                    "status",
+                    "latency_ms",
+                    "estimated_cost_usd",
+                    *[key for row in rows for key in row],
+                ]
+            )
+        )
+    )
+
+
+def render_report(config, state, records, questions):
+    frame = report_frame(config, state, records, questions)
+    effective = config["effective_config"]
+    generation = effective["generation"]
+    return dashboard.render_html(
+        run_id=state["run_id"],
+        run_manifest=state,
+        run_config={
+            "split": config["split"],
+            "benchmark_sha256": config["benchmark_sha256"],
+            "prompt": {"version": config["prompt_version"]},
+            "source_retrieval_run_id": config["data_release_key"],
+            "generation_overrides": generation,
+            "models": [{"name": generation["model"]}],
+        },
+        results=frame,
+        questions=questions,
+        configs=[
+            {
+                "config_id": "aws-current",
+                "selection_rank": 1,
+                "label": f'{effective["retrieval_strategy"]} · {effective["embedding"]["selected_model"]} · release publicada',
+            }
+        ],
+        provenance=run_metadata(config, state) | {"config": config},
+    )
 
 
 class CurrentMCQPipeline:
@@ -323,51 +478,69 @@ def summarize(records, expected):
     }
 
 
-def render_report(config, state, records):
-    stats = state["summary"]
-    accuracy = f'{stats["accuracy"]:.2%}' if stats["accuracy"] is not None else "—"
-    cost = (
-        f'USD {stats["estimated_cost_usd"]:.6f}'
-        if stats["estimated_cost_usd"] is not None
-        else "não estimado"
+def publish_overview(s3, bucket, output, *, split, current_run_id):
+    runs = []
+    pages = s3.get_paginator("list_objects_v2").paginate(
+        Bucket=bucket, Prefix=f"{PREFIX}/", Delimiter="/"
     )
-    rows = []
-    for row in records.values():
-        value = row.get("total_estimated_cost_usd")
-        row_cost = f"{value:.6f}" if value is not None else "—"
-        rows.append(
-            f'<tr><td>{escape(row["canonical_work"])}<br><small>{escape(row["query_id"])}</small></td><td>{escape(row["query"])}<details><summary>Resposta</summary><pre>{escape(row["answer"])}</pre></details></td><td>{escape(row["selected_option"] or "—")} / {escape(row["correct_option"])}</td><td>{escape(row["selected_class"])}</td><td>{row["latency_ms"] / 1000:.2f}s</td><td>{row.get("total_input_tokens", 0)} / {row.get("total_output_tokens", 0)}<br>USD {row_cost}</td><td>{escape(row.get("error_type", ""))}</td></tr>'
-        )
-    rows = "".join(rows)
-    latency = (
-        f'{stats["latency_p50_ms"] / 1000:.2f}s / {stats["latency_p95_ms"] / 1000:.2f}s'
-        if stats["attempted"]
-        else "—"
+    for page in pages:
+        for item in page.get("CommonPrefixes", []):
+            run_prefix = item["Prefix"].rstrip("/")
+            run_id = run_prefix.rsplit("/", 1)[-1]
+            if not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", run_id):
+                continue
+            state = read_json(s3, bucket, f"{run_prefix}/manifest.json", optional=True)
+            config = read_json(s3, bucket, f"{run_prefix}/config.json", optional=True)
+            if not state or not config or config.get("phase") != "mcq_current":
+                continue
+            if state.get("run_id") != run_id or state.get("signature") != digest(
+                config
+            ):
+                continue
+            entry = run_metadata(config, state)
+            report_key = f"{run_prefix}/report.html"
+            try:
+                content = s3.get_object(Bucket=bucket, Key=report_key)["Body"].read()
+            except ClientError as exc:
+                if exc.response["Error"]["Code"] not in {"NoSuchKey", "404"}:
+                    raise
+                entry["has_report"] = False
+            else:
+                entry["has_report"] = True
+                destination = output / "runs" / run_id / "report.html"
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(content)
+            runs.append(entry)
+    runs.sort(key=lambda row: (row["updated_at"], row["run_id"]), reverse=True)
+    html = dashboard.render_run_overview(
+        runs, split=split, current_run_id=current_run_id
     )
-    return f"""<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MCQ · {escape(state["run_id"])}</title><style>body{{max-width:1200px;margin:32px auto;padding:0 20px;font:16px/1.5 system-ui;color:#202b3a;background:#f6f7fa}}h1{{font-size:28px}}section{{padding:16px;background:white;margin:16px 0}}table{{width:100%;border-collapse:collapse}}th,td{{text-align:left;padding:12px;border-bottom:1px solid #d9dee6;vertical-align:top}}small{{color:#526079}}.scroll{{overflow:auto}}pre{{white-space:pre-wrap;overflow-wrap:anywhere}}details{{margin:12px 0}}</style>
-<h1>MCQ da configuração AWS atual</h1><p>{escape(state["run_id"])} · {escape(config["split"].upper())} · {escape(state["status"])}</p>
-<section><b>Acertos: {accuracy}</b> · corretas {stats["correct"]} · ambíguas {stats["ambiguous"]} · erradas {stats["wrong"]} · inválidas {stats["invalid"]}<br>
-Questões avaliadas: {stats["attempted"]}/{stats["expected"]} · pendentes {stats["pending"]} · erros {stats["errors"]}<br>
-Latência p50 / p95: {latency}<br>Tokens de entrada: {stats["input_tokens"]} · saída: {stats["output_tokens"]} · chamadas: {stats["calls"]} · custo estimado: {cost}</section>
-<p>Acurácia sobre as questões tentadas, incluindo falhas como inválidas. Resultado parcial enquanto houver erros ou pendências. Tokens e custo somam as tentativas registradas; a estimativa usa os preços da configuração e não inclui infraestrutura.</p>
-<details><summary>Configuração, release e proveniência</summary><pre>{escape(json.dumps(config,ensure_ascii=False,indent=2))}</pre></details>
-<div class="scroll"><table><thead><tr><th>Obra / ID</th><th>Pergunta</th><th>Escolha / gabarito</th><th>Classe</th><th>Latência MCQ</th><th>Tokens entrada / saída e custo acumulados</th><th>Erro</th></tr></thead><tbody>{rows}</tbody></table></div>
-</html>"""
+    (output / "index.html").write_text(html, encoding="utf-8")
+    (output / "index.json").write_bytes(json_bytes(runs))
+    s3.put_object(
+        Bucket=bucket,
+        Key="mcq/current/index.html",
+        Body=html.encode(),
+        ContentType="text/html; charset=utf-8",
+    )
+    write_json(s3, bucket, "mcq/current/index.json", runs)
 
 
-def publish(s3, bucket, prefix, config, state, records, output):
+def publish(
+    s3,
+    bucket,
+    prefix,
+    config,
+    state,
+    records,
+    output,
+    questions,
+    *,
+    write_manifest=True,
+):
     output.mkdir(parents=True, exist_ok=True)
-    frame = pd.DataFrame(
-        [
-            {
-                key: value
-                for key, value in row.items()
-                if not isinstance(value, (dict, list))
-            }
-            for row in records.values()
-        ]
-    )
+    state.update(run_metadata(config, state))
+    frame = report_frame(config, state, records, questions)
     parquet = io.BytesIO()
     frame.to_parquet(parquet, index=False)
     files = {
@@ -375,7 +548,7 @@ def publish(s3, bucket, prefix, config, state, records, output):
         "results.csv": (frame.to_csv(index=False).encode(), "text/csv; charset=utf-8"),
         "results.parquet": (parquet.getvalue(), "application/octet-stream"),
         "report.html": (
-            render_report(config, state, records).encode(),
+            render_report(config, state, records, questions).encode(),
             "text/html; charset=utf-8",
         ),
     }
@@ -387,20 +560,88 @@ def publish(s3, bucket, prefix, config, state, records, output):
             Body=payload,
             ContentType=content_type,
         )
-    write_json(s3, bucket, f"{prefix}/manifest.json", state)
+    (output / "config.json").write_bytes(json_bytes(config))
+    (output / "questions.csv").write_bytes(questions.to_csv(index=False).encode())
+    if write_manifest:
+        write_json(s3, bucket, f"{prefix}/manifest.json", state)
+    publish_overview(
+        s3, bucket, output, split=config["split"], current_run_id=state["run_id"]
+    )
     if os.getenv("GITHUB_STEP_SUMMARY"):
         with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as file:
             stats = state["summary"]
-            file.write(f'### MCQ {config["split"].upper()} — {state["status"]}\n\n')
+            file.write(f'### {state["run_label"]} — {state["status"]}\n\n')
             file.write(
                 f'Questões: {stats["attempted"]}/{stats["expected"]}; acertos: {stats["correct"]}; erros: {stats["errors"]}; pendentes: {stats["pending"]}.\n\n'
             )
             file.write(f"Relatório privado: `s3://{bucket}/{prefix}/report.html`\n")
+            file.write(f"\nVisão geral: `s3://{bucket}/mcq/current/index.html`\n\n")
+            file.write(
+                "Baixe o artifact desta execução e abra `index.html`; os relatórios individuais estão em `runs/`.\n"
+            )
+
+
+def report_saved_run(args, *, s3=None):
+    """Regenera HTML e visão geral sem SSM, recuperação ou chamadas de inferência."""
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", args.run_id):
+        raise ValueError("Informe o run_id salvo para regenerar o relatório.")
+    out = {
+        key: value["value"]
+        for key, value in json.loads(args.deployment_file.read_text()).items()
+    }
+    s3 = s3 or boto3.client("s3", region_name=out["region"])
+    require_operations_enabled(s3, out["ops_bucket"])
+    bucket, prefix = out["buckets"]["BENCHMARKS_BUCKET"], f"{PREFIX}/{args.run_id}"
+    config = read_json(s3, bucket, f"{prefix}/config.json")
+    state = read_json(s3, bucket, f"{prefix}/manifest.json")
+    if (
+        config.get("phase") != "mcq_current"
+        or state.get("run_id") != args.run_id
+        or state.get("signature") != digest(config)
+    ):
+        raise ValueError(
+            "Configuração ou manifest incompatíveis; relatório não substituído."
+        )
+    prepared = pd.read_csv(
+        io.BytesIO(
+            s3.get_object(Bucket=bucket, Key=f"{prefix}/split.csv")["Body"].read()
+        )
+    ).fillna("")
+    questions = prepared.loc[prepared["split"].eq(config["split"])].copy()
+    if config["limit_queries"]:
+        questions = questions.head(config["limit_queries"])
+    records = {}
+    for question in questions.itertuples(index=False):
+        item = read_json(
+            s3, bucket, f"{prefix}/questions/{question.query_id}.json", optional=True
+        )
+        if item:
+            if item.get("signature") != state["signature"] or str(
+                item.get("query_id")
+            ) != str(question.query_id):
+                raise ValueError(
+                    "Checkpoint de questão incompatível; relatório não substituído."
+                )
+            records[str(question.query_id)] = item
+    # A operação não altera o checkpoint ou a identidade da execução original.
+    publish(
+        s3,
+        bucket,
+        prefix,
+        config,
+        state,
+        records,
+        args.output,
+        questions,
+        write_manifest=False,
+    )
+    print(f'Relatórios regenerados: {state["run_label"]}', flush=True)
+    return 0
 
 
 def run(args, *, s3=None, ssm=None, pipeline_factory=CurrentMCQPipeline):
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", args.run_id) or not re.fullmatch(
-        r"[0-9a-f]{40}", args.revision
+        r"[0-9a-f]{40}", str(args.revision or "")
     ):
         raise ValueError("Use run_id válido e SHA completo.")
     out = {
@@ -413,6 +654,7 @@ def run(args, *, s3=None, ssm=None, pipeline_factory=CurrentMCQPipeline):
     bucket, prefix = out["buckets"]["BENCHMARKS_BUCKET"], f"{PREFIX}/{args.run_id}"
     previous = read_json(s3, bucket, f"{prefix}/config.json", optional=True)
     config, release_key, release_hash = load_aws_config(out, s3, ssm, previous)
+    config = select_model(config, getattr(args, "model", None))
     payload = (ROOT / "AED/benchmark_questions_final.csv").read_bytes()
     prepared, questions = load_questions(payload, args.split, args.limit_queries)
     identity = {
@@ -533,7 +775,7 @@ def run(args, *, s3=None, ssm=None, pipeline_factory=CurrentMCQPipeline):
     state.update(status=status, updated_at=now(), summary=stats)
     if error_type:
         state["error_type"] = error_type
-    publish(s3, bucket, prefix, identity, state, records, args.output)
+    publish(s3, bucket, prefix, identity, state, records, args.output, questions)
     print(
         f'[{status}] MCQ {args.split}: {stats["correct"]}/{stats["attempted"]} corretas; {stats["errors"]} erros; {stats["pending"]} pendentes.'
     )
@@ -548,14 +790,16 @@ def run(args, *, s3=None, ssm=None, pipeline_factory=CurrentMCQPipeline):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--deployment-file", required=True, type=Path)
-    parser.add_argument("--revision", required=True)
+    parser.add_argument("--revision", default=os.getenv("GITHUB_SHA"))
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--split", choices=["dev", "holdout"], default="dev")
+    parser.add_argument("--model", choices=list(AWS_MCQ_MODELS), default="qwen3-32b")
+    parser.add_argument("--operation", choices=["run", "report"], default="run")
     parser.add_argument("--limit-queries", type=int, default=0)
     parser.add_argument("--output", type=Path, default=ROOT / "reports/mcq-current")
     args = parser.parse_args()
     try:
-        code = run(args)
+        code = report_saved_run(args) if args.operation == "report" else run(args)
     except Exception as exc:
         print(
             (

@@ -47,3 +47,17 @@ OLLAMA_MODELS = (
         "ollama_id": "6577803aa9a0",
     },
 )
+
+# Alternativas do MCQ na AWS; os demais parâmetros vêm da configuração publicada.
+AWS_MCQ_MODELS = {
+    "qwen3-32b": {
+        "label": "Qwen3 32B",
+        "provider": "bedrock-mantle",
+        "model": "qwen.qwen3-32b",
+    },
+    "llama4-scout": {
+        "label": "Llama 4 Scout",
+        "provider": "bedrock",
+        "model": "us.meta.llama4-scout-17b-instruct-v1:0",
+    },
+}
