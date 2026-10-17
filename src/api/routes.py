@@ -4,7 +4,7 @@ import logging
 
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Body, HTTPException, Request
 from redis import RedisError
 
 from src.api.dependencies import ChatServiceDep, ConversationServiceDep, SessionId
@@ -20,6 +20,7 @@ from src.api.schemas import (
     GuideDrawRequest,
     GuideStateResponse,
     PersonaUpdateRequest,
+    TutorialCompleteRequest,
 )
 from src.storage.qdrant_manager import check_qdrant_collection_ready
 from src.generation.provider import GenerationQuotaError
@@ -46,7 +47,11 @@ def session_status(session_id: SessionId, service: ConversationServiceDep):
 
 
 @router.post("/api/v1/session/tutorial")
-def complete_tutorial(session_id: SessionId, service: ConversationServiceDep):
+def complete_tutorial(
+    session_id: SessionId,
+    service: ConversationServiceDep,
+    body: TutorialCompleteRequest = Body(default_factory=TutorialCompleteRequest),
+):
     try:
         service.complete_tutorial(session_id)
         return {"tutorial_completed": True}

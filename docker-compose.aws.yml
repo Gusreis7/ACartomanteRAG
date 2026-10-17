@@ -41,6 +41,8 @@ services:
       DATA_RELEASE_KEY: ${DATA_RELEASE_KEY:-production/current.json}
       API_ALLOWED_HOSTS: "${APP_DOMAIN:?Defina APP_DOMAIN},localhost,127.0.0.1"
       SESSION_COOKIE_SECURE: "true"
+      # Somente o Caddy desta rede pode informar o IP real do visitante.
+      API_TRUSTED_PROXY_IPS: "172.30.42.3"
       HF_HOME: /home/app/.cache/huggingface
       TOKENIZERS_PARALLELISM: "false"
       OMP_NUM_THREADS: "2"
@@ -48,7 +50,11 @@ services:
       - /srv/acartomante/data/cache:/home/app/.cache
     tmpfs:
       - /tmp:rw,nosuid,nodev,size=512m,mode=1777
-    networks: [redis_private, proxy_private, api_egress]
+    networks:
+      redis_private: {}
+      proxy_guarded:
+        ipv4_address: 172.30.42.2
+      api_egress: {}
     depends_on:
       redis:
         condition: service_healthy
@@ -78,7 +84,10 @@ services:
       - /srv/acartomante/data/caddy-config:/config
     tmpfs:
       - /tmp:rw,nosuid,nodev,size=32m
-    networks: [proxy_private, proxy_egress]
+    networks:
+      proxy_guarded:
+        ipv4_address: 172.30.42.3
+      proxy_egress: {}
     depends_on:
       api:
         condition: service_healthy
@@ -87,7 +96,10 @@ networks:
   redis_private:
     # Exclusiva de API/Redis; proxy e outros serviços não participam.
     internal: true
-  proxy_private:
+  proxy_guarded:
     internal: true
+    ipam:
+      config:
+        - subnet: 172.30.42.0/29
   api_egress: {}
   proxy_egress: {}

@@ -87,7 +87,7 @@ class RedisChatRepository:
         ids = self.redis.zrevrange(
             self._session_chats_key(session_id),
             0,
-            -1,
+            99,
         )
 
         result: list[dict] = []

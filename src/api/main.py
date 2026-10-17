@@ -7,6 +7,8 @@ from time import perf_counter
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.background import BackgroundTasks
@@ -16,6 +18,7 @@ from src.api.lifespan import lifespan
 from src.api.reading import router as reading_router
 from src.api.recommendations import router as recommendation_router
 from src.api.routes import router as api_router
+from src.api.security import APISecurityMiddleware, trusted_proxy_ips
 from src.api.views import WEB_ROOT, router as view_router
 from src.config.config_manager import DEFAULT_ENV_PATH
 
@@ -54,6 +57,10 @@ app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=allowed_hosts,
     www_redirect=False,
+)
+app.add_middleware(
+    APISecurityMiddleware,
+    trusted_proxies=trusted_proxy_ips(os.getenv("API_TRUSTED_PROXY_IPS", "")),
 )
 
 
@@ -98,6 +105,15 @@ async def security_headers(request, call_next):
         )
         response.background = tasks
     return response
+
+
+@app.exception_handler(RequestValidationError)
+async def invalid_request(request, exc):
+    # Não repetir mensagens ou anexos tentados no erro de validação.
+    return JSONResponse(
+        {"detail": "Dados inválidos. Envie somente os campos esperados."},
+        status_code=422,
+    )
 
 
 app.mount(

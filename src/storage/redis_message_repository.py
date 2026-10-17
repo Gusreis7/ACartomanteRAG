@@ -71,13 +71,14 @@ class RedisMessageRepository:
         session_id: UUID,
         chat_id: UUID,
     ) -> list[dict]:
-        rows = self.redis.xrange(
+        rows = self.redis.xrevrange(
             self._messages_key(
                 session_id=session_id,
                 chat_id=chat_id,
             ),
-            min="-",
             max="+",
+            min="-",
+            count=200,
         )
 
         return [
@@ -85,7 +86,7 @@ class RedisMessageRepository:
                 stream_id=stream_id,
                 data=data,
             )
-            for stream_id, data in rows
+            for stream_id, data in reversed(rows)
         ]
 
     @staticmethod
