@@ -177,7 +177,7 @@ def test_full_success_exports_report_and_never_exports_credentials(aws):
     assert config["effective_config"]["retrieval_index"]["index_id"] == "idx-colibri-v1"
     assert config["data_release_key"] == "production/releases/corpus-v1.json"
     report = (aws.args.output / "report.html").read_text()
-    assert "&lt;script&gt;" in report and "<script>alert" not in report
+    assert "\\u003cscript\\u003ealert(1)" in report and "<script>alert" not in report
     for private in ["read-key", "qdrant.example.org"]:
         assert private not in report and private not in json.dumps(config)
     assert "REDIS_PASSWORD" not in report and "REDIS_INSPECT_PASSWORD" not in report
@@ -388,6 +388,293 @@ def test_enrichment_fail_closed_prevents_generation(aws):
     assert instance.config.enrichment_retrieval.fail_open is False
     assert instance.evaluate(question)["status"] == "error"
     provider.invoke_structured.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "choice,provider,model",
+    [
+        ("qwen3-32b", "bedrock-mantle", "qwen.qwen3-32b"),
+        ("llama4-scout", "bedrock", "us.meta.llama4-scout-17b-instruct-v1:0"),
+    ],
+)
+def test_selecting_model_preserves_all_other_runtime_settings(
+    aws, choice, provider, model
+):
+    config, _, _ = mcq.load_aws_config(aws.out, aws.s3, aws.ssm)
+    original = config.model_dump()
+    selected = mcq.select_model(config, choice)
+    expected = config.model_dump()
+    expected["generation"].update(provider=provider, model=model)
+    assert selected.model_dump() == expected
+    assert config.model_dump() == original
+    assert selected.generation.model_prices[model]["input"] > 0
+
+
+def test_unknown_model_never_writes_results(aws):
+    aws.args.model = "another-model"
+    with pytest.raises(ValueError, match="Selecione"):
+        run(aws, result)
+    assert (
+        mcq.read_json(aws.s3, aws.bucket, f"{aws.prefix}/config.json", optional=True)
+        is None
+    )
+
+
+def test_model_change_requires_a_new_run(aws):
+    assert run(aws, result) == 0
+    before = aws.s3.get_object(Bucket=aws.bucket, Key=f"{aws.prefix}/manifest.json")[
+        "Body"
+    ].read()
+    aws.args.model = "llama4-scout"
+    with pytest.raises(ValueError, match="divergem"):
+        run(aws, result)
+    assert (
+        aws.s3.get_object(Bucket=aws.bucket, Key=f"{aws.prefix}/manifest.json")[
+            "Body"
+        ].read()
+        == before
+    )
+
+
+def test_overview_contains_models_commits_and_offline_reports(aws):
+    assert run(aws, result) == 0
+    first_id = aws.args.run_id
+    aws.args.run_id = "scout-test"
+    aws.args.model = "llama4-scout"
+    aws.args.revision = "b" * 40
+    assert run(aws, result) == 0
+    catalog = mcq.read_json(aws.s3, aws.bucket, "mcq/current/index.json")
+    assert {row["model_label"] for row in catalog} == {"Qwen3 32B", "Llama 4 Scout"}
+    assert {row["revision"] for row in catalog} == {"a" * 40, "b" * 40}
+    assert len({row["comparison_id"] for row in catalog}) == 1
+    for row in catalog:
+        assert (
+            row["revision"][:8] in row["run_label"]
+            and row["model_label"] in row["run_label"]
+        )
+        assert (aws.args.output / "runs" / row["run_id"] / "report.html").is_file()
+    assert {row["run_id"] for row in catalog} == {first_id, "scout-test"}
+    html = (aws.args.output / "index.html").read_text()
+    for text in [
+        "Acertos por run",
+        "Latência p95 por run",
+        "Tokens por run",
+        "Custo estimado por run",
+    ]:
+        assert text in html
+    assert '<select id="split">' in html and '<select id="group">' in html
+    exported = pd.read_parquet(aws.args.output / "results.parquet")
+    assert set(exported.model) == {"us.meta.llama4-scout-17b-instruct-v1:0"}
+    assert set(exported.revision) == {"b" * 40}
+
+
+def test_old_runs_without_new_metadata_are_listed(aws):
+    assert run(aws, result) == 0
+    manifest = state(aws)
+    for key in [
+        "run_label",
+        "model",
+        "model_label",
+        "provider",
+        "comparison_id",
+        "comparison_label",
+        "revision",
+    ]:
+        manifest.pop(key)
+    mcq.write_json(aws.s3, aws.bucket, f"{aws.prefix}/manifest.json", manifest)
+    mcq.publish_overview(
+        aws.s3, aws.bucket, aws.args.output, split="dev", current_run_id=aws.args.run_id
+    )
+    [entry] = mcq.read_json(aws.s3, aws.bucket, "mcq/current/index.json")
+    assert entry["model_label"] == "Qwen3 32B" and entry["revision"] == "a" * 40
+
+
+@pytest.mark.parametrize(
+    "field", ["split", "data_release_sha256", "benchmark_sha256", "prompt_sha256"]
+)
+def test_overview_keeps_different_protocols_separate(aws, field):
+    import copy
+
+    assert run(aws, result) == 0
+    config = mcq.read_json(aws.s3, aws.bucket, f"{aws.prefix}/config.json")
+    changed = copy.deepcopy(config)
+    changed[field] = "holdout" if field == "split" else "different"
+    assert (
+        mcq.run_metadata(config, state(aws))["comparison_id"]
+        != mcq.run_metadata(changed, state(aws))["comparison_id"]
+    )
+
+
+def test_generation_parameter_change_has_a_separate_comparison_group(aws):
+    import copy
+
+    assert run(aws, result) == 0
+    config = mcq.read_json(aws.s3, aws.bucket, f"{aws.prefix}/config.json")
+    changed = copy.deepcopy(config)
+    changed["effective_config"]["generation"]["temperature"] += 0.1
+    assert (
+        mcq.run_metadata(config, state(aws))["comparison_id"]
+        != mcq.run_metadata(changed, state(aws))["comparison_id"]
+    )
+
+
+def test_regenerate_old_report_does_not_run_inference_or_change_checkpoint(
+    aws, monkeypatch
+):
+    assert run(aws, result) == 0
+    keys = ["config.json", "manifest.json"]
+    before = {
+        key: aws.s3.get_object(Bucket=aws.bucket, Key=f"{aws.prefix}/{key}")[
+            "Body"
+        ].read()
+        for key in keys
+    }
+    monkeypatch.setattr(
+        mcq, "load_aws_config", Mock(side_effect=AssertionError("Não carregar runtime"))
+    )
+    monkeypatch.setattr(
+        mcq,
+        "create_generation_provider",
+        Mock(side_effect=AssertionError("Sem inferência")),
+    )
+    monkeypatch.setattr(
+        mcq, "load_questions", Mock(side_effect=AssertionError("Use o split salvo"))
+    )
+    aws.args.revision = "c" * 40
+    aws.args.model = "llama4-scout"
+    assert mcq.report_saved_run(aws.args, s3=aws.s3) == 0
+    for key in keys:
+        assert (
+            aws.s3.get_object(Bucket=aws.bucket, Key=f"{aws.prefix}/{key}")[
+                "Body"
+            ].read()
+            == before[key]
+        )
+    html = (aws.args.output / "report.html").read_text()
+    assert "commit aaaaaaaa" in html and "Benchmark Qwen3 32B" in html
+    mcq.create_generation_provider.assert_not_called()
+
+
+def test_regenerate_rejects_incompatible_checkpoint(aws):
+    assert run(aws, result) == 0
+    manifest = state(aws) | {"signature": "incorrect"}
+    mcq.write_json(aws.s3, aws.bucket, f"{aws.prefix}/manifest.json", manifest)
+    with pytest.raises(ValueError, match="incompatíveis"):
+        mcq.report_saved_run(aws.args, s3=aws.s3)
+
+
+def test_partial_run_has_original_dashboard_and_explicit_status(aws):
+    assert run(aws, lambda question: result(question, error=True, fatal=True)) == 2
+    html = (aws.args.output / "report.html").read_text()
+    assert "Resultado parcial" in html and '"status":"incomplete"' in html
+    for text in [
+        "function renderGeneral()",
+        "function renderCompare()",
+        "function renderModelTab(",
+    ]:
+        assert text in html
+
+
+def test_workflow_uses_model_and_commit_and_keeps_cache_at_step_level():
+    import yaml
+
+    workflow = yaml.load(
+        (mcq.ROOT / ".github/workflows/benchmark-mcq.yml").read_text(),
+        Loader=yaml.BaseLoader,
+    )
+    assert set(
+        workflow["on"]["workflow_dispatch"]["inputs"]["model"]["options"]
+    ) == set(mcq.AWS_MCQ_MODELS)
+    assert (
+        "github.sha" in workflow["run-name"] and "inputs.model" in workflow["run-name"]
+    )
+    job = workflow["jobs"]["mcq"]
+    assert "runner.temp" not in json.dumps(job["env"])
+    assert any(
+        step.get("uses", "").startswith("actions/upload-artifact@")
+        and "always()" in step["if"]
+        for step in job["steps"]
+    )
+
+
+def test_scout_uses_its_configured_token_prices(aws):
+    provider = SimpleNamespace(
+        invoke_structured=lambda *args, **kwargs: {
+            "parsed": mcq.MCQStructuredResponse(
+                resposta="Evidência", opcao_escolhida="A"
+            ),
+            "raw": AIMessage(
+                content="Evidência",
+                usage_metadata={
+                    "input_tokens": 100,
+                    "output_tokens": 10,
+                    "total_tokens": 110,
+                },
+            ),
+            "parsing_error": None,
+        }
+    )
+    instance, question = pipeline(aws, provider=provider)
+    instance.config = mcq.select_model(instance.config, "llama4-scout")
+    assert instance.evaluate(question)["estimated_cost_usd"] == pytest.approx(
+        (100 * 0.17 + 10 * 0.66) / 1_000_000
+    )
+
+
+def test_original_dashboard_and_dev_holdout_wrapper_remain_usable(aws):
+    assert run(aws, result) == 0
+    config = mcq.read_json(aws.s3, aws.bucket, f"{aws.prefix}/config.json")
+    records = {}
+    _, questions = mcq.load_questions(
+        (mcq.ROOT / "AED/benchmark_questions_final.csv").read_bytes(), "dev", 2
+    )
+    for question in questions.itertuples(index=False):
+        item = mcq.read_json(
+            aws.s3, aws.bucket, f"{aws.prefix}/questions/{question.query_id}.json"
+        )
+        records[str(question.query_id)] = item
+    frame = mcq.report_frame(config, state(aws), records, questions)
+    legacy = mcq.dashboard.render_html(
+        run_id="legacy",
+        run_manifest=state(aws),
+        run_config={"models": [], "split": "dev"},
+        results=frame,
+        questions=questions,
+        configs=[{"config_id": "aws-current", "label": "Atual"}],
+    )
+    assert "__REPORT_STYLE__" not in legacy and '"provenance":{}' in legacy
+    dev = {
+        "run_id": "legacy",
+        "split": "dev",
+        "results": frame,
+        "questions": questions,
+        "configs": [{"config_id": "aws-current", "label": "Atual"}],
+        "html": legacy,
+    }
+    combined = mcq.dashboard.render_dual_html(dev=dev, holdout=None)
+    assert "__DEV_B64__" not in combined and "__COMPARISON__" not in combined
+
+
+def test_regenerate_question_mismatch_preserves_existing_html(aws):
+    assert run(aws, result) == 0
+    before = aws.s3.get_object(Bucket=aws.bucket, Key=f"{aws.prefix}/report.html")[
+        "Body"
+    ].read()
+    _, questions = mcq.load_questions(
+        (mcq.ROOT / "AED/benchmark_questions_final.csv").read_bytes(), "dev", 2
+    )
+    query_id = str(questions.iloc[0].query_id)
+    key = f"{aws.prefix}/questions/{query_id}.json"
+    item = mcq.read_json(aws.s3, aws.bucket, key) | {"signature": "incorrect"}
+    mcq.write_json(aws.s3, aws.bucket, key, item)
+    with pytest.raises(ValueError, match="Checkpoint de questão"):
+        mcq.report_saved_run(aws.args, s3=aws.s3)
+    assert (
+        aws.s3.get_object(Bucket=aws.bucket, Key=f"{aws.prefix}/report.html")[
+            "Body"
+        ].read()
+        == before
+    )
 
 
 def test_three_consecutive_failures_stop_without_processing_whole_split(aws):

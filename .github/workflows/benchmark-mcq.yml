@@ -1,7 +1,19 @@
 name: AWS MCQ benchmark
+run-name: >-
+  ${{ inputs.operation == 'report' && format('Relatórios MCQ · {0}', inputs.run_id) || format('Benchmark MCQ · {0} · commit {1} · {2}', inputs.model, github.sha, inputs.split) }}
 on:
   workflow_dispatch:
     inputs:
+      operation:
+        description: Executar o MCQ ou regenerar relatórios de uma run salva sem inferência
+        type: choice
+        options: [run, report]
+        default: run
+      model:
+        description: Gerador; retrieval, enrichment e dados permanecem iguais
+        type: choice
+        options: [qwen3-32b, llama4-scout]
+        default: qwen3-32b
       split:
         description: DEV para avaliação; holdout apenas depois de congelar a configuração
         type: choice
@@ -36,6 +48,8 @@ jobs:
       SPLIT: ${{ inputs.split }}
       LIMIT_QUERIES: ${{ inputs.limit_queries }}
       REQUESTED_RUN_ID: ${{ inputs.run_id }}
+      OPERATION: ${{ inputs.operation }}
+      MODEL: ${{ inputs.model }}
       TOKENIZERS_PARALLELISM: 'false'
       OMP_NUM_THREADS: '2'
     steps:
@@ -50,8 +64,13 @@ jobs:
           : "${OPS_BUCKET:?Execute o bootstrap inicial}"
           : "${BENCHMARK_ROLE:?Execute o bootstrap inicial}"
           case "$SPLIT" in dev|holdout) ;; *) exit 1 ;; esac
+          case "$OPERATION" in run|report) ;; *) exit 1 ;; esac
+          case "$MODEL" in qwen3-32b|llama4-scout) ;; *) exit 1 ;; esac
           [[ "$LIMIT_QUERIES" =~ ^[0-9]{1,5}$ ]] || { echo 'limit_queries inválido'; exit 1; }
-          run_id="${REQUESTED_RUN_ID:-mcq-$SPLIT-$GITHUB_RUN_ID}"
+          if [[ "$OPERATION" == report && -z "$REQUESTED_RUN_ID" ]]; then
+            echo 'Informe run_id para regenerar os relatórios.'; exit 1
+          fi
+          run_id="${REQUESTED_RUN_ID:-mcq-$MODEL-${GITHUB_SHA:0:8}-$SPLIT-$GITHUB_RUN_ID}"
           [[ "$run_id" =~ ^[A-Za-z0-9_-]{1,100}$ ]] || { echo 'run_id inválido'; exit 1; }
           printf 'MCQ_RUN_ID=%s\n' "$run_id" >> "$GITHUB_ENV"
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
@@ -76,5 +95,14 @@ jobs:
           python -u -m benchmark.run_current_mcq \
             --deployment-file "$RUNNER_TEMP/deployment.local.json" \
             --revision "$GITHUB_SHA" --run-id "$MCQ_RUN_ID" \
+            --operation "$OPERATION" --model "$MODEL" \
             --split "$SPLIT" --limit-queries "$LIMIT_QUERIES" \
             --output "$RUNNER_TEMP/mcq-report"
+      - name: Downloadable MCQ dashboards and results
+        if: always() && env.MCQ_RUN_ID != ''
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: benchmark-${{ env.MCQ_RUN_ID }}
+          path: ${{ runner.temp }}/mcq-report/
+          if-no-files-found: ignore
+          retention-days: 7
