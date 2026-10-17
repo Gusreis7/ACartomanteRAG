@@ -59,6 +59,32 @@ A graça de um projeto desses é aprender, quebrar as coisas, consertar, subir e
 * pipeline de CI/CD para publicação;
 * uso de soluções open source para a parte de DevOps do projeto.
 
+## Atalhos de desenvolvimento
+
+Execute `make help` na raiz do projeto. O Makefile reaproveita os Composes, scripts e workflows existentes.
+
+| Comando | Ação |
+|---|---|
+| `make local` | Valida, constrói e inicia a aplicação no notebook; mostra a URL publicada. |
+| `make local-ready` | Consulta as dependências em `/ready` no IP e porta reais. |
+| `make local-logs` / `make local-status` | Acompanha logs / lista containers. |
+| `make local-restart` | Recria somente a API para aplicar variáveis; mudanças de código usam `make local`. |
+| `make local-stop` / `make local-down` | Para serviços / remove containers e redes, preservando volumes. |
+| `make raspi` | Executa checagens estáticas; a suspensão por falta de espaço permanece. |
+| `make aws` | Dispara CI, Terraform e deploy na `main` já espelhada no GitHub. |
+| `make aws-status` | Lista execuções do GitHub; `aws-watch RUN=<id>` acompanha e `aws-logs RUN=<id>` mostra logs. |
+| `make aws-plan` / `make aws-apply` | Dispara plano / plano e apply da infraestrutura pelo GitHub. |
+| `make aws-stop` / `make aws-resume` | Solicita emergência / retomada; consulte as limitações em [AWS_AUTOMATION.md](docs/AWS_AUTOMATION.md#parada-de-emergência). |
+| `make deps` / `make test` / `make check` | Instala o perfil CI / executa testes / valida sintaxe, Composes e dependências. |
+
+No notebook, `config/.env` continua definindo credenciais, volumes e bind; Ollama e índices locais precisam estar disponíveis. Para restringir o teste ao próprio notebook, mantenha `API_BIND_IP=127.0.0.1` nesse arquivo ou use `make local API_BIND_IP=127.0.0.1`. A inicialização dos modelos continua após o `up`; confirme com `make local-ready`.
+
+Se o Docker exige sudo, use `make local DOCKER="sudo docker"`, repetindo essa opção nos outros atalhos Docker. Para trocar o arquivo privado, use `ENV_FILE=/caminho/ambiente.env`; para logs, `SERVICE=api LOG_LINES=100`. Dependências e testes aceitam `PYTHON=.venv/bin/python`; `make deps PROFILE=ops` seleciona outro perfil do mesmo `pyproject.toml`.
+
+Após manutenção e revisão de capacidade, execute **no Raspberry** `make raspi-up RASPI_RUNTIME=1`; esse comando inclui a imagem e o modelo Ollama antes suspensos. `raspi-status`, `raspi-logs`, `raspi-stop` e `raspi-down` também atuam no Docker do host atual. O Makefile não estabelece SSH com o Raspberry.
+
+Os atalhos AWS usam `gh` autenticado e o repositório `Gusreis7/ACartomanteRAG`, alterável por `GITHUB_REPO`. Primeiro publique o código pelo Gitea e confira o espelho: `make aws` usa a revisão presente na `main` do GitHub, sem enviar arquivos locais. A pipeline mantém OIDC, o Secret privado Terraform e `AWS_APP_DEPLOY_ENABLED`; não são criadas novas chaves AWS no notebook. Os atalhos não mudam os gatilhos existentes: um push na `main` já dispara CI/CD. Se o push já iniciou a revisão desejada, use `make aws-status` e acompanhe essa execução, evitando outro disparo.
+
 ## Execução e documentação
 
 | Documento | Conteúdo |

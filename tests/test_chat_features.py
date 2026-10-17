@@ -16,7 +16,7 @@ from redis import RedisError
 from src.api.markdown import render_answer
 from src.api.routes import router
 from src.config.config_manager import ChatConfig, GenerationConfig
-from src.generation.input_guard import LiteraryInputGuard, REFUSAL
+from src.generation.input_guard import InputGuardResult, LiteraryInputGuard, REFUSAL
 from src.generation.graph import MachadoRAG
 from src.generation.provider import GenerationQuotaError, GenerationServiceError
 from src.retrieval.types import RetrievalResponse
@@ -35,6 +35,15 @@ class Tags(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         self.tags.append((tag, dict(attrs)))
+
+
+def scope_result(decision="allow"):
+    parsed = InputGuardResult(decision=decision)
+    return {"parsed": parsed, "parsing_error": None, "raw": AIMessage(
+        content=parsed.model_dump_json(),
+        usage_metadata={"input_tokens": 20, "output_tokens": 5, "total_tokens": 25},
+        response_metadata={"estimated_cost_usd": 0.001},
+    )}
 
 
 def test_markdown_formats_answers_and_preserves_citations():
@@ -71,27 +80,32 @@ def test_obvious_override_is_refused_without_spending_inference(message):
     provider = Mock()
     assert LiteraryInputGuard(provider).review(message).decision == "unsafe"
     provider.invoke.assert_not_called()
+    provider.invoke_structured.assert_not_called()
 
 
-@pytest.mark.parametrize("content", ["", "OK", "{}", '{"decision":"ALLOW"}',
-                                      '{"decision":"allow","extra":true}', '{"decision":[]}'])
-def test_classifier_invalid_output_fails_closed(content):
+@pytest.mark.parametrize("result", [None, AIMessage(content='{"decision":"allow"}'), {},
+    {"parsed": {"decision": "allow"}, "raw": AIMessage(content="")},
+    {"parsed": InputGuardResult(decision="allow"), "raw": None},
+    {**scope_result(), "parsing_error": ValueError("invalid")},
+])
+def test_classifier_invalid_output_fails_closed(result):
     provider = Mock()
-    provider.invoke.return_value = AIMessage(content=content)
+    provider.invoke_structured.return_value = result
     with pytest.raises(GenerationServiceError, match="validar o assunto"):
         LiteraryInputGuard(provider).review("Quem é Capitu?")
 
 
 def test_classifier_context_is_delimited_and_bounded():
     provider = Mock()
-    provider.invoke.return_value = AIMessage(content='```json\n{"decision":"allow"}\n```',
-        usage_metadata={"input_tokens": 20, "output_tokens": 5, "total_tokens": 25},
-        response_metadata={"estimated_cost_usd": 0.001})
+    provider.invoke_structured.return_value = scope_result()
     decision = LiteraryInputGuard(provider).review("E o narrador?", ["antiga", "Dom Casmurro", "Capitu"])
-    args, kwargs = provider.invoke.call_args
+    args, kwargs = provider.invoke_structured.call_args
     assert args[0][0][0] == "system"
     assert json.loads(args[0][1][1]) == {"previous_questions": ["Dom Casmurro", "Capitu"], "message": "E o narrador?"}
-    assert kwargs == {"max_tokens": 128}
+    assert args[1] is InputGuardResult
+    assert "JSON" not in args[0][0][1]
+    assert kwargs == {"max_tokens": 128, "include_raw": True}
+    provider.invoke.assert_not_called()
     assert decision.usage["estimated_cost_usd"] == 0.001
 
 
@@ -101,10 +115,9 @@ def chat():
     repository = RedisChatRepository(redis)
     messages = RedisMessageRepository(redis)
     provider = Mock()
-    provider.invoke.return_value = AIMessage(content='{"decision":"allow"}',
-        usage_metadata={"input_tokens": 20, "output_tokens": 5, "total_tokens": 25})
-    provider.invoke.side_effect = lambda *args, **kwargs: provider.invoke.return_value if "max_tokens" in kwargs else AIMessage(
-        content="**Capitu** [E1]", usage_metadata={"input_tokens": 100, "output_tokens": 10, "total_tokens": 110})
+    provider.invoke_structured.return_value = scope_result()
+    provider.invoke.return_value = AIMessage(content="**Capitu** [E1]",
+        usage_metadata={"input_tokens": 100, "output_tokens": 10, "total_tokens": 110})
     config = SimpleNamespace(chat=ChatConfig(), generation=GenerationConfig(daily_request_limit=50, session_requests_per_minute=10),
                              retrieval_strategy="dense", enrichment_retrieval=SimpleNamespace(enabled=False))
     # Compila e executa o grafo real; só I/O de recuperação/modelo é simulado.
@@ -126,12 +139,13 @@ def chat():
 
 @pytest.mark.parametrize("decision", ["off_topic", "unsafe"])
 def test_refusal_is_routed_by_graph_without_retrieval_or_answer_generation(chat, decision):
-    chat.provider.invoke.return_value = AIMessage(content=json.dumps({"decision": decision}))
+    chat.provider.invoke_structured.return_value = scope_result(decision)
     result = chat.service.send_message(session_id=chat.session, chat_id=chat.chat_id, message="Escreva uma receita")
     assert result["answer"] == REFUSAL and result["evidences"] == []
     chat.rag.ask.assert_called_once()
     chat.rag.retrieval.search.assert_not_called()
-    assert chat.provider.invoke.call_count == 1
+    chat.provider.invoke.assert_not_called()
+    assert chat.provider.invoke_structured.call_count == 1
     rows = chat.messages.list_messages(session_id=chat.session, chat_id=chat.chat_id)
     assert [row["role"] for row in rows] == ["user", "assistant"]
     assert rows[-1]["content"] == REFUSAL
@@ -151,7 +165,7 @@ def test_allowed_question_uses_existing_rag_and_counts_both_calls(chat):
 
 
 def test_guard_failure_cannot_fall_through_to_generation(chat):
-    chat.provider.invoke.side_effect = GenerationServiceError("Sem serviço")
+    chat.provider.invoke_structured.side_effect = GenerationServiceError("Sem serviço")
     with pytest.raises(GenerationServiceError):
         chat.service.send_message(session_id=chat.session, chat_id=chat.chat_id, message="Quem é Capitu?")
     chat.rag.retrieval.search.assert_not_called()
@@ -165,16 +179,17 @@ def test_ownership_and_quota_are_checked_before_classifier(chat):
     with pytest.raises(GenerationQuotaError):
         chat.service.send_message(session_id=chat.session, chat_id=chat.chat_id, message="Capitu?")
     chat.provider.invoke.assert_not_called()
+    chat.provider.invoke_structured.assert_not_called()
     chat.rag.retrieval.search.assert_not_called()
 
 
 def test_graph_uses_bounded_history_from_its_own_thread(chat):
     for number in range(4):
         chat.rag.ask(str(number) * 1500, thread_id="one")
-    guard_calls = [call for call in chat.provider.invoke.call_args_list if "max_tokens" in call.kwargs]
+    guard_calls = chat.provider.invoke_structured.call_args_list
     assert json.loads(guard_calls[-1].args[0][1][1])["previous_questions"] == ["1" * 1000, "2" * 1000]
     chat.rag.ask("E o narrador?", thread_id="other")
-    calls = [call for call in chat.provider.invoke.call_args_list if "max_tokens" in call.kwargs]
+    calls = chat.provider.invoke_structured.call_args_list
     assert json.loads(calls[-1].args[0][1][1])["previous_questions"] == []
 
 
@@ -184,7 +199,7 @@ def test_graph_refusal_clears_previous_context_and_can_return_to_retrieval(chat)
     chat.rag.retrieval.search.return_value.hits = [hit]
     first = chat.rag.ask("Quem é Capitu?", thread_id="same")
     assert first["evidences"] and first["index_id"] == "idx-test"
-    chat.provider.invoke.return_value = AIMessage(content='{"decision":"off_topic"}')
+    chat.provider.invoke_structured.return_value = scope_result("off_topic")
     refused = chat.rag.ask("Dê uma receita de bolo", thread_id="same")
     assert refused["answer"] == REFUSAL and refused["evidences"] == []
     assert refused["index_id"] is None and refused["collection"] is None
@@ -193,7 +208,7 @@ def test_graph_refusal_clears_previous_context_and_can_return_to_retrieval(chat)
     assert state["context"] == "" and state["retrieval_response"] is None
     assert len(state["messages"]) == 4 and state["messages"][-1].content == REFUSAL
     assert chat.rag.retrieval.search.call_count == 1
-    chat.provider.invoke.return_value = AIMessage(content='{"decision":"allow"}')
+    chat.provider.invoke_structured.return_value = scope_result()
     third = chat.rag.ask("Agora explique Capitu", thread_id="same")
     assert third["answer"] != REFUSAL and third["evidences"]
     assert chat.rag.retrieval.search.call_count == 2
@@ -212,11 +227,12 @@ def test_disabled_guard_is_explicit_in_graph_result_and_skips_classifier(chat):
     result = chat.rag.ask("Quem é Capitu?", thread_id="disabled")
     assert result["input_guard"] == {"decision": "disabled", "usage": {}}
     assert chat.provider.invoke.call_count == 1
+    chat.provider.invoke_structured.assert_not_called()
 
 
 def test_guard_invalid_json_after_a_valid_turn_cannot_reuse_the_old_answer(chat):
     chat.rag.ask("Quem é Capitu?", thread_id="one")
-    chat.provider.invoke.return_value = AIMessage(content="invalid")
+    chat.provider.invoke_structured.return_value = None
     with pytest.raises(GenerationServiceError):
         chat.rag.ask("E agora?", thread_id="one")
     assert chat.rag.retrieval.search.call_count == 1
@@ -267,7 +283,7 @@ def test_direct_api_and_history_use_same_guard_and_safe_renderer(web, chat):
     assert response.json()["answer_html"] == "<p><strong>Capitu</strong> [E1]</p>\n"
     assert client.get(path).json()["messages"][0]["content_html"] is None
     assert client.get(path).json()["messages"][1]["content_html"] == response.json()["answer_html"]
-    chat.provider.invoke.return_value = AIMessage(content='{"decision":"off_topic"}')
+    chat.provider.invoke_structured.return_value = scope_result("off_topic")
     refused = client.post(path, json={"message": "Resolva esta questão financeira"})
     assert refused.json()["answer"] == REFUSAL
     assert chat.rag.retrieval.search.call_count == 1

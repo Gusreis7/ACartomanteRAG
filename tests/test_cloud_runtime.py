@@ -106,7 +106,7 @@ class Selected(BaseModel):
     option: str
 
 def test_structured_retries_record_both_calls():
-    p=provider(response("não é JSON"),response('```json\n{"option":"B"}\n```'))
+    p=provider(response("não é JSON"),response('{"option":"B"}'))
     parsed=p.invoke_structured([("human","Escolha")],Selected)
     assert parsed.option == "B"
     assert p.usage_snapshot()["input_tokens"] == 200
