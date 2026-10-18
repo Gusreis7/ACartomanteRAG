@@ -48,6 +48,7 @@ jobs:
           terraform -chdir=infra/aws fmt -check
           terraform -chdir=infra/aws init -backend=false -input=false
           terraform -chdir=infra/aws validate
+          terraform -chdir=infra/aws test
       - name: Compose validation
         run: python scripts/validate_compose.py
       - name: Build runtime
