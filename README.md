@@ -1,115 +1,88 @@
 # ACartomanteRAG
 
-Desenvolvimento de uma aplicação RAG nas obras de Machado de Assis.
+**Inteligência documental e RAG sobre as obras de Machado de Assis.**
 
-O objetivo do projeto é montar um sistema especialista documental de ponta a ponta, da obtenção dos documentos à integração com um LLM capaz de responder perguntas sobre as obras.
+Acesso a aplicação publicada: [cartomante rag](https://acartomanterag.gustavodreis.dev.br)
 
-Machado de Assis foi escolhido por ser um dos meus autores preferidos e por suas obras estarem disponíveis em domínio público.
+[Rodar no notebook](docs/REPRODUCAO_LOCAL.md) · [Entender a arquitetura](docs/INFRA_ATUAL.md)
 
-Isso cria uma oportunidade para o desenvolvimento de um sistema de conhecimento que vai da obtenção dos dados via crawler até a extração inteligente de informações por meio de uma arquitetura RAG.
+## Sobre o projeto
 
-Dada essa oportunidade, espero, neste projeto, trabalhar:
+Comecei querendo construir um sistema de inteligência documental de ponta a ponta: definir requisitos, coletar PDFs em domínio público, entender sua estrutura, preparar os dados e consultar o acervo com um LLM, trazendo evidências concretas para as respostas. O projeto foi evoluindo conforme eu investigava a base e revisitava as obras de Machado.
 
-* conceitos de LLMOps;
-* Data Science aplicada a documentos;
-* diferentes estratégias de recuperação de informações em documentos longos;
-* roteamento de modelos para requisições;
-* criação de pipelines de dados reproduzíveis;
-* CI/CD para repositório Git e publicação de aplicações e features;
-* observabilidade e infraestrutura utilizando soluções open source.
+Nesse caminho, trabalhei com extração e classificação de textos, identificação de obras duplicadas, divisão em chunks, embeddings e busca vetorial. Comparei estratégias de recuperação, reranking e geração de resumos auxiliares, combinando heurísticas, processamento de texto e LLMs. Os notebooks registram essa investigação; os pipelines transformam os experimentos em etapas reproduzíveis.
 
-Dadas as minhas intenções, algumas ideias permeiam as decisões do projeto em nível de arquitetura.
+O valor da solução está em tornar um acervo consultável, recuperar informações espalhadas pelos documentos e permitir conferir a origem das respostas. A arquitetura também serve como base para outros domínios, como documentação técnica e acervos institucionais. Essa adaptação exige revisar a coleta, os metadados, as regras de preparação e os critérios de avaliação: trocar a pasta de PDFs é só o começo da conversa.
 
-> "Limitações estimulam a criatividade."
+Acima de tudo, o propósito é **experimental e investigativo**: testar abordagens, modelos e estratégias, medir seus efeitos e entender suas limitações.
 
-De maneira autoimposta, quero usar modelos open source de IA durante o projeto e na extração dessas informações. Esses modelos, como o Llama 3 8B, rodam localmente na minha máquina e, francamente, são ruinzinhos para grande parte das coisas.
+## A aplicação
 
-Mas, neste projeto, quero contornar essas dificuldades e utilizá-los de forma que possam se tornar bons sistemas e agentes.
+A aplicação combina **FastAPI, LangGraph e recuperação com reranking e resumos auxiliares** contando com um ci/cd para publicação e deploy na aws . Tem histórico de conversas, evidências do texto original, respostas em Markdown e uma tiragem de cartas para escolher o guia de cada conversa. Também é possível trocar de guia ou seguir no modo neutro.
 
-A ideia é desenvolver a arquitetura do projeto ao redor de suas limitações, compensando-as com outras soluções, como:
+*O que será que cada guia sussurra à cartomante?*
 
-* estratégias de chunking;
-* heurísticas textuais;
-* validação.
+## Por que RAG e não fine-tuning?
 
-Acredito que isso nos força a trabalhar melhor com o que temos e a construir dados de maior qualidade, que, consequentemente, melhoram as IAs utilizadas.
+A prioridade aqui é consultar um acervo específico e vincular as respostas aos documentos. Com RAG, recupero trechos relevantes e os forneço ao modelo como contexto. Para acrescentar ou corrigir documentos, atualizo os dados e os índices, sem precisar retreinar o gerador.
 
-Parte do que vem sendo feito no pré-processamento de dados já envolve isso. Uso extensivamente heurísticas para extrair capítulos e classificar obras, sendo que um LLM maior e mais potente provavelmente faria isso melhor e mais rápido, e eu não teria dores de cabeça nem notebooks com mais de 100 células.
+Fine-tuning pode ajudar a adaptar comportamento, estilo ou tarefas específicas e pode complementar essa arquitetura. Sozinho, porém, não oferece o mecanismo de busca e rastreabilidade documental que quero investigar. Por isso, concentrei o trabalho inicial na qualidade do corpus, na recuperação das evidências e na avaliação das respostas.
 
-Mas também não teria o conhecimento adquirido ao trabalhar nesses cenários em que a descrição e a estrutura importam, inclusive em contextos com modelos proprietários. Ao escolher usar essas abordagens locais, mantenho a privacidade dos meus documentos e o domínio completo da solução.
+## Machado de Assis: referência e homenagem
 
-## Por que LLMs locais?
+Machado é um dos meus autores preferidos, e o projeto também é uma pequena homenagem à sua obra. Se a conversa levar alguém de volta aos livros, já valeu uma parte das dores de cabeça com a infraestrutura.
 
-* LLMs locais são ótimas ferramentas e podem ser usados em cenários nos quais os documentos não podem sair da organização;
-* quando privacidade é um requisito;
-* quando precisamos de mais controle sobre a solução;
-* quando o custo se torna mais relevante.
+<table>
+  <tr>
+    <td width="270" align="center" valign="bottom">
+      <a href="https://pt.wikipedia.org/wiki/Ficheiro:Machado_de_Assis_by_Marc_Ferrez.jpg">
+        <img src="docs/images/machado-de-assis.jpg" alt="Retrato de Machado de Assis, fotografado por Marc Ferrez em 1890" width="250">
+      </a>
+    </td>
+    <td valign="bottom">
+      <p>
+        <strong>Fundação da ABL</strong><br>
+        Foi um dos fundadores e o primeiro presidente da Academia Brasileira de Letras, de 1897 até sua morte, em 1908.
+        <a href="https://www.academia.org.br/academicos/machado-de-assis/biografia">Fonte: ABL</a>.
+      </p>
+      <p>
+        <strong>Um marco literário</strong><br>
+        <em>Memórias Póstumas de Brás Cubas</em>, publicado em livro em 1881, marcou a passagem do Romantismo ao Realismo na literatura brasileira.
+        <a href="https://www.bpp.pr.gov.br/Candido/Pagina/Especial-Fragmentacao-Literaria-Prateleira">Fonte: Biblioteca Pública do Paraná</a>.
+      </p>
+      <p>
+        <strong>Reconhecimento</strong><br>
+        Seu nome batiza o Prêmio Machado de Assis, concedido pela ABL a escritores pelo conjunto da obra.
+        <a href="https://www.academia.org.br/academia/premios">Fonte: ABL</a>.
+      </p>
+    </td>
+  </tr>
+</table>
 
-Isso é útil para todo caso? Não. Mas, dependendo do contexto, pode ser.
+<sub>Foto: Marc Ferrez, 1890; restauração de Adam Cuerden. Domínio público. <a href="https://pt.wikipedia.org/wiki/Ficheiro:Machado_de_Assis_by_Marc_Ferrez.jpg">Origem e créditos</a>.</sub>
 
-A graça de um projeto desses é aprender, quebrar as coisas, consertar, subir e fazer de novo!
+## Para começar
 
-## Metas
+| Quero… | Caminho |
+| --- | --- |
+| Rodar no meu notebook | [Reprodução local](docs/REPRODUCAO_LOCAL.md) |
+| Publicar na minha conta AWS | [Reprodução AWS](docs/REPRODUCAO_AWS.md) |
+| Entender serviços, acessos e recuperação | [Infra atual](docs/INFRA_ATUAL.md) |
+| Entender camadas, vetores e releases | [Arquitetura de dados](docs/ARQUITETURA_DADOS.md) |
+| Examinar ou repetir avaliações | [Benchmarks](docs/BENCHMARKS.md) |
+| Desenvolver e abrir um PR | [Contribuição](CONTRIBUTING.md) |
+| Consultar as limitações encontradas | [Impedimentos](docs/IMPEDITIVOS.md) |
 
-* Plataforma web para chat sobre obras de Machado de Assis;
-* desenvolvimento de um jogo com as informações extraídas, em uma espécie de quiz;
-* comparação entre abordagens RAG:
-  * diferentes arquiteturas de recuperação;
-  * diferentes modelos;
-* pipeline de CI/CD para publicação;
-* uso de soluções open source para a parte de DevOps do projeto.
+**Raspberry e Gitea são particulares à minha execução; não são requisitos para reproduzir o projeto.** No notebook uso Docker e Ollama. Na AWS, GitHub Actions publica a aplicação e dispara os jobs.
 
-## Atalhos de desenvolvimento
+As motivações estão em [Objetivos](docs/Obejtivos.md), [Metas e conclusão](docs/METAS_E_CONCLUSAO.MD) e [IA no desenvolvimento](docs/IA_NO_DESENVOLVIMENTO.MD).
 
-Execute `make help` na raiz do projeto. O Makefile reaproveita os Composes, scripts e workflows existentes.
+## Futuro do projeto
 
-| Comando | Ação |
-|---|---|
-| `make local` | Valida, constrói e inicia a aplicação no notebook; mostra a URL publicada. |
-| `make local-ready` | Consulta as dependências em `/ready` no IP e porta reais. |
-| `make local-logs` / `make local-status` | Acompanha logs / lista containers. |
-| `make local-restart` | Recria somente a API para aplicar variáveis; mudanças de código usam `make local`. |
-| `make local-stop` / `make local-down` | Para serviços / remove containers e redes, preservando volumes. |
-| `make raspi` | Executa checagens estáticas; a suspensão por falta de espaço permanece. |
-| `make aws` | Dispara CI, Terraform e deploy na `main` já espelhada no GitHub. |
-| `make aws-status` | Lista execuções do GitHub; `aws-watch RUN=<id>` acompanha e `aws-logs RUN=<id>` mostra logs. |
-| `make aws-plan` / `make aws-apply` | Dispara plano / plano e apply da infraestrutura pelo GitHub. |
-| `make aws-stop` / `make aws-resume` | Solicita emergência / retomada; consulte as limitações em [AWS_AUTOMATION.md](docs/AWS_AUTOMATION.md#parada-de-emergência). |
-| `make deps` / `make test` / `make check` | Instala o perfil CI / executa testes / valida sintaxe, Composes e dependências. |
+Bem, eu ainda quero testar muitas abordagens e criar aplicações em cima dessa base e dos conhecimentos adquiridos durante o desenvolvimento. Gostaria de ter fechado um minigame nesta primeira entrega, mas isso ampliaria demais o escopo e acabaria levando mais tempo.
 
-No notebook, `config/.env` continua definindo credenciais, volumes e bind; Ollama e índices locais precisam estar disponíveis. Para restringir o teste ao próprio notebook, mantenha `API_BIND_IP=127.0.0.1` nesse arquivo ou use `make local API_BIND_IP=127.0.0.1`. A inicialização dos modelos continua após o `up`; confirme com `make local-ready`.
+Quero continuar testando técnicas para melhorar a organização das informações e a avaliação dos resultados de recuperação e geração. Ainda há um mundo de desafios à espera.
 
-Se o Docker exige sudo, use `make local DOCKER="sudo docker"`, repetindo essa opção nos outros atalhos Docker. Para trocar o arquivo privado, use `ENV_FILE=/caminho/ambiente.env`; para logs, `SERVICE=api LOG_LINES=100`. Dependências e testes aceitam `PYTHON=.venv/bin/python`; `make deps PROFILE=ops` seleciona outro perfil do mesmo `pyproject.toml`.
-
-Após manutenção e revisão de capacidade, execute **no Raspberry** `make raspi-up RASPI_RUNTIME=1`; esse comando inclui a imagem e o modelo Ollama antes suspensos. `raspi-status`, `raspi-logs`, `raspi-stop` e `raspi-down` também atuam no Docker do host atual. O Makefile não estabelece SSH com o Raspberry.
-
-Os atalhos AWS usam `gh` autenticado e o repositório `Gusreis7/ACartomanteRAG`, alterável por `GITHUB_REPO`. Primeiro publique o código pelo Gitea e confira o espelho: `make aws` usa a revisão presente na `main` do GitHub, sem enviar arquivos locais. A pipeline mantém OIDC, o Secret privado Terraform e `AWS_APP_DEPLOY_ENABLED`; não são criadas novas chaves AWS no notebook. Os atalhos não mudam os gatilhos existentes: um push na `main` já dispara CI/CD. Se o push já iniciou a revisão desejada, use `make aws-status` e acompanhe essa execução, evitando outro disparo.
-
-## Execução e documentação
-
-| Documento | Conteúdo |
-|---|---|
-| [Arquitetura e fluxo](docs/RUNTIME_ARCHITECTURE.md) | Pipeline, módulos, estado, chat, evidências e UI. |
-| [Execução e publicação](docs/INFRA_LOCAL_AND_DEPLOYMENT.md) | Ambiente local, rede, AWS, ETL na nuvem e CI/CD. |
-| [AWS: bootstrap e automação](docs/AWS_AUTOMATION.md) | O que configurar, primeira infraestrutura, ETL integral na nuvem e publicação pelo GitHub. |
-| [Resultados e decisões](docs/RESULTS_AND_LEARNINGS.md) | Benchmarks, configuração promovida e limites dos resultados. |
-
-No ambiente local, mantenho o `config/.env` existente, usando `config/.env.example` como referência. Preservo os volumes e as credenciais e defino `API_BIND_IP` com o IP LAN do notebook.
-
-```bash
-docker compose --env-file config/.env -f docker-compose.local.yml config --quiet
-docker compose --env-file config/.env -f docker-compose.local.yml up -d --build
-```
-
-A aplicação fica em `http://<IP_LAN>:8000`. Na AWS, uso `docker-compose.aws.yml`, Terraform, S3, Qdrant Cloud e Bedrock. Desenvolvimento e PRs ficam no Gitea; o GitHub espelhado valida e publica somente a `main` ou por disparo manual.
-
-As dependências ficam em um único `pyproject.toml`, organizadas por perfil. Com Python 3.11+ e o ambiente virtual ativo:
-
-```bash
-python scripts/dependencies.py install runtime  # API/RAG, CPU
-python scripts/dependencies.py install ci       # testes, sem instalar os modelos
-```
-
-Os perfis `glue`, `crawler`, `ops` e `tools` atendem às outras operações. O mesmo leitor é usado pelos Dockerfiles e workflows; os sete arquivos antigos de requirements foram removidos. Os pins de API/Glue foram preservados, inclusive as diferenças entre Python 3.11 e 3.12. Não é necessário instalar todos os perfis no notebook.
-
-A preparação da infraestrutura, o ETL integral na nuvem, o reaproveitamento do enrichment e o CI/CD estão no guia de [bootstrap e automação AWS](docs/AWS_AUTOMATION.md). Aplicar o patch não cria recursos nem executa deploy.
+> “Cada estação da vida é uma edição, que corrige a anterior, e que será corrigida também, até a edição definitiva, que o editor dá de graça aos vermes.”
+>
+> — Machado de Assis

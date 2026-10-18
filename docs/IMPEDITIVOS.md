@@ -1,81 +1,51 @@
-# Impeditivos e decisões operacionais
+# Restrições operacionais
 
-## Chat público e operação — 17/10/2026
+## Raspberry Pi: runtime suspenso
 
-O espelho GitHub publica somente a `main`; desenvolvimento e PRs permanecem no Gitea, cujas verificações locais ainda têm a limitação do Raspberry. A validação da revisão que chega à AWS continua no GitHub.
+O Docker falhou ao extrair a imagem do Ollama por falta de espaço (`no space left on device`). A falha antecedeu o download do modelo; escolher um modelo menor não resolve o espaço necessário à extração da imagem.
 
-Foram adotados Markdown com HTML/imagens desativados, guia por sessão e o nó `input_guard` do LangGraph antes da busca. O grafo roteia para recuperação ou recusa fixa, preservando o histórico e limpando o contexto da pergunta anterior. A triagem usa o modelo atual, acrescenta uma chamada curta e bloqueia a resposta quando não consegue classificar. Reduz abuso, sem garantir imunidade a prompt injection. Os contadores Redis têm 14 dias; sessões não identificam pessoas e o custo contabilizado não é a fatura AWS.
+O Raspberry permanece dedicado ao Gitea e ao espelhamento do GitHub. Os workflows locais fazem checagens estáticas; seu sucesso não comprova inicialização ou deploy do RAG. Notebook e publicação AWS seguem independentes.
 
-As dependências foram reunidas no `pyproject.toml`, com os pins de API/Glue e suas diferenças por versão Python preservados. O Redis mantém rede exclusiva da API e loopback na EC2; o notebook usa SSM/IAM e ACL de leitura. Não há abertura pública de 6379 nem acesso automático de outros serviços internos.
+Para retomar o runtime:
 
-O workflow manual `AWS emergency` para EC2/Glue e mantém uma trava contra novos disparos pelas pipelines atualizadas. Preserva dados, não zera custos de armazenamento/IP e exige conferir Terraform/SSM já em andamento. A retomada do ETL é explícita, após verificar o lock. Procedimento: [AWS_AUTOMATION.md](AWS_AUTOMATION.md#parada-de-emergência).
+1. Revisar o filesystem usado pelo Docker e disponibilizar espaço para imagens, pesos, cache e dados.
+2. Preservar volumes, credenciais e o nome do projeto Compose.
+3. Medir RAM, latência e concorrência no hardware real.
+4. Testar o overlay do Raspberry e restaurar as verificações de runtime/deploy dos workflows.
 
-Registro: 15/10/2026. Situação: execução do RAG e deploy local suspensos até a manutenção do Raspberry Pi.
+`make raspi-up RASPI_RUNTIME=1` é uma liberação manual após essa revisão; não corrige capacidade nem reativa etapas desabilitadas dos workflows. Os atalhos atuam no host atual, sem estabelecer SSH.
 
-## Impedimento observado
+## MEC: coleta fora do Glue
 
-O job do Gitea falhou em `Pull images` ao extrair uma camada da imagem oficial do Ollama:
+Em 15/10/2026, o Glue recebeu HTTP 403 nas sete páginas do Domínio Público; a mesma consulta no notebook retornou 200. A causa exata não foi determinada.
 
-```text
-Extracting 2.668GB
-failed to register layer: write /usr/lib/ollama/cuda_jetpack6/libcublasLt.so.12.6.1.4: no space left on device
-```
+A coleta única no notebook grava PDFs e manifest diretamente no S3 Raw. Bronze, Silver, embeddings e enrichment continuam no Glue por `run-from-raw`. O Raw só segue como completo após validação do recibo. Se o acesso à fonte também falhar no notebook, a coleta fica pendente.
 
-A falha registrada é falta de espaço no filesystem usado pelo Docker durante a extração da imagem. O caminho de bibliotecas CUDA faz parte da imagem; ele não demonstra uso de GPU no Raspberry. O erro ocorre antes do preparo do modelo. Trocar apenas o modelo não resolve o espaço exigido para extrair essa imagem.
+Procedimento: [coleta Raw](REPRODUCAO_AWS.md#3-coletar-somente-o-raw-no-notebook).
 
-Os pesos de `qwen3.5:4b`, o cache da aplicação, as imagens e os dados persistentes ainda exigem espaço adicional. A RAM disponível, a concorrência e a latência do RAG no hardware real também precisam de medição; não foram a causa comprovada deste erro.
+## CPU e janela de processamento
 
-## Decisão temporária
+A geração de embeddings permanece em CPU, preservando a opção de plano FREE e adiando um executor GPU. Em uma execução com 15.402 chunks, o ritmo observado projetou cerca de 1h45 apenas para o índice textual; esse registro não é uma previsão para outras máquinas ou execuções.
 
-Preservar o Raspberry para o Gitea e o fluxo do repositório que espelha no GitHub. Pausar a carga de execução local do ACartomanteRAG até revisar armazenamento e capacidade da máquina.
+O Glue usa dois workers `G.1X`, timeout de 600 minutos, uma execução simultânea e nenhum retry automático do job. O GitHub acompanha o mesmo `jr_` em cinco janelas com renovação OIDC. Trocar o timeout do job não altera uma execução já iniciada.
 
-## Acesso ao MEC pelo crawler no Glue
+Cancelar o workflow não garante parar o Glue. A retomada preserva Raw, `run_id` e revisão; um índice parcial pode recalcular lotes. Locks só devem ser removidos após confirmar que o produtor encerrou.
 
-O job Glue recebeu HTTP 403 nas sete páginas consultadas do portal Domínio Público. A mesma consulta via Python/Requests no notebook retornou HTTP 200, com `server: cloudflare`. O motivo exato da diferença não foi identificado; não é um erro de permissão S3 ou de credenciais do GitHub demonstrado por esses logs.
+## Bedrock e quotas
 
-Por decisão operacional, executar somente o crawler no notebook uma vez, enviando os PDFs e o manifest diretamente ao S3 Raw. A coleta publica um recibo de conclusão após verificar páginas, downloads e integridade dos objetos. Bronze, Silver, embeddings e enrichment permanecem no Glue, usando o modo `run-from-raw` e sem voltar ao portal. Não se migram artefatos processados locais.
+O Qwen no Bedrock Runtime apresentou throttling; uma chamada equivalente funcionou no Mantle. A geração AWS usa Mantle com IAM/SigV4, mantendo Converse para Scout. Uma chamada curta bem-sucedida não comprova capacidade para todo o corpus.
 
-O procedimento, os checkpoints e as limitações estão em [AWS_RAW_CRAWL.md](AWS_RAW_CRAWL.md). Não há retomada do runtime no Raspberry nem coleta automática recorrente. Se o notebook também passar a receber 403, a coleta permanece bloqueada até resolver o acesso à fonte; um Raw parcial não será promovido como completo.
-
-## Indexação em CPU e permanência no plano FREE
-
-Registro: 16/10/2026. Situação: processamento mantido em CPU, com ampliação da janela de execução.
-
-A Silver produziu 15.402 chunks. O log registrou 9.728 indexados (63%) em 1h06m41s, com cerca de 39 minutos restantes. O ritmo observado projeta aproximadamente 1h45 para o índice textual; o enrichment e seu índice ainda vêm depois. O limite anterior de 120 minutos no Glue era insuficiente para o processamento completo.
-
-A decisão foi preservar o plano FREE e os US$140 de créditos informados, evitando a exposição a cobranças excedentes do plano Paid. A GPU temporária foi adiada: aceleraria a indexação, mas exigiria outro executor, acesso e quota compatíveis. O enrichment continuaria no Bedrock. A API permanece em CPU; não se altera a instância para executar esse ETL.
-
-| Controle | Configuração adotada |
-|---|---|
-| Glue | Dois workers `G.1X`, limite de 600 minutos, uma execução simultânea e nenhuma repetição automática |
-| GitHub Actions | Um início do Glue e cinco janelas sequenciais de acompanhamento, de até 135 minutos |
-| Credenciais | Nova sessão OIDC em cada job, preservando a role atual de três horas |
-| Publicação | Confirmação de `SUCCEEDED` antes do encerramento do workflow e da recarga da API |
-
-Cada janela acompanha o mesmo identificador `jr_`; não inicia outro processamento. O bloqueio `aws-production` permanece durante todo o workflow. Essa divisão respeita o limite de seis horas por job do GitHub e evita depender de uma única sessão OIDC durante o ETL inteiro.
-
-Como referência de planejamento, duas DPUs a US$0,44 por hora representam US$0,88/h e aproximadamente US$8,80 de computação em uma execução de dez horas. Bedrock, armazenamento e demais recursos têm consumo adicional. O orçamento preliminar de US$5–15 para a carga inicial não é um teto; depende do tempo, dos tokens e das retomadas. O budget do projeto envia alerta, sem desligamento automático configurado.
-
-O novo prazo exige um plano Terraform atualizado e vale para execuções seguintes. Para retomar o processamento existente, manter Raw, `run_id` e SHA da revisão ETL. As etapas concluídas são reutilizadas; o índice parcial ainda recalcula os lotes e faz upsert dos mesmos IDs. Uma interrupção forçada pode deixar o lock do ETL no S3; sua remoção exige confirmar que não existe job ativo. O procedimento está em [AWS_AUTOMATION.md](AWS_AUTOMATION.md).
-
-Referências: [preços do Glue](https://aws.amazon.com/glue/pricing/), [planos e créditos AWS](https://aws.amazon.com/free/free-tier-faqs/) e [limites do GitHub Actions](https://docs.github.com/en/actions/reference/limits).
-
-## Qwen pela rota Mantle
-
-Em 16/10/2026, o enrichment parou por throttling no Bedrock Runtime; as quotas consultadas para Qwen estavam zeradas. O mesmo Qwen3 32B respondeu pela API Chat Completions do Mantle no notebook. Adotamos essa rota com assinatura IAM das roles, mantendo o plano FREE e o processamento no Glue. O Mantle tem quotas próprias; o teste curto não garante capacidade para todo o corpus.
-
-O preço Standard em `us-east-1` permanece US$0,15 por milhão de tokens de entrada e US$0,60 por milhão de saída, além do Glue. Smoke e ETL fazem uma inferência curta antes dos embeddings. A migração explícita do checkpoint preserva Bronze, Silver e o índice textual; o enrichment passa a ter identidade própria da nova rota. Procedimento: [AWS_AUTOMATION.md](AWS_AUTOMATION.md#qwen-no-mantle).
-
-Fontes: [endpoints e quotas](https://docs.aws.amazon.com/bedrock/latest/userguide/endpoints.html), [permissões Mantle](https://docs.aws.amazon.com/service-authorization/latest/reference/list_bedrock-mantle.html) e [preços regionais](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonBedrock/current/us-east-1/index.json).
+Acesso e quotas dependem da conta, do modelo, da rota e da região. O preflight verifica uma chamada pequena antes do trabalho pesado. Limites do chat, orçamento de alerta e parada de emergência não formam um teto de gastos; armazenamento e IP podem continuar sendo cobrados.
 
 ## Respostas incompletas no enrichment
 
-A run `jr_52b202ab4666100693d0e4ba81cdf4f6e65db8392655bdaaf135f6ac25f62e2d` terminou com um erro que agrupava resposta vazia e truncamento. O log disponível não preservou o motivo original; a causa permanece sem confirmação. O Mantle também pode cortar a geração ao atingir a quota de saída, conforme a [documentação de quotas](https://docs.aws.amazon.com/bedrock/latest/userguide/quotas-mantle.html).
+| Falha | Tratamento |
+| --- | --- |
+| Resposta vazia, truncada ou inválida | Até três novas tentativas, com espera de 10/20/40 s; depois, erro no manifest. |
+| Corte exatamente no teto de saída | Retry pode ampliar 1.024 → 2.048 → 4.096 tokens; não aumenta o teto para qualquer erro. |
+| Quota, permissão ou indisponibilidade | Tratamento limitado de transporte e pausa do lote. |
+| Unidade formada só por numeral romano e linhas pontilhadas | Ignorada antes da inferência, com registro em `plan.skipped_units`. |
 
-A decisão foi registrar motivo, tokens e request ID, com até três retries de resposta (10/20/40 segundos), preservando o orçamento de tokens por chamada. Após esgotá-los, a obra fica no manifest e o lote continua; quota, permissão ou indisponibilidade de serviço pausam o lote. Pendências bloqueiam o índice auxiliar e a promoção. A retomada reutiliza obras e unidades concluídas; os novos contadores começam em zero nos manifests antigos.
+A triagem das unidades ornamentais resolveu o caso observado em *O almada*, sem aceitar resultados vazios para trechos com conteúdo. Obras e unidades concluídas são reutilizadas. Pendências impedem índice auxiliar e promoção; código de saída 2 indica resultado salvo ainda incompleto.
 
-Na execução seguinte, `jr_299f37f11d5012c96cd41e6ebbd3db6d15cf1e0ab6d8c284485a950b374a9323`, o lote terminou com 253 sucessos e quatro erros. O diagnóstico fornecido mostrou `length` exatamente no teto de 1.024 tokens. Repetir esse teto não resolveu o caso. A decisão foi permitir 2.048 e até 4.096 tokens apenas nos retries após esse corte, mantendo o máximo de três retries. O novo teto é registrado como política de recuperação; os resultados concluídos são preservados. As quatro obras serão retomadas no mesmo dataset. Código 2 continua impedindo índice auxiliar e promoção enquanto houver erro; o log mostrado não comprova falta de quota.
-
-Na retomada, `Memórias Póstumas de Brás Cubas` concluiu, mas apareceram respostas curtas com `stop` durante `O almada`. O rótulo `invalid_json` também cobria schema incompatível e estrutura vazia; sem a saída rejeitada, a causa exata não pôde ser confirmada. A decisão foi separar os motivos e guardar a última resposta rejeitada no S3 de enrichment, com schema e contexto da unidade. Os logs mantêm somente metadados e o caminho do objeto. A instrumentação não aceita respostas vazias nem altera prompts, regras ou resultados concluídos; ela fornece evidência para a correção seguinte.
-
-A inspeção confirmou a causa restante em `O almada`: `s004_p01` e `s017_p01` contêm somente `I` e linhas pontilhadas. O JSON vazio era coerente com a ausência de fatos no trecho. A decisão foi triar esse padrão estrito antes da inferência e registrar os descartes em `plan.skipped_units`. IDs e posições das demais unidades são preservados para reutilizar seus checkpoints. A correção permite retomar a obra pendente conservando as outras 256; a validação de saídas vazias permanece ativa para unidades com texto. Não houve ajuste de quota, modelo ou orçamento de tokens.
+Diagnóstico e atualização de revisão: [retomar e diagnosticar o ETL](REPRODUCAO_AWS.md#retomar-e-diagnosticar-o-etl).

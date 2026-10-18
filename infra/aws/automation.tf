@@ -3,22 +3,21 @@ resource "aws_iam_role" "github_infra" {
   name               = "${var.project}-github-infra"
   assume_role_policy = aws_iam_role.github_deploy.assume_role_policy
 }
-resource "aws_iam_role_policy_attachment" "github_infra_poweruser" {
-  role       = aws_iam_role.github_infra.name
-  policy_arn = "arn:aws:iam::aws:policy/PowerUserAccess"
-}
+# Alterações nestas políticas são aplicadas pelo perfil administrativo local.
 resource "aws_iam_role_policy" "github_infra_iam" {
-  role = aws_iam_role.github_infra.id
-  policy = jsonencode({ Version = "2012-10-17", Statement = [
-    { Effect = "Allow", Action = ["iam:*"], Resource = concat(
-      [for suffix in ["runtime", "etl", "github-deploy", "github-infra", "github-etl"] : "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${var.project}-${suffix}"],
-      ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/${var.project}", local.github_oidc_arn]
-    ) },
-    { Effect = "Allow", Action = ["iam:ListInstanceProfiles", "iam:ListOpenIDConnectProviders"], Resource = ["*"] },
-    { Effect = "Allow", Action = ["iam:GetPolicy", "iam:GetPolicyVersion"], Resource = [
-      "arn:aws:iam::aws:policy/PowerUserAccess", "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-    ] }
-  ] })
+  role   = aws_iam_role.github_infra.id
+  policy = jsonencode(local.github_infra_read_policy)
+}
+resource "aws_iam_role_policy" "github_infra_operations" {
+  name   = "${var.project}-infra-operations"
+  role   = aws_iam_role.github_infra.id
+  policy = jsonencode(local.github_infra_operations_policy)
+  lifecycle {
+    precondition {
+      condition     = length(jsonencode(local.github_infra_read_policy)) + length(jsonencode(local.github_infra_operations_policy)) <= 10240
+      error_message = "As políticas inline da infraestrutura excedem o limite de 10.240 caracteres."
+    }
+  }
 }
 resource "aws_iam_role" "github_etl" {
   name                 = "${var.project}-github-etl"

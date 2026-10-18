@@ -104,6 +104,12 @@ jobs:
         run: python3 scripts/cloud.py check-emergency --bucket "$OPS_BUCKET"
       - name: Plan
         run: terraform -chdir=infra/aws plan -input=false -lock-timeout=5m -var-file=production.tfvars.json -out="$RUNNER_TEMP/deployment.tfplan"
+      - name: Check scope before CI apply
+        if: inputs.operation == 'apply'
+        run: |
+          umask 077
+          terraform -chdir=infra/aws show -json "$RUNNER_TEMP/deployment.tfplan" > "$RUNNER_TEMP/deployment.plan.json"
+          python3 scripts/check_infra_plan.py "$RUNNER_TEMP/deployment.plan.json"
       - name: Apply
         if: inputs.operation == 'apply'
         run: |
@@ -111,4 +117,4 @@ jobs:
           terraform -chdir=infra/aws apply -input=false "$RUNNER_TEMP/deployment.tfplan"
       - name: Remove private Terraform inputs and plan
         if: always()
-        run: rm -f -- infra/aws/production.tfvars.json "$RUNNER_TEMP/deployment.tfplan"
+        run: rm -f -- infra/aws/production.tfvars.json "$RUNNER_TEMP/deployment.tfplan" "$RUNNER_TEMP/deployment.plan.json"
