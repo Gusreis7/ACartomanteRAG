@@ -82,7 +82,7 @@ As motivações estão em [Objetivos](docs/Obejtivos.md), [Metas e conclusão](d
 Bem, eu ainda quero testar muitas abordagens e criar aplicações em cima dessa base e dos conhecimentos adquiridos durante o desenvolvimento. Gostaria de ter fechado um minigame nesta primeira entrega, mas isso ampliaria demais o escopo e acabaria levando mais tempo.
 
 Quero continuar testando técnicas para melhorar a organização das informações e a avaliação dos resultados de recuperação e geração. Ainda há um mundo de desafios à espera.
-
+teste
 > “Cada estação da vida é uma edição, que corrige a anterior, e que será corrigida também, até a edição definitiva, que o editor dá de graça aos vermes.”
 >
 > — Machado de Assis
